@@ -427,30 +427,55 @@
 </div>
 
 <script>
-// Global Agent Position Extractor
+// Dynamic Agent Position Extractor with Continuous Single-Pass Horizon
 function getAgentPos(ag) {
   if (!ag) return { x: 0, y: 0 };
-  if (ag.motion === 'static' || !ag.path || ag.path.length <= 1) return { x: ag.x, y: ag.y };
-  const totalPoints = ag.path.length;
-  const idx = Math.floor(ag.pathProgress || 0) % totalPoints;
-  const nextIdx = (idx + 1) % totalPoints;
-  const frac = (ag.pathProgress || 0) - Math.floor(ag.pathProgress || 0);
-  const p1 = ag.path[idx];
-  const p2 = ag.path[nextIdx];
-  return {
-    x: p1.x + (p2.x - p1.x) * frac,
-    y: p1.y + (p2.y - p1.y) * frac
-  };
+  if (ag.motion === 'static' || !ag.path || ag.path.length < 2) return { x: ag.x, y: ag.y };
+  
+  if (ag.pathProgress === undefined) ag.pathProgress = 0;
+  
+  let totalLen = 0;
+  for (let i = 0; i < ag.path.length - 1; i++) {
+    totalLen += Math.hypot(ag.path[i+1].x - ag.path[i].x, ag.path[i+1].y - ag.path[i].y);
+  }
+
+  // If agent reaches the end of crossing trajectory, linger forward on shoulder without looping back
+  if (ag.pathProgress >= totalLen) {
+    const lastPt = ag.path[ag.path.length - 1];
+    const prevPt = ag.path[ag.path.length - 2];
+    const dx = lastPt.x - prevPt.x;
+    const dy = lastPt.y - prevPt.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const extraDist = ag.pathProgress - totalLen;
+    return {
+      x: lastPt.x + (dx / len) * extraDist,
+      y: lastPt.y + (dy / len) * extraDist
+    };
+  }
+
+  let accum = 0;
+  for (let i = 0; i < ag.path.length - 1; i++) {
+    const segLen = Math.hypot(ag.path[i+1].x - ag.path[i].x, ag.path[i+1].y - ag.path[i].y);
+    if (accum + segLen >= ag.pathProgress) {
+      const r = (ag.pathProgress - accum) / segLen;
+      return {
+        x: ag.path[i].x + (ag.path[i+1].x - ag.path[i].x) * r,
+        y: ag.path[i].y + (ag.path[i+1].y - ag.path[i].y) * r
+      };
+    }
+    accum += segLen;
+  }
+  return ag.path[ag.path.length - 1];
 }
 
-// APOLLO & AUTOWARE ST-GRAPH SPEED DECIDER WITH STATE LATCHING & AEB
+// APOLLO & AUTOWARE ST-GRAPH SPEED DECIDER WITH NUDGE VS YIELD & INSTANT UNLATCH
 class STGraphSpeedDecider {
     constructor(ppm) {
         this.PPM = ppm;
         this.horizon = 5.0;
         this.dt = 0.1;
-        this.safetyBuffer = 4.0 * ppm;
-        this.laneHalfWidth = 2.0 * ppm;
+        this.safetyBuffer = 3.5 * ppm;
+        this.laneHalfWidth = 1.6 * ppm;
         this.state = "CRUISE";
         this.latchedObstacle = null;
         this.virtualStopStation = null;
@@ -459,78 +484,67 @@ class STGraphSpeedDecider {
 
     evaluate(ego, globalPath, activeAgents) {
         const egoStation = this.getStationAlongPath(ego, globalPath);
+        this.virtualStopLine = null;
 
-        // 1. Check if latched obstacle has cleared
+        // 1. Immediate Unlatch Check: Has latched obstacle cleared the lane?
         if (this.latchedObstacle) {
             const obs = getAgentPos(this.latchedObstacle);
-            const lateralOffset = Math.abs(this.getLateralDistanceToPath(obs, globalPath));
-            if (lateralOffset > this.laneHalfWidth + 1.2 * this.PPM || (obs.x < ego.x - 2.0 * this.PPM)) {
+            const lateralOffset = Math.abs(obs.y - ego.y);
+            
+            // Instantly unlatch if obstacle cleared lane vertically or passed behind ego car
+            if (lateralOffset > 28 || obs.x < ego.x - 10) {
                 this.latchedObstacle = null;
                 this.virtualStopStation = null;
-                this.virtualStopLine = null;
             }
         }
 
-        // 2. Scan for new dynamic conflict zones if not latched
-        if (!this.latchedObstacle) {
-            for (const agent of activeAgents) {
-                const agentPos = getAgentPos(agent);
-                if (agentPos.x < ego.x - 1.0 * this.PPM) continue;
+        // 2. Evaluate Conflict vs Nudge for Active Agents ahead
+        let blockingAgent = null;
+        let nudgingAgent = null;
 
-                for (let t = 0; t <= this.horizon; t += this.dt) {
-                    const futurePos = this.predictAgentPosition(agent, t);
-                    const latDist = Math.abs(this.getLateralDistanceToPath(futurePos, globalPath));
-
-                    if (latDist <= this.laneHalfWidth + 0.8 * this.PPM) {
-                        const conflictStation = this.getStationAlongPath(futurePos, globalPath);
-                        if (conflictStation > egoStation && conflictStation - egoStation < 25.0 * this.PPM) {
-                            this.latchedObstacle = agent;
-                            this.virtualStopStation = Math.max(egoStation + 0.5 * this.PPM, conflictStation - this.safetyBuffer);
-                            break;
-                        }
-                    }
-                }
-                if (this.latchedObstacle) break;
-            }
-        }
-
-        // 3. Deterministic AEB Override
         for (const agent of activeAgents) {
             const agentPos = getAgentPos(agent);
-            const directDist = Math.hypot(agentPos.x - ego.x, agentPos.y - ego.y) / this.PPM;
-            const latDist = Math.abs(this.getLateralDistanceToPath(agentPos, globalPath));
-            if (agentPos.x > ego.x && directDist < 5.5 && latDist < this.laneHalfWidth + 0.5 * this.PPM) {
-                this.state = "EMERGENCY_BRAKE";
-                const stopPt = this.getPointAtStation(globalPath, egoStation + Math.max(1.0 * this.PPM, (directDist - 1.5) * this.PPM));
-                return {
-                    targetSpeed: 0,
-                    accel: -5.0,
-                    state: this.state,
-                    stopLine: stopPt,
-                    target: agent
-                };
+            const dx = agentPos.x - ego.x;
+            const dy = agentPos.y - ego.y;
+
+            if (dx > -10 && dx < 160) {
+                if (Math.abs(dy) < 26) {
+                    blockingAgent = agent;
+                    break;
+                } else if (Math.abs(dy) < 65) {
+                    nudgingAgent = agent;
+                }
             }
         }
 
-        // 4. Smooth Yielding Execution on Latched Obstacle
-        if (this.latchedObstacle && this.virtualStopStation) {
-            const distToStopPixels = this.virtualStopStation - egoStation;
-            const distToStopMeters = distToStopPixels / this.PPM;
-            this.virtualStopLine = this.getPointAtStation(globalPath, this.virtualStopStation);
+        // 3. Decision Logic: YIELD vs NUDGE vs CRUISE
+        if (blockingAgent || (this.latchedObstacle && Math.abs(getAgentPos(this.latchedObstacle).y - ego.y) < 26)) {
+            const targetAgent = blockingAgent || this.latchedObstacle;
+            this.latchedObstacle = targetAgent;
 
-            if (distToStopMeters <= 0.8 || (ego.vx < 0.2 && distToStopMeters < 4.0)) {
+            const targetPos = getAgentPos(targetAgent);
+            const stopStation = Math.max(egoStation + 15, targetPos.x - 45);
+            this.virtualStopLine = { x: stopStation, y: ego.y };
+
+            const distToStop = (stopStation - egoStation) / this.PPM;
+
+            if (distToStop < 1.0 || ego.vx < 0.3) {
                 this.state = "YIELD_WAIT";
-                return { targetSpeed: 0, accel: -2.0, state: this.state, stopLine: this.virtualStopLine, target: this.latchedObstacle };
+                return { targetSpeed: 0, accel: -3.0, state: this.state, stopLine: this.virtualStopLine, target: targetAgent };
             } else {
                 this.state = "YIELD_DECEL";
-                const requiredDecel = -Math.max(1.5, Math.min(4.5, (ego.vx * ego.vx) / (2 * Math.max(0.5, distToStopMeters))));
-                return { targetSpeed: 0, accel: requiredDecel, state: this.state, stopLine: this.virtualStopLine, target: this.latchedObstacle };
+                const requiredDecel = -Math.max(2.0, (ego.vx * ego.vx) / (2 * Math.max(0.5, distToStop)));
+                return { targetSpeed: 0, accel: requiredDecel, state: this.state, stopLine: this.virtualStopLine, target: targetAgent };
             }
+        } else if (nudgingAgent) {
+            this.state = "NUDGE";
+            const targetSpeed = 6.0; // ~22 km/h cautionary speed
+            const accel = ego.vx > targetSpeed ? -1.5 : 1.0;
+            return { targetSpeed: targetSpeed, accel: accel, state: this.state, stopLine: null, target: nudgingAgent };
         }
 
-        // 5. Nominal Cruise State
-        this.state = ego.vx < 11.5 ? "RESUME" : "CRUISE";
-        return { targetSpeed: 12.0, accel: 2.0, state: this.state, stopLine: null, target: null };
+        this.state = ego.vx < 11.0 ? "RESUME" : "CRUISE";
+        return { targetSpeed: 11.1, accel: 2.0, state: this.state, stopLine: null, target: null };
     }
 
     predictAgentPosition(agent, t) {
