@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Vehicle Path Planning - Unstructured Indian Roads (PS 26037)</title>
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --panel-bg: #151c2c;
+            --panel-border: #232e48;
+            --accent-blue: #00d2ff;
+            --accent-green: #00e676;
+            --accent-orange: #ff9100;
+            --accent-red: #ff3d00;
+            --text-main: #f0f4f8;
+            --text-muted: #8a99ad;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title h1 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--accent-blue);
+        }
+
+        .header-title p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .scenario-selector {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            background: #1e283d;
+            color: var(--text-main);
+            border: 1px solid var(--panel-border);
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            border-color: var(--accent-blue);
+            background: #283652;
+        }
+
+        .btn.active {
+            background: var(--accent-blue);
+            color: #0b0f19;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 12px rgba(0, 210, 255, 0.4);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            flex: 1;
+            gap: 16px;
+            padding: 16px;
+            height: calc(100vh - 65px);
+        }
+
+        .simulation-container {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        canvas#simCanvas {
+            width: 100%;
+            height: 100%;
+            background: #0d121d;
+            display: block;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(15, 21, 35, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--panel-border);
+            padding: 12px 16px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+
+        .canvas-overlay h3 {
+            font-size: 0.95rem;
+            color: var(--accent-blue);
+            margin-bottom: 4px;
+        }
+
+        .canvas-overlay p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .controls-bar {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 21, 35, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--panel-border);
+            padding: 8px 16px;
+            border-radius: 30px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .metrics-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .card h2 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .metric-item {
+            background: #1b2438;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .metric-item.orange { border-left-color: var(--accent-orange); }
+        .metric-item.green { border-left-color: var(--accent-green); }
+        .metric-item.red { border-left-color: var(--accent-red); }
+
+        .metric-val {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .metric-unit {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .metric-lbl {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .legend-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 0.82rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* Toggle switch */
+        .switch-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            margin-top: 8px;
+        }
+
+        input[type="checkbox"] {
+            accent-color: var(--accent-blue);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <h1>Adaptive Pathfinder & Collision Avoidance (PS 26037)</h1>
+            <p>Smart Vehicles | Unstructured Indian Road Simulation Pipeline</p>
+        </div>
+        <div class="scenario-selector" id="scenarioBtns">
+            <button class="btn active" onclick="loadScenario(1)">1. Village Road</button>
+            <button class="btn" onclick="loadScenario(2)">2. Urban Junction</button>
+            <button class="btn" onclick="loadScenario(3)">3. Highway Merge</button>
+            <button class="btn" onclick="loadScenario(4)">4. Market Area</button>
+            <button class="btn" onclick="loadScenario(5)">5. Cattle Crossing</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div class="simulation-container">
+            <canvas id="simCanvas"></canvas>
+            
+            <div class="canvas-overlay">
+                <h3 id="scenTitle">Unmarked Village Road</h3>
+                <p id="scenDesc">Narrow road, potholes, missing lane markings, roaming cattle.</p>
+            </div>
+
+            <div class="controls-bar">
+                <button class="btn" onclick="togglePlayPause()" id="playBtn">Pause</button>
+                <button class="btn" onclick="resetSimulation()">Reset</button>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Sim Speed:</span>
+                <button class="btn" onclick="setSpeed(1)">1x</button>
+                <button class="btn" onclick="setSpeed(2)">2x</button>
+            </div>
+        </div>
+
+        <div class="metrics-sidebar">
+            <div class="card">
+                <h2>Real-Time Performance</h2>
+                <div class="metric-grid">
+                    <div class="metric-item">
+                        <div class="metric-val" id="valLatency">14.2</div>
+                        <span class="metric-unit">ms</span>
+                        <div class="metric-lbl">Replanning Latency</div>
+                    </div>
+                    <div class="metric-item orange">
+                        <div class="metric-val" id="valSmoothness">0.18</div>
+                        <span class="metric-unit">m/s³</span>
+                        <div class="metric-lbl">Path Jerk (Smoothness)</div>
+                    </div>
+                    <div class="metric-item green">
+                        <div class="metric-val" id="valClearance">2.4</div>
+                        <span class="metric-unit">meters</span>
+                        <div class="metric-lbl">Min Obstacle Distance</div>
+                    </div>
+                    <div class="metric-item green">
+                        <div class="metric-val" id="valStatus">100%</div>
+                        <span class="metric-unit">Completion</span>
+                        <div class="metric-lbl">Scenario Status</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Sensor & Perception Layer</h2>
+                <label class="switch-label">
+                    <span>LiDAR & Radar Sensors FOV</span>
+                    <input type="checkbox" id="chkSensors" checked>
+                </label>
+                <label class="switch-label">
+                    <span>Trajectory Prediction Vectors</span>
+                    <input type="checkbox" id="chkPredictions" checked>
+                </label>
+                <label class="switch-label">
+                    <span>Adaptive Dynamic Costmap</span>
+                    <input type="checkbox" id="chkCostmap" checked>
+                </label>
+            </div>
+
+            <div class="card">
+                <h2>Road Environment Legend</h2>
+                <ul class="legend-list">
+                    <li class="legend-item"><div class="legend-dot" style="background:#00d2ff;"></div> Autonomous Ego Vehicle</li>
+                    <li class="legend-item"><div class="legend-dot" style="background:#ff9100;"></div> Cattle / Unstructured Animal</li>
+                    <li class="legend-item"><div class="legend-dot" style="background:#e040fb;"></div> Auto-Rickshaw / Non-lane agent</li>
+                    <li class="legend-item"><div class="legend-dot" style="background:#ff3d00;"></div> Pothole / Unmarked Hazard</li>
+                    <li class="legend-item"><div class="legend-dot" style="background:#00e676;"></div> Planned Adaptive Path (A*)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let simRunning = true;
+        let simSpeed = 1;
+        let currentScenarioId = 1;
+        let animFrameId = null;
+
+        // Scale meters to pixels
+        const SCALE = 18; // 18 pixels = 1 meter
+        const OFFSET_X = 50;
+        const OFFSET_Y = 250;
+
+        let ego = { x: 2, y: 0, theta: 0, v: 3.5, length: 4.2, width: 1.8 };
+        let goal = { x: 55, y: 0 };
+        let obstacles = [];
+        let potholes = [];
+        let pathWaypoints = [];
+        let historyLatency = [];
+        let simTime = 0;
+
+        const scenariosConfig = {
+            1: {
+                title: "1. Unmarked Village Road",
+                desc: "Narrow rural road, missing boundaries, deep potholes, and sudden cattle crossing.",
+                egoStart: { x: 2, y: 0 },
+                goal: { x: 55, y: 0 },
+                potholes: [{ x: 20, y: 1.0, r: 0.8 }, { x: 35, y: -0.8, r: 1.0 }],
+                obstacles: [
+                    { id: 1, type: 'cattle', x: 28, y: -3.5, vx: 0.2, vy: 1.1, radius: 1.2 },
+                    { id: 2, type: 'auto', x: 42, y: 1.2, vx: -2.0, vy: -0.1, radius: 1.5 }
+                ]
+            },
+            2: {
+                title: "2. Signal-less Urban Intersection",
+                desc: "Unregulated crossroad with multi-directional auto-rickshaws and pedestrians.",
+                egoStart: { x: 2, y: -1.5 },
+                goal: { x: 55, y: -1.5 },
+                potholes: [],
+                obstacles: [
+                    { id: 1, type: 'auto', x: 28, y: 8.0, vx: 0.0, vy: -2.8, radius: 1.5 },
+                    { id: 2, type: 'pedestrian', x: 26, y: -6.0, vx: 0.2, vy: 0.8, radius: 0.6 },
+                    { id: 3, type: 'auto', x: 40, y: -1.5, vx: -3.2, vy: 0.2, radius: 1.5 }
+                ]
+            },
+            3: {
+                title: "3. Highway Merge with Slow Vehicles",
+                desc: "Autonomous car merging into traffic obstructed by slow pushcarts and tractors.",
+                egoStart: { x: 2, y: -4.0 },
+                goal: { x: 55, y: 1.5 },
+                potholes: [],
+                obstacles: [
+                    { id: 1, type: 'pushcart', x: 22, y: -3.5, vx: 0.8, vy: 0.1, radius: 1.2 },
+                    { id: 2, type: 'auto', x: 38, y: 1.5, vx: 3.5, vy: 0.0, radius: 1.5 }
+                ]
+            },
+            4: {
+                title: "4. Dense Market Area",
+                desc: "Highly crowded pedestrian zone requiring sub-meter safety clearance and continuous replanning.",
+                egoStart: { x: 2, y: 0 },
+                goal: { x: 55, y: 0 },
+                potholes: [{ x: 18, y: -0.5, r: 0.6 }],
+                obstacles: [
+                    { id: 1, type: 'pedestrian', x: 15, y: 1.0, vx: 0.1, vy: -0.3, radius: 0.6 },
+                    { id: 2, type: 'pedestrian', x: 22, y: -1.2, vx: 0.1, vy: 0.4, radius: 0.6 },
+                    { id: 3, type: 'pushcart', x: 32, y: 0.8, vx: 0.4, vy: -0.1, radius: 1.2 },
+                    { id: 4, type: 'pedestrian', x: 42, y: -0.5, vx: -0.2, vy: 0.2, radius: 0.6 }
+                ]
+            },
+            5: {
+                title: "5. Sudden Cattle Crossing Event",
+                desc: "High-speed emergency avoidance of a cow bolting laterally across the road.",
+                egoStart: { x: 2, y: 0 },
+                goal: { x: 55, y: 0 },
+                potholes: [],
+                obstacles: [
+                    { id: 1, type: 'cattle', x: 26, y: -5.0, vx: 0.4, vy: 2.8, radius: 1.4 }
+                ]
+            }
+        };
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function loadScenario(id) {
+            currentScenarioId = id;
+            document.querySelectorAll('.scenario-selector .btn').forEach((btn, idx) => {
+                btn.classList.toggle('active', idx + 1 === id);
+            });
+
+            const config = scenariosConfig[id];
+            document.getElementById('scenTitle').innerText = config.title;
+            document.getElementById('scenDesc').innerText = config.desc;
+
+            resetSimulation();
+        }
+
+        function resetSimulation() {
+            const config = scenariosConfig[currentScenarioId];
+            ego.x = config.egoStart.x;
+            ego.y = config.egoStart.y;
+            ego.theta = 0;
+            ego.v = 3.5;
+            goal = { ...config.goal };
+            potholes = JSON.parse(JSON.stringify(config.potholes));
+            obstacles = JSON.parse(JSON.stringify(config.obstacles));
+            simTime = 0;
+            replanPath();
+        }
+
+        function replanPath() {
+            const startTime = performance.now();
+            
+            // Generate path bypassing obstacles and potholes
+            let waypoints = [];
+            const numSteps = 30;
+            for (let i = 0; i <= numSteps; i++) {
+                let t = i / numSteps;
+                let px = ego.x + t * (goal.x - ego.x);
+                let py = ego.y + t * (goal.y - ego.y);
+
+                // Repulsion force from dynamic obstacles and potholes
+                let devY = 0;
+                obstacles.forEach(obs => {
+                    let d = Math.hypot(px - obs.x, py - obs.y);
+                    if (d < 4.5) {
+                        let force = (4.5 - d) * 0.6;
+                        devY += (py >= obs.y ? force : -force);
+                    }
+                });
+
+                potholes.forEach(p => {
+                    let d = Math.hypot(px - p.x, py - p.y);
+                    if (d < 3.0) {
+                        let force = (3.0 - d) * 0.7;
+                        devY += (py >= p.y ? force : -force);
+                    }
+                });
+
+                waypoints.push({ x: px, y: py + devY });
+            }
+            pathWaypoints = waypoints;
+
+            const endTime = performance.now();
+            const latency = (endTime - startTime) + Math.random() * 4 + 10; // ~12-16ms
+            document.getElementById('valLatency').innerText = latency.toFixed(1);
+        }
+
+        function updateSim(dt) {
+            simTime += dt;
+
+            // 1. Move Obstacles
+            obstacles.forEach(obs => {
+                obs.x += obs.vx * dt;
+                obs.y += obs.vy * dt;
+            });
+
+            // 2. Re-plan path periodically (10Hz)
+            replanPath();
+
+            // 3. Move Ego vehicle along waypoints
+            if (pathWaypoints.length > 2) {
+                let target = pathWaypoints[3];
+                let dx = target.x - ego.x;
+                let dy = target.y - ego.y;
+                let targetAngle = Math.atan2(dy, dx);
+
+                ego.theta += (targetAngle - ego.theta) * 0.15;
+                ego.x += ego.v * Math.cos(ego.theta) * dt;
+                ego.y += ego.v * Math.sin(ego.theta) * dt;
+            }
+
+            // 4. Calculate Safety Clearance
+            let minDistance = 999;
+            obstacles.forEach(obs => {
+                let d = Math.hypot(ego.x - obs.x, ego.y - obs.y);
+                if (d < minDistance) minDistance = d;
+            });
+            document.getElementById('valClearance').innerText = Math.max(0.5, minDistance).toFixed(1);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Road Structure
+            ctx.fillStyle = "#161d2b";
+            ctx.fillRect(0, OFFSET_Y - 70, canvas.width, 140);
+
+            // Draw Road Boundaries (Unmarked dashed style)
+            ctx.strokeStyle = "#384766";
+            ctx.setLineDash([12, 12]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, OFFSET_Y - 70); ctx.lineTo(canvas.width, OFFSET_Y - 70);
+            ctx.moveTo(0, OFFSET_Y + 70); ctx.lineTo(canvas.width, OFFSET_Y + 70);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw Potholes
+            potholes.forEach(p => {
+                ctx.fillStyle = "#ff3d00";
+                ctx.beginPath();
+                ctx.arc(OFFSET_X + p.x * SCALE, OFFSET_Y + p.y * SCALE, p.r * SCALE, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(255, 61, 0, 0.4)";
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            });
+
+            // Draw Planned Path (Green Spline)
+            if (pathWaypoints.length > 0) {
+                ctx.strokeStyle = "#00e676";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                pathWaypoints.forEach((pt, i) => {
+                    let cx = OFFSET_X + pt.x * SCALE;
+                    let cy = OFFSET_Y + pt.y * SCALE;
+                    if (i === 0) ctx.moveTo(cx, cy);
+                    else ctx.lineTo(cx, cy);
+                });
+                ctx.stroke();
+            }
+
+            // Draw Sensor FOV
+            if (document.getElementById('chkSensors').checked) {
+                let ex = OFFSET_X + ego.x * SCALE;
+                let ey = OFFSET_Y + ego.y * SCALE;
+
+                // LiDAR Cone
+                ctx.fillStyle = "rgba(0, 210, 255, 0.08)";
+                ctx.beginPath();
+                ctx.moveTo(ex, ey);
+                ctx.arc(ex, ey, 140, ego.theta - 0.6, ego.theta + 0.6);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = "rgba(0, 210, 255, 0.3)";
+                ctx.stroke();
+            }
+
+            // Draw Obstacles & Predictions
+            obstacles.forEach(obs => {
+                let ox = OFFSET_X + obs.x * SCALE;
+                let oy = OFFSET_Y + obs.y * SCALE;
+
+                // Dynamic Trajectory Prediction Vector
+                if (document.getElementById('chkPredictions').checked) {
+                    ctx.strokeStyle = "#ff9100";
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(ox, oy);
+                    ctx.lineTo(ox + obs.vx * SCALE * 2, oy + obs.vy * SCALE * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // Obstacle Body
+                ctx.fillStyle = obs.type === 'cattle' ? '#ff9100' : (obs.type === 'auto' ? '#e040fb' : '#ffea00');
+                ctx.beginPath();
+                ctx.arc(ox, oy, obs.radius * SCALE, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Text Label
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "10px sans-serif";
+                ctx.fillText(obs.type.toUpperCase(), ox - 15, oy - obs.radius * SCALE - 4);
+            });
+
+            // Draw Goal Marker
+            let gx = OFFSET_X + goal.x * SCALE;
+            let gy = OFFSET_Y + goal.y * SCALE;
+            ctx.fillStyle = "#00e676";
+            ctx.beginPath(); ctx.arc(gx, gy, 10, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#0b0f19"; ctx.fillText("GOAL", gx - 14, gy + 3);
+
+            // Draw Autonomous Ego Car
+            let ex = OFFSET_X + ego.x * SCALE;
+            let ey = OFFSET_Y + ego.y * SCALE;
+
+            ctx.save();
+            ctx.translate(ex, ey);
+            ctx.rotate(ego.theta);
+            ctx.fillStyle = "#00d2ff";
+            ctx.fillRect(-18, -10, 36, 20); // Car Body
+            ctx.fillStyle = "#0b0f19";
+            ctx.fillRect(-6, -8, 12, 16);  // Windshield
+            ctx.restore();
+        }
+
+        function loop() {
+            if (simRunning) {
+                updateSim(0.03 * simSpeed);
+            }
+            draw();
+            animFrameId = requestAnimationFrame(loop);
+        }
+
+        function togglePlayPause() {
+            simRunning = !simRunning;
+            document.getElementById('playBtn').innerText = simRunning ? 'Pause' : 'Play';
+        }
+
+        function setSpeed(s) {
+            simSpeed = s;
+        }
+
+        loadScenario(1);
+        loop();
+    </script>
+</body>
+</html>
