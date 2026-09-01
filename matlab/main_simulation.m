@@ -72,6 +72,42 @@ for step = 1:num_steps
     state_hist(step, :) = ego_state';
     control_hist(step, :) = control';
     
+    % Live Plot Updates
+    cla(ax);
+    hold(ax, 'on'); grid(ax, 'on');
+    title(ax, sprintf('Scenario %d: %s | t = %.2fs', scenario.id, scenario.title, t), 'Color', 'w', 'FontSize', 12);
+    xlabel(ax, 'X Position (m)', 'Color', 'w'); ylabel(ax, 'Y Position (m)', 'Color', 'w');
+    set(ax, 'XColor', 'w', 'YColor', 'w', 'XLim', [0 60], 'YLim', [-10 10]);
+    
+    % Draw Road Edge Boundaries
+    plot(ax, [0 60], [3.5 3.5], 'w--', 'LineWidth', 1.5);
+    plot(ax, [0 60], [-3.5 -3.5], 'w--', 'LineWidth', 1.5);
+    
+    % Draw Goal
+    plot(ax, scenario.goal_pose(1), scenario.goal_pose(2), 'gp', 'MarkerSize', 14, 'MarkerFaceColor', 'g');
+    
+    % Draw Dynamic Planned Path (Cyan)
+    plot(ax, current_path(:,1), current_path(:,2), 'c-', 'LineWidth', 2.5);
+    
+    % Draw Dynamic Obstacles
+    for k = 1:length(current_obs)
+        pos = current_obs(k).position;
+        obs_type = current_obs(k).type;
+        if strcmpi(obs_type, 'cattle')
+            plot(ax, pos(1), pos(2), 'o', 'MarkerSize', 10, 'MarkerFaceColor', [1 0.6 0], 'MarkerEdgeColor', 'w');
+            text(ax, pos(1)+0.5, pos(2), 'CATTLE', 'Color', [1 0.6 0], 'FontSize', 9);
+        else
+            plot(ax, pos(1), pos(2), 's', 'MarkerSize', 10, 'MarkerFaceColor', [0.8 0.2 1], 'MarkerEdgeColor', 'w');
+            text(ax, pos(1)+0.5, pos(2), upper(obs_type), 'Color', [0.8 0.2 1], 'FontSize', 9);
+        end
+    end
+    
+    % Draw Ego Vehicle (Blue Marker + Heading Arrow)
+    plot(ax, ego_state(1), ego_state(2), 'd', 'MarkerSize', 12, 'MarkerFaceColor', [0 0.8 1], 'MarkerEdgeColor', 'w');
+    quiver(ax, ego_state(1), ego_state(2), cos(ego_state(3))*2, sin(ego_state(3))*2, 'Color', 'y', 'LineWidth', 1.5, 'MaxHeadSize', 0.8);
+    
+    drawnow limitrate;
+    
     % Check Goal Reached
     if norm(ego_state(1:2) - scenario.goal_pose(1:2)') < 2.0
         fprintf('Goal reached successfully at t = %.2f seconds!\n', t);
@@ -87,7 +123,3 @@ end
 % Evaluate Metrics
 metrics = evaluate_metrics(time_vec, state_hist, control_hist, latency_hist, obstacles_hist);
 
-% Plot Trajectory
-plot(ax, state_hist(:,1), state_hist(:,2), 'c-', 'LineWidth', 2.5, 'DisplayName', 'Ego Path');
-plot(ax, scenario.goal_pose(1), scenario.goal_pose(2), 'gp', 'MarkerSize', 14, 'MarkerFaceColor', 'g', 'DisplayName', 'Goal');
-legend(ax, 'TextColor', 'w', 'Location', 'northwest');

@@ -81,7 +81,7 @@ path = path_raw;
 for k = 2:(num_pts-1)
     pt = path(k, :);
     gx = round(pt(1)/grid_res);
-    gy = round(pt(2)/grid_res);
+    gy = round((pt(2) + 10)/grid_res);
     
     if gx >= 2 && gx <= cols-1 && gy >= 2 && gy <= rows-1
         % Gradient of cost map
@@ -89,8 +89,8 @@ for k = 2:(num_pts-1)
         grad_y = costmap(gy+1, gx) - costmap(gy-1, gx);
         
         % Push path away from high cost gradients (potholes, cattle, road edges)
-        path(k, 1) = path(k, 1) - 0.05 * grad_x * grid_res;
-        path(k, 2) = path(k, 2) - 0.05 * grad_y * grid_res;
+        path(k, 1) = path(k, 1) - 0.08 * grad_x * grid_res;
+        path(k, 2) = path(k, 2) - 0.08 * grad_y * grid_res;
     end
 end
 
