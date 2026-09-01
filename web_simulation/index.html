@@ -586,13 +586,15 @@
     let desiredSpeed = ego.targetSpeed;
     if (localCurvature > 0.3) desiredSpeed *= 0.55;
 
-    // Longitudinal Braking / Acceleration Model
-    const stopDistanceThreshold = 3.5;
+    // Intelligent Driver Braking / Overtake Model
+    const stopDistanceThreshold = 1.8; // Reduced so vehicle maneuvers around obstacles before braking
     if (minDistance < stopDistanceThreshold) {
       ego.ax = -ego.maxBraking;
-    } else if (minDistance < 8.0) {
-      ego.ax = -ego.maxAccel * (1.0 - (minDistance - stopDistanceThreshold) / 4.5);
+    } else if (minDistance < 4.0 && localCurvature > 0.4) {
+      // Slow down slightly while dodging closely
+      ego.ax = -ego.maxAccel * 0.5;
     } else {
+      // Accelerate towards cruise speed
       ego.ax = (desiredSpeed - ego.vx) * 0.8;
       ego.ax = Math.max(-ego.maxBraking, Math.min(ego.maxAccel, ego.ax));
     }
