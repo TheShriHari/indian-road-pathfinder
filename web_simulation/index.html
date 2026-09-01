@@ -7,17 +7,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
-      --bg-dark: #0a0f1d;
-      --panel-bg: #111827;
-      --card-bg: #1f2937;
-      --border-color: #374151;
+      --bg-dark: #0b111e;
+      --panel-bg: #0f172a;
+      --card-bg: #1e293b;
+      --border-color: #334155;
       --accent-cyan: #06b6d4;
-      --accent-green: #00FF66;
-      --accent-red: #FF3B30;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
       --accent-orange: #f59e0b;
-      --accent-purple: #8b5cf6;
-      --text-main: #f3f4f6;
-      --text-dim: #9ca3af;
+      --text-main: #f8fafc;
+      --text-dim: #94a3b8;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
@@ -32,22 +31,23 @@
     }
 
     header {
+      height: 56px;
       background: var(--panel-bg);
       border-bottom: 1px solid var(--border-color);
-      padding: 10px 24px;
+      padding: 0 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .title { font-size: 1.15rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    .title { font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
     .header-actions { display: flex; gap: 10px; }
 
     button.btn {
-      padding: 8px 18px;
+      padding: 8px 16px;
       border-radius: 6px;
       border: none;
-      font-weight: 700;
+      font-weight: 600;
       font-size: 0.85rem;
       cursor: pointer;
       transition: all 0.2s;
@@ -56,17 +56,18 @@
     .btn-run:hover { background: #059669; }
     .btn-reset { background: #ef4444; color: white; }
     .btn-reset:hover { background: #dc2626; }
-    .btn-export { background: #06b6d4; color: white; }
-    .btn-export:hover { background: #0891b2; }
+    .btn-export { background: #0284c7; color: white; }
+    .btn-export:hover { background: #0369a1; }
 
     .studio-container {
-      display: grid;
-      grid-template-columns: 260px 1fr 290px;
+      display: flex;
       flex: 1;
+      height: calc(100vh - 56px);
       overflow: hidden;
     }
 
     .sidebar-left, .sidebar-right {
+      width: 270px;
       background: var(--panel-bg);
       padding: 16px;
       display: flex;
@@ -75,10 +76,10 @@
       overflow-y: auto;
     }
     .sidebar-left { border-right: 1px solid var(--border-color); }
-    .sidebar-right { border-left: 1px solid var(--border-color); }
+    .sidebar-right { border-left: 1px solid var(--border-color); width: 290px; }
 
     .section-title {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -96,7 +97,7 @@
 
     .draggable-agent {
       background: var(--card-bg);
-      border: 1px dashed #4b5563;
+      border: 1px dashed #475569;
       border-radius: 6px;
       padding: 10px 6px;
       text-align: center;
@@ -137,8 +138,9 @@
     }
 
     .canvas-viewport {
+      flex: 1;
       position: relative;
-      background: #0d1322;
+      background: #070d18;
       display: flex;
       flex-direction: column;
     }
@@ -154,7 +156,7 @@
       z-index: 10;
     }
     .status-badge {
-      background: rgba(17, 24, 39, 0.85);
+      background: rgba(15, 23, 42, 0.85);
       border: 1px solid var(--border-color);
       padding: 6px 12px;
       border-radius: 6px;
@@ -173,7 +175,7 @@
       background: var(--card-bg);
       border-radius: 6px;
       padding: 10px;
-      border-left: 3px solid #4b5563;
+      border-left: 3px solid #475569;
     }
     .telemetry-card.danger { border-left-color: var(--accent-red); }
     .telemetry-card.safe { border-left-color: var(--accent-green); }
@@ -214,9 +216,9 @@
       font-weight: 600;
       text-align: left;
     }
-    .choice-card button:hover { background: #374151; border-color: var(--accent-cyan); }
+    .choice-card button:hover { background: #334155; border-color: var(--accent-cyan); }
 
-    /* Post-Simulation Analytics Modal */
+    /* Analytics Modal */
     .analytics-modal {
       background: var(--panel-bg);
       border: 1px solid var(--border-color);
@@ -318,7 +320,7 @@
   <!-- Center Canvas Viewport -->
   <div class="canvas-viewport" id="viewport">
     <div class="canvas-topbar">
-      <div class="status-badge" id="modeBadge" style="color: var(--accent-cyan); font-weight:600;">Scenario: Indian Village Road (Default)</div>
+      <div class="status-badge" id="modeBadge" style="color: var(--accent-cyan); font-weight:600;">Scenario: Indian Village Road</div>
       <div class="status-badge" id="stateBadge" style="font-weight:600;">Vehicle: IDLE</div>
     </div>
     <canvas id="simCanvas"></canvas>
@@ -338,7 +340,7 @@
       <div class="analytics-modal">
         <div class="analytics-header">
           <h2>📊 Post-Simulation Diagnostics & Analytics</h2>
-          <button class="btn btn-reset" onclick="closeAnalyticsModal()">Close</button>
+          <button class="btn btn-reset" id="btnCloseAnalytics">Close</button>
         </div>
 
         <div class="kpi-row">
@@ -373,8 +375,8 @@
         </div>
 
         <div style="display:flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
-          <button class="btn btn-export" onclick="exportTelemetryCSV()">📥 Export Telemetry CSV</button>
-          <button class="btn btn-run" onclick="closeAnalyticsModal()">Done & Re-Run</button>
+          <button class="btn btn-export" id="btnExportCSVModal">📥 Export Telemetry CSV</button>
+          <button class="btn btn-run" id="btnDoneAnalytics">Done & Re-Run</button>
         </div>
       </div>
     </div>
@@ -385,7 +387,7 @@
     <div class="section-title">Visualizer Legend</div>
     <div style="font-size: 0.78rem; display: flex; flex-direction: column; gap: 8px; background: var(--card-bg); padding: 12px; border-radius: 6px;">
       <div><span style="color: var(--accent-green); font-weight: 900;">━━━</span> <strong>Past Traveled Path</strong> (Ground Truth)</div>
-      <div><span style="color: var(--accent-red); font-weight: 900;">━━━</span> <strong>Live AI Planned Path</strong> (Spline Horizon)</div>
+      <div><span style="color: #ef4444; font-weight: 900;">━━━</span> <strong>Live AI Planned Path</strong> (Spline Horizon)</div>
       <div><span style="color: var(--accent-cyan); font-weight: 900;">■</span> <strong>Ego Vehicle</strong> (Physics Body)</div>
       <div><span style="color: var(--accent-orange); font-weight: 900;">╍╍╍</span> <strong>Virtual Stop Line</strong> (Yielding Zone)</div>
     </div>
@@ -393,7 +395,7 @@
     <div class="section-title">Telemetry & Dynamics Engine</div>
     <div class="telemetry-grid">
       <div class="telemetry-card danger">
-        <div class="telemetry-val" id="valDanger" style="color: var(--accent-red)">0.0%</div>
+        <div class="telemetry-val" id="valDanger" style="color: #ef4444">0.0%</div>
         <div class="telemetry-lbl">Collision Risk (P_danger)</div>
       </div>
       <div class="telemetry-card safe">
@@ -425,16 +427,32 @@
 </div>
 
 <script>
-// --- APOLLO & AUTOWARE ST-GRAPH SPEED DECIDER ENGINE WITH STATE LATCHING & AEB ---
+// Global Agent Position Extractor
+function getAgentPos(ag) {
+  if (!ag) return { x: 0, y: 0 };
+  if (ag.motion === 'static' || !ag.path || ag.path.length <= 1) return { x: ag.x, y: ag.y };
+  const totalPoints = ag.path.length;
+  const idx = Math.floor(ag.pathProgress || 0) % totalPoints;
+  const nextIdx = (idx + 1) % totalPoints;
+  const frac = (ag.pathProgress || 0) - Math.floor(ag.pathProgress || 0);
+  const p1 = ag.path[idx];
+  const p2 = ag.path[nextIdx];
+  return {
+    x: p1.x + (p2.x - p1.x) * frac,
+    y: p1.y + (p2.y - p1.y) * frac
+  };
+}
+
+// APOLLO & AUTOWARE ST-GRAPH SPEED DECIDER WITH STATE LATCHING & AEB
 class STGraphSpeedDecider {
     constructor(ppm) {
         this.PPM = ppm;
-        this.horizon = 5.0;           // Lookahead seconds
+        this.horizon = 5.0;
         this.dt = 0.1;
-        this.safetyBuffer = 4.0 * ppm; // Distance in pixels to stop before obstacle
-        this.laneHalfWidth = 2.0 * ppm; // Lane envelope
-        this.state = "CRUISE";        // CRUISE, YIELD_DECEL, YIELD_WAIT, RESUME, EMERGENCY_BRAKE
-        this.latchedObstacle = null;  // Persistent target lock (hysteresis)
+        this.safetyBuffer = 4.0 * ppm;
+        this.laneHalfWidth = 2.0 * ppm;
+        this.state = "CRUISE";
+        this.latchedObstacle = null;
         this.virtualStopStation = null;
         this.virtualStopLine = null;
     }
@@ -442,12 +460,10 @@ class STGraphSpeedDecider {
     evaluate(ego, globalPath, activeAgents) {
         const egoStation = this.getStationAlongPath(ego, globalPath);
 
-        // 1. Check if previously latched obstacle has cleared the lane
+        // 1. Check if latched obstacle has cleared
         if (this.latchedObstacle) {
-            const obs = getAgentPosition(this.latchedObstacle);
+            const obs = getAgentPos(this.latchedObstacle);
             const lateralOffset = Math.abs(this.getLateralDistanceToPath(obs, globalPath));
-            
-            // If obstacle has moved well outside lane bounds or passed behind ego
             if (lateralOffset > this.laneHalfWidth + 1.2 * this.PPM || (obs.x < ego.x - 2.0 * this.PPM)) {
                 this.latchedObstacle = null;
                 this.virtualStopStation = null;
@@ -458,8 +474,8 @@ class STGraphSpeedDecider {
         // 2. Scan for new dynamic conflict zones if not latched
         if (!this.latchedObstacle) {
             for (const agent of activeAgents) {
-                const agentPos = getAgentPosition(agent);
-                if (agentPos.x < ego.x - 1.0 * this.PPM) continue; // Behind ego vehicle
+                const agentPos = getAgentPos(agent);
+                if (agentPos.x < ego.x - 1.0 * this.PPM) continue;
 
                 for (let t = 0; t <= this.horizon; t += this.dt) {
                     const futurePos = this.predictAgentPosition(agent, t);
@@ -468,7 +484,6 @@ class STGraphSpeedDecider {
                     if (latDist <= this.laneHalfWidth + 0.8 * this.PPM) {
                         const conflictStation = this.getStationAlongPath(futurePos, globalPath);
                         if (conflictStation > egoStation && conflictStation - egoStation < 25.0 * this.PPM) {
-                            // Latch onto this obstacle
                             this.latchedObstacle = agent;
                             this.virtualStopStation = Math.max(egoStation + 0.5 * this.PPM, conflictStation - this.safetyBuffer);
                             break;
@@ -479,9 +494,9 @@ class STGraphSpeedDecider {
             }
         }
 
-        // 3. Deterministic AEB Override (Spatial Proximity Check)
+        // 3. Deterministic AEB Override
         for (const agent of activeAgents) {
-            const agentPos = getAgentPosition(agent);
+            const agentPos = getAgentPos(agent);
             const directDist = Math.hypot(agentPos.x - ego.x, agentPos.y - ego.y) / this.PPM;
             const latDist = Math.abs(this.getLateralDistanceToPath(agentPos, globalPath));
             if (agentPos.x > ego.x && directDist < 5.5 && latDist < this.laneHalfWidth + 0.5 * this.PPM) {
@@ -508,7 +523,6 @@ class STGraphSpeedDecider {
                 return { targetSpeed: 0, accel: -2.0, state: this.state, stopLine: this.virtualStopLine, target: this.latchedObstacle };
             } else {
                 this.state = "YIELD_DECEL";
-                // Continuous deceleration: a = -(v^2) / (2 * d)
                 const requiredDecel = -Math.max(1.5, Math.min(4.5, (ego.vx * ego.vx) / (2 * Math.max(0.5, distToStopMeters))));
                 return { targetSpeed: 0, accel: requiredDecel, state: this.state, stopLine: this.virtualStopLine, target: this.latchedObstacle };
             }
@@ -580,30 +594,29 @@ class STGraphSpeedDecider {
     }
 }
 
-(() => {
+document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('simCanvas');
   const ctx = canvas.getContext('2d');
   const viewport = document.getElementById('viewport');
 
-  // Scale: 1 meter = 24 pixels
   const PPM = 24;
-
   const stDecider = new STGraphSpeedDecider(PPM);
 
-  let width, height;
+  let width = canvas.width = viewport.clientWidth || 800;
+  let height = canvas.height = viewport.clientHeight || 500;
+
   function resizeCanvas() {
-    width = canvas.width = viewport.clientWidth;
-    height = canvas.height = viewport.clientHeight;
+    width = canvas.width = viewport.clientWidth || 800;
+    height = canvas.height = viewport.clientHeight || 500;
+    updateRoadBounds();
   }
   window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
 
-  // Road Configuration
   const road = {
     yTop: 0,
     yBottom: 0,
     yCenter: 0,
-    laneWidth: 3.75 * PPM,
+    laneWidth: 70,
     numLanes: 2
   };
 
@@ -614,19 +627,18 @@ class STGraphSpeedDecider {
   }
   updateRoadBounds();
 
-  // Ego Vehicle State
   const ego = {
     x: 60,
     y: road.yCenter,
-    vx: 0,              // m/s
-    ax: 0,              // m/s²
-    targetSpeed: 11.1,  // m/s (~40 km/h)
-    maxAccel: 2.2,      // m/s²
-    maxBraking: 4.5,    // m/s²
+    vx: 0,
+    ax: 0,
+    targetSpeed: 11.1,
+    maxAccel: 2.2,
+    maxBraking: 4.5,
     width: 2.0 * PPM,
     length: 4.2 * PPM,
     yaw: 0,
-    history: [],        // [{x, y}]
+    history: [],
     status: 'READY',
     goalX: 0
   };
@@ -637,80 +649,74 @@ class STGraphSpeedDecider {
   let lastTimestamp = null;
   let pendingAgent = null;
   let isDrawingFreehand = false;
-  let currentDecision = { targetSpeed: 11.1, accel: 0, state: 'CRUISE', stopLine: null, ttc: Infinity, target: null };
+  let currentDecision = { targetSpeed: 11.1, accel: 0, state: 'CRUISE', stopLine: null, target: null };
 
-  // Telemetry Log Store
-  let telemetryLog = {
-    t: [],
-    x: [],
-    v: [],
-    a: [],
-    S: [],
-    Dmin: []
-  };
+  let telemetryLog = { t: [], x: [], v: [], a: [], S: [], Dmin: [] };
 
-  // UI Elements
   const modeBadge = document.getElementById('modeBadge');
   const stateBadge = document.getElementById('stateBadge');
   const motionModal = document.getElementById('motionModal');
   const analyticsModal = document.getElementById('analyticsModal');
   const activeAgentsList = document.getElementById('activeAgentsList');
 
-  // Chart Instances
   let chartVtInstance = null;
   let chartVxInstance = null;
   let chartAtInstance = null;
 
-  // 1. AUTOMATED DEFAULT "INDIAN VILLAGE ROAD" SCENARIO SETUP
   function loadDefaultVillageScenario() {
     updateRoadBounds();
+    ego.x = 60;
+    ego.y = road.yCenter;
+    ego.vx = 0;
+    ego.ax = 0;
+    ego.yaw = 0;
+    ego.history = [];
+    ego.status = 'READY';
+
     agents = [
-      // 1. Stray Cattle (Slow Diagonal Crossing & Linger)
       {
         id: 1,
         type: 'cattle',
-        x: 180,
+        x: 200,
         y: road.yTop + 10,
         width: 1.5 * PPM,
         length: 2.2 * PPM,
         motion: 'freehand',
         path: [
-          { x: 180, y: road.yTop + 10 },
-          { x: 220, y: road.yCenter - 10 },
-          { x: 250, y: road.yBottom - 20 }
+          { x: 200, y: road.yTop + 10 },
+          { x: 240, y: road.yCenter - 10 },
+          { x: 280, y: road.yBottom - 20 }
         ],
         pathProgress: 0,
         speed: 0.8
       },
-      // 2. Pedestrian / Pushcart (Transverse Perpendicular Crossing)
       {
         id: 2,
         type: 'pedestrian',
-        x: 380,
+        x: 420,
         y: road.yBottom - 10,
         width: 1.2 * PPM,
         length: 1.2 * PPM,
         motion: 'freehand',
         path: [
-          { x: 380, y: road.yBottom - 10 },
-          { x: 380, y: road.yTop + 10 }
+          { x: 420, y: road.yBottom - 10 },
+          { x: 420, y: road.yTop + 10 }
         ],
         pathProgress: 0,
         speed: 1.2
       },
-      // 3. Erratic Auto-Rickshaw (Overtake & Lane Merge)
       {
         id: 3,
         type: 'auto',
-        x: 480,
+        x: 520,
         y: road.yCenter + 15,
         width: 1.8 * PPM,
         length: 3.0 * PPM,
         motion: 'freehand',
         path: [
-          { x: 480, y: road.yCenter + 15 },
-          { x: 560, y: road.yCenter - 25 },
-          { x: 640, y: road.yCenter + 10 }
+          { x: 520, y: road.yCenter + 15 },
+          { x: 600, y: road.yCenter - 25 },
+          { x: 680, y: road.yCenter + 10 }
         ],
         pathProgress: 0,
         speed: 3.5
@@ -757,7 +763,6 @@ class STGraphSpeedDecider {
     }
   });
 
-  // Motion Modal Selection
   document.getElementById('btnChooseFreehand').addEventListener('click', () => {
     motionModal.style.display = 'none';
     pendingAgent.motion = 'freehand';
@@ -791,7 +796,6 @@ class STGraphSpeedDecider {
     modeBadge.innerText = 'Scenario: Indian Village Road';
   });
 
-  // Freehand Trajectory Collector
   canvas.addEventListener('mousedown', (e) => {
     if (!isDrawingFreehand || !pendingAgent) return;
     const rect = canvas.getBoundingClientRect();
@@ -841,7 +845,6 @@ class STGraphSpeedDecider {
     renderAgentList();
   };
 
-  // Slider Updates
   document.getElementById('sliderWidth').addEventListener('input', (e) => {
     document.getElementById('lblWidth').innerText = e.target.value;
   });
@@ -849,7 +852,6 @@ class STGraphSpeedDecider {
     document.getElementById('lblLength').innerText = e.target.value;
   });
 
-  // --- Monotonic Parametric Path Planner ---
   function computeLivePlannedPath() {
     const plannedPoints = [];
     ego.goalX = width - 50;
@@ -861,7 +863,7 @@ class STGraphSpeedDecider {
       let targetY = road.yCenter;
       
       for (const ag of agents) {
-        const agPos = getAgentPosition(ag);
+        const agPos = getAgentPos(ag);
         const dx = agPos.x - sampleX;
         const dy = agPos.y - targetY;
         const dist = Math.hypot(dx, dy);
@@ -882,40 +884,26 @@ class STGraphSpeedDecider {
     return plannedPoints;
   }
 
-  function getAgentPosition(ag) {
-    if (ag.motion === 'static' || ag.path.length <= 1) return { x: ag.x, y: ag.y };
-    const totalPoints = ag.path.length;
-    const idx = Math.floor(ag.pathProgress) % totalPoints;
-    const nextIdx = (idx + 1) % totalPoints;
-    const frac = ag.pathProgress - Math.floor(ag.pathProgress);
-    const p1 = ag.path[idx];
-    const p2 = ag.path[nextIdx];
-    return {
-      x: p1.x + (p2.x - p1.x) * frac,
-      y: p1.y + (p2.y - p1.y) * frac
-    };
-  }
-
-  // --- Vehicle Physics & Controller ---
   function updateVehiclePhysics(dt, livePath) {
     if (ego.status === 'ARRIVED' || ego.status === 'COLLISION') {
       ego.vx = Math.max(0, ego.vx - ego.maxBraking * dt);
       return;
     }
 
-    // Evaluate Spatio-Temporal Behavior Decider (Apollo / Autoware)
     currentDecision = stDecider.evaluate(ego, livePath, agents);
 
-    // Update Telemetry Behavior State Badge
     if (currentDecision.state === 'CRUISE') {
       stateBadge.innerText = '🟢 CRUISE (40 km/h)';
-      stateBadge.style.color = '#00FF66';
+      stateBadge.style.color = '#10b981';
     } else if (currentDecision.state === 'YIELD_DECEL') {
-      stateBadge.innerText = `🟡 YIELDING (Decelerating for ${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Agent'})`;
+      stateBadge.innerText = `🟡 YIELDING (${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Agent'})`;
       stateBadge.style.color = '#f59e0b';
     } else if (currentDecision.state === 'YIELD_WAIT') {
-      stateBadge.innerText = `🔴 WAITING (${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Agent'} in Conflict Zone)`;
-      stateBadge.style.color = '#FF3B30';
+      stateBadge.innerText = `🔴 WAITING (${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Agent'} in Lane)`;
+      stateBadge.style.color = '#ef4444';
+    } else if (currentDecision.state === 'EMERGENCY_BRAKE') {
+      stateBadge.innerText = '🚨 EMERGENCY BRAKE (AEB)';
+      stateBadge.style.color = '#ef4444';
     } else if (currentDecision.state === 'RESUME') {
       stateBadge.innerText = '🔵 RESUMING TRAFFIC';
       stateBadge.style.color = '#38bdf8';
@@ -924,7 +912,7 @@ class STGraphSpeedDecider {
     let minDistance = Infinity;
     let closestObsType = '';
     for (const ag of agents) {
-      const pos = getAgentPosition(ag);
+      const pos = getAgentPos(ag);
       const d = Math.hypot(pos.x - ego.x, pos.y - ego.y) / PPM;
       if (d < minDistance) {
         minDistance = d;
@@ -932,22 +920,19 @@ class STGraphSpeedDecider {
       }
     }
 
-    // Critical Collision Check (< 0.6 meters clearance)
     if (minDistance < 0.6) {
       ego.vx = 0;
       ego.ax = 0;
       ego.status = 'COLLISION';
       stateBadge.innerText = `CRITICAL COLLISION with ${closestObsType.toUpperCase()}`;
-      stateBadge.style.color = '#FF3B30';
+      stateBadge.style.color = '#ef4444';
       triggerPostSimulationAnalytics(false, closestObsType);
       return;
     }
 
-    // Apply ST Decider Acceleration & Target Speed
     ego.ax = currentDecision.accel;
     ego.ax = Math.max(-ego.maxBraking, Math.min(ego.maxAccel, ego.ax));
 
-    // Terminal Goal Lock
     const distToGoal = (ego.goalX - ego.x) / PPM;
     if (distToGoal < 5.0) {
       ego.ax = -Math.min(ego.maxBraking, (ego.vx * ego.vx) / (2 * Math.max(0.5, distToGoal)));
@@ -956,7 +941,7 @@ class STGraphSpeedDecider {
         ego.ax = 0;
         ego.status = 'ARRIVED';
         stateBadge.innerText = '🏁 ARRIVED (Goal Reached)';
-        stateBadge.style.color = '#00FF66';
+        stateBadge.style.color = '#10b981';
         triggerPostSimulationAnalytics(true, '');
         return;
       }
@@ -965,7 +950,6 @@ class STGraphSpeedDecider {
     ego.vx = Math.max(0, ego.vx + ego.ax * dt);
     const speedPixels = ego.vx * PPM;
 
-    // Pure Pursuit Steering & Yaw
     if (livePath.length > 1) {
       const target = livePath[1];
       const targetAngle = Math.atan2(target.y - ego.y, target.x - ego.x);
@@ -977,13 +961,11 @@ class STGraphSpeedDecider {
       ego.x += speedPixels * dt;
     }
 
-    // Record Traveled History
     const lastHistory = ego.history[ego.history.length - 1];
     if (!lastHistory || Math.hypot(ego.x - lastHistory.x, ego.y - lastHistory.y) > 4) {
       ego.history.push({ x: ego.x, y: ego.y });
     }
 
-    // 2. TELEMETRY LOGGING ENGINE (Every tick)
     telemetryLog.t.push(parseFloat(simTime.toFixed(2)));
     telemetryLog.x.push(parseFloat((ego.x / PPM).toFixed(2)));
     telemetryLog.v.push(parseFloat(ego.vx.toFixed(2)));
@@ -997,11 +979,10 @@ class STGraphSpeedDecider {
     telemetryLog.Dmin.push(minDistance === Infinity ? 99 : parseFloat(minDistance.toFixed(2)));
   }
 
-  // --- Telemetry UI Update ---
   function updateTelemetryUI() {
     let minD = Infinity;
     for (const ag of agents) {
-      const pos = getAgentPosition(ag);
+      const pos = getAgentPos(ag);
       const d = Math.hypot(pos.x - ego.x, pos.y - ego.y) / PPM;
       if (d < minD) minD = d;
     }
@@ -1022,19 +1003,17 @@ class STGraphSpeedDecider {
     document.getElementById('valETA').innerText = eta;
   }
 
-  // 3. POST-SIMULATION DIAGNOSTICS ANALYTICS MODAL & CHARTS
   function triggerPostSimulationAnalytics(isClean, collisionType) {
     simRunning = false;
     analyticsModal.style.display = 'flex';
 
-    // Calculate KPI Statistics
     const finalTime = simTime.toFixed(1);
-    const minSafety = Math.min(...telemetryLog.S);
+    const minSafety = telemetryLog.S.length > 0 ? Math.min(...telemetryLog.S) : 100;
     const minSafetyIdx = telemetryLog.S.indexOf(minSafety);
     const minSafetyPos = telemetryLog.x[minSafetyIdx] || 0;
 
-    const maxAccel = Math.max(...telemetryLog.a).toFixed(2);
-    const minAccel = Math.min(...telemetryLog.a).toFixed(2);
+    const maxAccel = telemetryLog.a.length > 0 ? Math.max(...telemetryLog.a).toFixed(2) : '0.00';
+    const minAccel = telemetryLog.a.length > 0 ? Math.min(...telemetryLog.a).toFixed(2) : '0.00';
 
     document.getElementById('kpiTime').innerText = `${finalTime}s`;
     document.getElementById('kpiMinSafety').innerText = `${minSafety.toFixed(1)}% (at x=${minSafetyPos.toFixed(1)}m)`;
@@ -1045,11 +1024,10 @@ class STGraphSpeedDecider {
       document.getElementById('kpiStatus').innerText = 'CLEAN MISSION';
       statusCard.className = 'kpi-card green';
     } else {
-      document.getElementById('kpiStatus').innerText = `CRITICAL COLLISION (${collisionType.toUpperCase()})`;
+      document.getElementById('kpiStatus').innerText = `COLLISION (${collisionType.toUpperCase()})`;
       statusCard.className = 'kpi-card red';
     }
 
-    // Render Telemetry Charts
     renderAnalyticsCharts();
   }
 
@@ -1059,7 +1037,6 @@ class STGraphSpeedDecider {
     const xPosData = telemetryLog.x;
     const accelData = telemetryLog.a;
 
-    // 1. Chart v(t): Velocity vs Time
     if (chartVtInstance) chartVtInstance.destroy();
     chartVtInstance = new Chart(document.getElementById('chartVt'), {
       type: 'line',
@@ -1077,15 +1054,14 @@ class STGraphSpeedDecider {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#f3f4f6' } } },
+        plugins: { legend: { labels: { color: '#f8fafc' } } },
         scales: {
-          x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
-          y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
         }
       }
     });
 
-    // 2. Chart v(x): Velocity vs Position (Spatial Deceleration Zones)
     if (chartVxInstance) chartVxInstance.destroy();
     chartVxInstance = new Chart(document.getElementById('chartVx'), {
       type: 'line',
@@ -1103,15 +1079,14 @@ class STGraphSpeedDecider {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#f3f4f6' } } },
+        plugins: { legend: { labels: { color: '#f8fafc' } } },
         scales: {
-          x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
-          y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
         }
       }
     });
 
-    // 3. Chart a(t): Acceleration & Braking Profile vs Time
     if (chartAtInstance) chartAtInstance.destroy();
     chartAtInstance = new Chart(document.getElementById('chartAt'), {
       type: 'line',
@@ -1129,21 +1104,16 @@ class STGraphSpeedDecider {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#f3f4f6' } } },
+        plugins: { legend: { labels: { color: '#f8fafc' } } },
         scales: {
-          x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
-          y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
         }
       }
     });
   }
 
-  window.closeAnalyticsModal = () => {
-    analyticsModal.style.display = 'none';
-  };
-
-  // 4. CSV TELEMETRY EXPORTER
-  window.exportTelemetryCSV = () => {
+  function exportCSV() {
     let csvContent = "data:text/csv;charset=utf-8,time,x_pos,velocity,acceleration,safety_index,min_clearance\n";
     for (let i = 0; i < telemetryLog.t.length; i++) {
       csvContent += `${telemetryLog.t[i]},${telemetryLog.x[i]},${telemetryLog.v[i]},${telemetryLog.a[i]},${telemetryLog.S[i]},${telemetryLog.Dmin[i]}\n`;
@@ -1155,16 +1125,19 @@ class STGraphSpeedDecider {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-  document.getElementById('btnExportCSV').addEventListener('click', window.exportTelemetryCSV);
+  }
 
-  // --- Render Functions ---
+  document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
+  document.getElementById('btnExportCSVModal').addEventListener('click', exportCSV);
+  document.getElementById('btnCloseAnalytics').addEventListener('click', () => analyticsModal.style.display = 'none');
+  document.getElementById('btnDoneAnalytics').addEventListener('click', () => analyticsModal.style.display = 'none');
+
   function drawRoad() {
     updateRoadBounds();
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, road.yTop, width, road.laneWidth * road.numLanes);
 
-    ctx.strokeStyle = '#64748b';
+    ctx.strokeStyle = '#475569';
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(0, road.yTop); ctx.lineTo(width, road.yTop);
@@ -1190,7 +1163,7 @@ class STGraphSpeedDecider {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      if (pendingAgent.path.length > 1) {
+      if (pendingAgent.path && pendingAgent.path.length > 1) {
         ctx.strokeStyle = '#f59e0b';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -1203,7 +1176,7 @@ class STGraphSpeedDecider {
     }
 
     agents.forEach(ag => {
-      const pos = getAgentPosition(ag);
+      const pos = getAgentPos(ag);
 
       if (ag.path && ag.path.length > 1) {
         ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
@@ -1236,9 +1209,8 @@ class STGraphSpeedDecider {
   }
 
   function drawTrailsAndVehicle(livePath) {
-    // 1. PAST TRAVELED PATH (BOLD GREEN LINE)
     if (ego.history.length > 1) {
-      ctx.strokeStyle = '#00FF66';
+      ctx.strokeStyle = '#10b981';
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
       ctx.beginPath();
@@ -1249,9 +1221,8 @@ class STGraphSpeedDecider {
       ctx.stroke();
     }
 
-    // 2. LIVE AI PLANNED PATH (THIN RED LINE)
     if (livePath.length > 1) {
-      ctx.strokeStyle = '#FF3B30';
+      ctx.strokeStyle = '#ef4444';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.moveTo(livePath[0].x, livePath[0].y);
@@ -1264,7 +1235,6 @@ class STGraphSpeedDecider {
       ctx.stroke();
     }
 
-    // 3. VIRTUAL STOP LINE (AMBER DASHED BAR)
     if (currentDecision.stopLine) {
       const sl = currentDecision.stopLine;
       ctx.save();
@@ -1281,12 +1251,10 @@ class STGraphSpeedDecider {
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
       const targetName = currentDecision.target ? currentDecision.target.type.toUpperCase() : 'AGENT';
-      const ttcText = isFinite(currentDecision.ttc) ? ` (TTC: ${currentDecision.ttc.toFixed(1)}s)` : '';
-      ctx.fillText(`STOP LINE: YIELDING TO ${targetName}${ttcText}`, sl.x, road.yTop - 10);
+      ctx.fillText(`VIRTUAL STOP LINE: YIELDING TO ${targetName}`, sl.x, road.yTop - 10);
       ctx.restore();
     }
 
-    // 4. EGO VEHICLE (CYAN BOX)
     ctx.save();
     ctx.translate(ego.x, ego.y);
     ctx.rotate(ego.yaw);
@@ -1296,7 +1264,6 @@ class STGraphSpeedDecider {
     ctx.lineWidth = 2;
     ctx.strokeRect(-ego.length / 2, -ego.width / 2, ego.length, ego.width);
 
-    // Headlights
     ctx.fillStyle = '#fef08a';
     ctx.fillRect(ego.length / 2 - 3, -ego.width / 2 + 2, 3, 5);
     ctx.fillRect(ego.length / 2 - 3, ego.width / 2 - 7, 3, 5);
@@ -1314,8 +1281,8 @@ class STGraphSpeedDecider {
     if (simRunning) {
       simTime += dt;
       agents.forEach(ag => {
-        if (ag.motion !== 'static' && ag.path.length > 1) {
-          ag.pathProgress += (ag.speed * dt * 0.5);
+        if (ag.motion !== 'static' && ag.path && ag.path.length > 1) {
+          ag.pathProgress = (ag.pathProgress || 0) + ((ag.speed || 1.2) * dt * 0.5);
         }
       });
     }
@@ -1332,36 +1299,27 @@ class STGraphSpeedDecider {
 
     requestAnimationFrame(gameLoop);
   }
-  requestAnimationFrame(gameLoop);
 
-  // Simulation Controls
   document.getElementById('btnRun').addEventListener('click', () => {
     simRunning = true;
     ego.status = 'DRIVING';
     stateBadge.innerText = '🟢 CRUISE (40 km/h)';
-    stateBadge.style.color = '#00FF66';
+    stateBadge.style.color = '#10b981';
   });
 
   document.getElementById('btnReset').addEventListener('click', () => {
     simRunning = false;
     simTime = 0;
-    ego.x = 60;
-    ego.y = road.yCenter;
-    ego.vx = 0;
-    ego.ax = 0;
-    ego.yaw = 0;
-    ego.history = [];
-    ego.status = 'READY';
     stateBadge.innerText = 'Vehicle: IDLE';
-    stateBadge.style.color = '#f3f4f6';
+    stateBadge.style.color = '#f8fafc';
     telemetryLog = { t: [], x: [], v: [], a: [], S: [], Dmin: [] };
     agents.forEach(a => a.pathProgress = 0);
     loadDefaultVillageScenario();
   });
 
-  // Load default scenario on start
   loadDefaultVillageScenario();
-})();
+  requestAnimationFrame(gameLoop);
+});
 </script>
 </body>
 </html>
