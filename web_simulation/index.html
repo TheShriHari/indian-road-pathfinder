@@ -15,6 +15,7 @@
       --accent-green: #00FF66;
       --accent-red: #FF3B30;
       --accent-orange: #f59e0b;
+      --accent-purple: #8b5cf6;
       --text-main: #f3f4f6;
       --text-dim: #9ca3af;
     }
@@ -386,6 +387,7 @@
       <div><span style="color: var(--accent-green); font-weight: 900;">━━━</span> <strong>Past Traveled Path</strong> (Ground Truth)</div>
       <div><span style="color: var(--accent-red); font-weight: 900;">━━━</span> <strong>Live AI Planned Path</strong> (Spline Horizon)</div>
       <div><span style="color: var(--accent-cyan); font-weight: 900;">■</span> <strong>Ego Vehicle</strong> (Physics Body)</div>
+      <div><span style="color: var(--accent-orange); font-weight: 900;">╍╍╍</span> <strong>Virtual Stop Line</strong> (Yielding Zone)</div>
     </div>
 
     <div class="section-title">Telemetry & Dynamics Engine</div>
@@ -423,6 +425,138 @@
 </div>
 
 <script>
+// --- APOLLO & AUTOWARE ST-GRAPH SPEED DECIDER ENGINE ---
+class STGraphSpeedDecider {
+    constructor(ppm) {
+        this.PPM = ppm;
+        this.horizon = 6.0;        // seconds lookahead
+        this.dt = 0.1;
+        this.safetyBuffer = 3.5 * ppm;   // 3.5 meters stop buffer before obstacle
+        this.laneHalfWidth = 1.8 * ppm;  // meters
+        this.state = "CRUISE";     // CRUISE, YIELD_DECEL, YIELD_WAIT, RESUME
+        this.yieldTarget = null;
+        this.virtualStopLine = null;
+        this.ttc = Infinity;
+    }
+
+    evaluate(ego, globalPath, activeAgents) {
+        this.virtualStopLine = null;
+        this.yieldTarget = null;
+        this.ttc = Infinity;
+        let minStopStation = Infinity;
+
+        const egoStation = this.getStationAlongPath(ego, globalPath);
+
+        for (const agent of activeAgents) {
+            // Predict agent movement over horizon
+            for (let t = 0; t <= this.horizon; t += this.dt) {
+                const agentFuturePos = this.predictAgentPosition(agent, t);
+                
+                // Check if agent is inside ego vehicle corridor at time t
+                const lateralDist = this.getLateralDistanceToPath(agentFuturePos, globalPath);
+                if (Math.abs(lateralDist) <= this.laneHalfWidth + (agent.width ? agent.width/2 : 1.0 * this.PPM)) {
+                    const conflictStation = this.getStationAlongPath(agentFuturePos, globalPath);
+                    
+                    // Obstacle is ahead of ego vehicle
+                    if (conflictStation > egoStation) {
+                        const egoTimeToStation = (conflictStation - egoStation) / Math.max(0.5, ego.vx * this.PPM);
+                        
+                        // Collision hazard window detected (Apollo Yield condition)
+                        if (Math.abs(egoTimeToStation - t) < 2.5 || egoTimeToStation <= t) {
+                            const stopStation = Math.max(egoStation + 0.5 * this.PPM, conflictStation - this.safetyBuffer);
+                            if (stopStation < minStopStation) {
+                                minStopStation = stopStation;
+                                this.yieldTarget = agent;
+                                this.ttc = Math.max(0.1, egoTimeToStation);
+                                this.virtualStopLine = this.getPointAtStation(globalPath, stopStation);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // State Machine & Velocity Commands (Autoware behavior_velocity_planner)
+        if (this.virtualStopLine) {
+            const distToStop = Math.max(0.1, (minStopStation - egoStation) / this.PPM);
+            if (ego.vx < 0.2 && distToStop < 4.0) {
+                this.state = "YIELD_WAIT";
+                return { targetSpeed: 0, accel: 0, state: this.state, stopLine: this.virtualStopLine, ttc: this.ttc, target: this.yieldTarget };
+            } else {
+                this.state = "YIELD_DECEL";
+                // Smooth deceleration profile: v^2 = 2 * a * d
+                const targetDecel = Math.max(-4.5, -Math.pow(ego.vx, 2) / (2 * distToStop));
+                return { targetSpeed: 0, accel: targetDecel, state: this.state, stopLine: this.virtualStopLine, ttc: this.ttc, target: this.yieldTarget };
+            }
+        }
+
+        this.state = ego.vx < 11.5 ? "RESUME" : "CRUISE";
+        return { targetSpeed: 12.0, accel: 2.0, state: this.state, stopLine: null, ttc: Infinity, target: null };
+    }
+
+    predictAgentPosition(agent, t) {
+        if (!agent.path || agent.path.length < 2 || agent.motion === 'static') return { x: agent.x, y: agent.y };
+        const speed = (agent.speed || 1.2) * this.PPM;
+        const totalDist = speed * t;
+        return this.interpolateAlongPath(agent.path, totalDist);
+    }
+
+    getStationAlongPath(pt, path) {
+        if (!path || path.length === 0) return 0;
+        let nearestIdx = 0, minDist = Infinity;
+        for (let i = 0; i < path.length; i++) {
+            const d = Math.hypot(path[i].x - pt.x, path[i].y - pt.y);
+            if (d < minDist) { minDist = d; nearestIdx = i; }
+        }
+        let station = 0;
+        for (let i = 0; i < nearestIdx; i++) {
+            station += Math.hypot(path[i+1].x - path[i].x, path[i+1].y - path[i].y);
+        }
+        return station;
+    }
+
+    getPointAtStation(path, targetStation) {
+        if (!path || path.length === 0) return { x: 0, y: 0 };
+        let currentStation = 0;
+        for (let i = 0; i < path.length - 1; i++) {
+            const segDist = Math.hypot(path[i+1].x - path[i].x, path[i+1].y - path[i].y);
+            if (currentStation + segDist >= targetStation) {
+                const ratio = (targetStation - currentStation) / segDist;
+                return {
+                    x: path[i].x + (path[i+1].x - path[i].x) * ratio,
+                    y: path[i].y + (path[i+1].y - path[i].y) * ratio
+                };
+            }
+            currentStation += segDist;
+        }
+        return path[path.length - 1];
+    }
+
+    getLateralDistanceToPath(pt, path) {
+        if (!path || path.length === 0) return Infinity;
+        let minDist = Infinity;
+        for (let i = 0; i < path.length - 1; i++) {
+            const d = Math.hypot(path[i].x - pt.x, path[i].y - pt.y);
+            if (d < minDist) minDist = d;
+        }
+        return minDist;
+    }
+
+    interpolateAlongPath(path, dist) {
+        let dAccum = 0;
+        for (let i = 0; i < path.length - 1; i++) {
+            const d = Math.hypot(path[i+1].x - path[i].x, path[i+1].y - path[i].y);
+            if (dAccum + d >= dist) {
+                const r = (dist - dAccum) / d;
+                return { x: path[i].x + (path[i+1].x - path[i].x) * r, y: path[i].y + (path[i+1].y - path[i].y) * r };
+            }
+            dAccum += d;
+        }
+        return path[path.length - 1];
+    }
+}
+
 (() => {
   const canvas = document.getElementById('simCanvas');
   const ctx = canvas.getContext('2d');
@@ -430,6 +564,8 @@
 
   // Scale: 1 meter = 24 pixels
   const PPM = 24;
+
+  const stDecider = new STGraphSpeedDecider(PPM);
 
   let width, height;
   function resizeCanvas() {
@@ -461,7 +597,7 @@
     y: road.yCenter,
     vx: 0,              // m/s
     ax: 0,              // m/s²
-    targetSpeed: 10.0,  // m/s (~36 km/h)
+    targetSpeed: 11.1,  // m/s (~40 km/h)
     maxAccel: 2.2,      // m/s²
     maxBraking: 4.5,    // m/s²
     width: 2.0 * PPM,
@@ -478,6 +614,7 @@
   let lastTimestamp = null;
   let pendingAgent = null;
   let isDrawingFreehand = false;
+  let currentDecision = { targetSpeed: 11.1, accel: 0, state: 'CRUISE', stopLine: null, ttc: Infinity, target: null };
 
   // Telemetry Log Store
   let telemetryLog = {
@@ -619,7 +756,7 @@
     agents.push(pendingAgent);
     pendingAgent = null;
     renderAgentList();
-    modeBadge.innerText = 'Mode: Indian Village Road';
+    modeBadge.innerText = 'Scenario: Indian Village Road';
   });
 
   document.getElementById('btnChooseStatic').addEventListener('click', () => {
@@ -628,7 +765,7 @@
     agents.push(pendingAgent);
     pendingAgent = null;
     renderAgentList();
-    modeBadge.innerText = 'Mode: Indian Village Road';
+    modeBadge.innerText = 'Scenario: Indian Village Road';
   });
 
   // Freehand Trajectory Collector
@@ -659,7 +796,7 @@
       agents.push(pendingAgent);
       pendingAgent = null;
       renderAgentList();
-      modeBadge.innerText = 'Mode: Indian Village Road';
+      modeBadge.innerText = 'Scenario: Indian Village Road';
     }
   });
 
@@ -743,6 +880,24 @@
       return;
     }
 
+    // Evaluate Spatio-Temporal Behavior Decider (Apollo / Autoware)
+    currentDecision = stDecider.evaluate(ego, livePath, agents);
+
+    // Update Telemetry Behavior State Badge
+    if (currentDecision.state === 'CRUISE') {
+      stateBadge.innerText = '🟢 CRUISE (40 km/h)';
+      stateBadge.style.color = '#00FF66';
+    } else if (currentDecision.state === 'YIELD_DECEL') {
+      stateBadge.innerText = `🟡 YIELDING (Decelerating for ${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Agent'})`;
+      stateBadge.style.color = '#f59e0b';
+    } else if (currentDecision.state === 'YIELD_WAIT') {
+      stateBadge.innerText = `🔴 WAITING (${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Agent'} in Conflict Zone)`;
+      stateBadge.style.color = '#FF3B30';
+    } else if (currentDecision.state === 'RESUME') {
+      stateBadge.innerText = '🔵 RESUMING TRAFFIC';
+      stateBadge.style.color = '#38bdf8';
+    }
+
     let minDistance = Infinity;
     let closestObsType = '';
     for (const ag of agents) {
@@ -760,31 +915,14 @@
       ego.ax = 0;
       ego.status = 'COLLISION';
       stateBadge.innerText = `CRITICAL COLLISION with ${closestObsType.toUpperCase()}`;
+      stateBadge.style.color = '#FF3B30';
       triggerPostSimulationAnalytics(false, closestObsType);
       return;
     }
 
-    // Dynamic curvature slowing
-    let localCurvature = 0;
-    if (livePath.length >= 3) {
-      const dy1 = livePath[1].y - livePath[0].y;
-      const dy2 = livePath[2].y - livePath[1].y;
-      localCurvature = Math.abs(dy2 - dy1) / 40.0;
-    }
-
-    let desiredSpeed = ego.targetSpeed;
-    if (localCurvature > 0.3) desiredSpeed *= 0.55;
-
-    // Intelligent Driver Braking Model
-    const stopDistanceThreshold = 1.8;
-    if (minDistance < stopDistanceThreshold) {
-      ego.ax = -ego.maxBraking;
-    } else if (minDistance < 4.0 && localCurvature > 0.4) {
-      ego.ax = -ego.maxAccel * 0.5;
-    } else {
-      ego.ax = (desiredSpeed - ego.vx) * 0.8;
-      ego.ax = Math.max(-ego.maxBraking, Math.min(ego.maxAccel, ego.ax));
-    }
+    // Apply ST Decider Acceleration & Target Speed
+    ego.ax = currentDecision.accel;
+    ego.ax = Math.max(-ego.maxBraking, Math.min(ego.maxAccel, ego.ax));
 
     // Terminal Goal Lock
     const distToGoal = (ego.goalX - ego.x) / PPM;
@@ -794,7 +932,8 @@
         ego.vx = 0;
         ego.ax = 0;
         ego.status = 'ARRIVED';
-        stateBadge.innerText = 'Vehicle: ARRIVED (Goal Reached)';
+        stateBadge.innerText = '🏁 ARRIVED (Goal Reached)';
+        stateBadge.style.color = '#00FF66';
         triggerPostSimulationAnalytics(true, '');
         return;
       }
@@ -1102,7 +1241,29 @@
       ctx.stroke();
     }
 
-    // 3. EGO VEHICLE (CYAN BOX)
+    // 3. VIRTUAL STOP LINE (AMBER DASHED BAR)
+    if (currentDecision.stopLine) {
+      const sl = currentDecision.stopLine;
+      ctx.save();
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.moveTo(sl.x, road.yTop + 5);
+      ctx.lineTo(sl.x, road.yBottom - 5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      const targetName = currentDecision.target ? currentDecision.target.type.toUpperCase() : 'AGENT';
+      const ttcText = isFinite(currentDecision.ttc) ? ` (TTC: ${currentDecision.ttc.toFixed(1)}s)` : '';
+      ctx.fillText(`STOP LINE: YIELDING TO ${targetName}${ttcText}`, sl.x, road.yTop - 10);
+      ctx.restore();
+    }
+
+    // 4. EGO VEHICLE (CYAN BOX)
     ctx.save();
     ctx.translate(ego.x, ego.y);
     ctx.rotate(ego.yaw);
@@ -1154,7 +1315,8 @@
   document.getElementById('btnRun').addEventListener('click', () => {
     simRunning = true;
     ego.status = 'DRIVING';
-    stateBadge.innerText = 'Vehicle: AUTONOMOUS CRUISE';
+    stateBadge.innerText = '🟢 CRUISE (40 km/h)';
+    stateBadge.style.color = '#00FF66';
   });
 
   document.getElementById('btnReset').addEventListener('click', () => {
@@ -1168,6 +1330,7 @@
     ego.history = [];
     ego.status = 'READY';
     stateBadge.innerText = 'Vehicle: IDLE';
+    stateBadge.style.color = '#f3f4f6';
     telemetryLog = { t: [], x: [], v: [], a: [], S: [], Dmin: [] };
     agents.forEach(a => a.pathProgress = 0);
     loadDefaultVillageScenario();
