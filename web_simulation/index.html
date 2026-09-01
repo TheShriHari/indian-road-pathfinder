@@ -1,899 +1,839 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Pathfinder Studio - Autonomous Indian Road Pathfinder (PS 26037)</title>
-    <style>
-        :root {
-            --bg-dark: #0b0f19;
-            --panel-bg: #151c2c;
-            --panel-border: #232e48;
-            --accent-blue: #00d2ff;
-            --accent-green: #00FF66;
-            --accent-red: #FF3B30;
-            --accent-orange: #ff9100;
-            --accent-purple: #e040fb;
-            --text-main: #f0f4f8;
-            --text-muted: #8a99ad;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Autonomous Pathfinder Studio (PS 26037)</title>
+  <style>
+    :root {
+      --bg-dark: #0a0f1d;
+      --panel-bg: #111827;
+      --card-bg: #1f2937;
+      --border-color: #374151;
+      --accent-cyan: #06b6d4;
+      --accent-green: #00FF66;
+      --accent-red: #FF3B30;
+      --accent-orange: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-dim: #9ca3af;
+    }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            user-select: none;
-        }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
 
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
+    header {
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
-        header {
-            background-color: var(--panel-bg);
-            border-bottom: 1px solid var(--panel-border);
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .title { font-size: 1.15rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    .header-actions { display: flex; gap: 10px; }
 
-        .header-title h1 {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--accent-blue);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+    button.btn {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-run { background: #10b981; color: white; }
+    .btn-run:hover { background: #059669; }
+    .btn-reset { background: #ef4444; color: white; }
+    .btn-reset:hover { background: #dc2626; }
 
-        .main-layout {
-            display: grid;
-            grid-template-columns: 290px 1fr 310px;
-            flex: 1;
-            gap: 12px;
-            padding: 12px;
-            height: calc(100vh - 60px);
-        }
+    .studio-container {
+      display: grid;
+      grid-template-columns: 260px 1fr 290px;
+      flex: 1;
+      overflow: hidden;
+    }
 
-        .panel {
-            background: var(--panel-bg);
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            overflow-y: auto;
-        }
+    .sidebar-left, .sidebar-right {
+      background: var(--panel-bg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    .sidebar-left { border-right: 1px solid var(--border-color); }
+    .sidebar-right { border-left: 1px solid var(--border-color); }
 
-        .panel h2 {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            color: var(--text-muted);
-            border-bottom: 1px solid var(--panel-border);
-            padding-bottom: 4px;
-        }
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 4px;
+    }
 
-        .btn {
-            background: #1e283d;
-            color: var(--text-main);
-            border: 1px solid var(--panel-border);
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.82rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
+    .agent-palette {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
 
-        .btn:hover {
-            border-color: var(--accent-blue);
-            background: #283652;
-        }
+    .draggable-agent {
+      background: var(--card-bg);
+      border: 1px dashed #4b5563;
+      border-radius: 6px;
+      padding: 10px 6px;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: grab;
+      transition: border-color 0.2s, transform 0.1s;
+    }
+    .draggable-agent:hover {
+      border-color: var(--accent-cyan);
+      transform: translateY(-2px);
+    }
 
-        .btn.green {
-            background: var(--accent-green);
-            color: #0b0f19;
-            border-color: var(--accent-green);
-            font-weight: 700;
-        }
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+    .slider-group input { width: 100%; accent-color: var(--accent-cyan); }
 
-        .btn.red {
-            background: var(--accent-red);
-            color: #fff;
-            border-color: var(--accent-red);
-        }
+    .agent-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      margin-bottom: 6px;
+    }
+    .agent-item button {
+      background: transparent;
+      border: none;
+      color: var(--accent-red);
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
 
-        /* Drag and Drop Palette Items */
-        .palette-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
+    .canvas-viewport {
+      position: relative;
+      background: #0d1322;
+      display: flex;
+      flex-direction: column;
+    }
 
-        .draggable-item {
-            background: #1b2438;
-            border: 1px dashed var(--accent-blue);
-            border-radius: 6px;
-            padding: 10px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: grab;
-            transition: all 0.2s ease;
-        }
+    .canvas-topbar {
+      position: absolute;
+      top: 12px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .status-badge {
+      background: rgba(17, 24, 39, 0.85);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      backdrop-filter: blur(4px);
+    }
 
-        .draggable-item:hover {
-            background: #25334d;
-            border-style: solid;
-            box-shadow: 0 0 8px rgba(0, 210, 255, 0.3);
-        }
+    canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 
-        .draggable-item:active {
-            cursor: grabbing;
-        }
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .telemetry-card {
+      background: var(--card-bg);
+      border-radius: 6px;
+      padding: 10px;
+      border-left: 3px solid #4b5563;
+    }
+    .telemetry-card.danger { border-left-color: var(--accent-red); }
+    .telemetry-card.safe { border-left-color: var(--accent-green); }
+    .telemetry-card.info { border-left-color: var(--accent-cyan); }
 
-        .slider-group {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            font-size: 0.78rem;
-        }
+    .telemetry-val { font-size: 1.15rem; font-weight: 700; }
+    .telemetry-lbl { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
 
-        .slider-group label {
-            display: flex;
-            justify-content: space-between;
-            color: var(--text-muted);
-        }
-
-        input[type="range"] {
-            accent-color: var(--accent-blue);
-            width: 100%;
-        }
-
-        .sim-area {
-            position: relative;
-            background: var(--panel-bg);
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        canvas#simCanvas {
-            width: 100%;
-            height: 100%;
-            background: #0d121d;
-        }
-
-        .canvas-toolbar {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            background: rgba(15, 21, 35, 0.9);
-            backdrop-filter: blur(8px);
-            border: 1px solid var(--panel-border);
-            padding: 6px 14px;
-            border-radius: 20px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            font-size: 0.8rem;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-
-        .metric-card {
-            background: #1b2438;
-            padding: 10px;
-            border-radius: 6px;
-            border-left: 3px solid var(--accent-blue);
-        }
-
-        .metric-card.red { border-left-color: var(--accent-red); }
-        .metric-card.green { border-left-color: var(--accent-green); }
-        .metric-card.orange { border-left-color: var(--accent-orange); }
-
-        .metric-val {
-            font-size: 1.25rem;
-            font-weight: 700;
-        }
-
-        .metric-lbl {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .path-legend {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            font-size: 0.8rem;
-            background: #151c2c;
-        }
-
-        .legend-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .legend-line {
-            height: 4px;
-            border-radius: 2px;
-        }
-
-        .obs-list {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            max-height: 180px;
-            overflow-y: auto;
-        }
-
-        .obs-item {
-            background: #1b2438;
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-size: 0.78rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .obs-actions {
-            display: flex;
-            gap: 4px;
-        }
-
-        .icon-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 2px 4px;
-            font-size: 0.8rem;
-        }
-        .icon-btn:hover { color: #fff; }
-
-        /* Modal for Motion Mode Selection */
-        .modal-overlay {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(11, 15, 25, 0.75);
-            backdrop-filter: blur(4px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
-
-        .modal-box {
-            background: var(--panel-bg);
-            border: 1px solid var(--accent-blue);
-            border-radius: 10px;
-            padding: 20px;
-            width: 320px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            box-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
-        }
-
-        .modal-box h3 {
-            font-size: 0.95rem;
-            color: var(--accent-blue);
-        }
-
-        .modal-box .btn {
-            justify-content: flex-start;
-            padding: 10px;
-        }
-    </style>
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .choice-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--accent-cyan);
+      padding: 20px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 280px;
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+    }
+    .choice-card button {
+      padding: 10px;
+      background: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      text-align: left;
+    }
+    .choice-card button:hover { background: #374151; border-color: var(--accent-cyan); }
+  </style>
 </head>
 <body>
 
-    <header>
-        <div class="header-title">
-            <h1>Interactive Pathfinder Studio (PS 26037)</h1>
-        </div>
-        <div style="display:flex; gap:10px;">
-            <button class="btn green" onclick="runSimulation()" id="btnRun">▶ RUN SIMULATION</button>
-            <button class="btn red" onclick="resetStudio()">↺ RESET STUDIO</button>
-        </div>
-    </header>
+<header>
+  <div class="title">Interactive Autonomous Pathfinder Studio (PS 26037)</div>
+  <div class="header-actions">
+    <button class="btn btn-run" id="btnRun">▶ RUN SIMULATION</button>
+    <button class="btn btn-reset" id="btnReset">↺ RESET STUDIO</button>
+  </div>
+</header>
 
-    <div class="main-layout">
-        <!-- LEFT SIDEBAR: DRAG & DROP TOOLS & DIMENSIONS -->
-        <div class="panel">
-            <h2>1. Drag & Drop Agents</h2>
-            <div class="palette-grid">
-                <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'cattle')">
-                    <span>🐄</span> Cattle
-                </div>
-                <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'auto')">
-                    <span>🛺</span> Auto
-                </div>
-                <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'pedestrian')">
-                    <span>🚶</span> Pedestrian
-                </div>
-                <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'static')">
-                    <span>🛑</span> Static Object
-                </div>
-            </div>
-
-            <h2>2. Static Object Sizing</h2>
-            <div class="slider-group">
-                <label><span>Width:</span> <span id="lblWidth">1.5m</span></label>
-                <input type="range" id="sliderWidth" min="0.5" max="5.0" step="0.1" value="1.5" oninput="updateStaticSize()">
-            </div>
-            <div class="slider-group">
-                <label><span>Length:</span> <span id="lblLength">1.5m</span></label>
-                <input type="range" id="sliderLength" min="0.5" max="5.0" step="0.1" value="1.5" oninput="updateStaticSize()">
-            </div>
-
-            <h2>3. Active Agents (<span id="obsCount">0</span>)</h2>
-            <div class="obs-list" id="obsList"></div>
-        </div>
-
-        <!-- CENTER PANEL: SIMULATION CANVAS -->
-        <div class="sim-area" id="canvasContainer">
-            <canvas id="simCanvas"></canvas>
-            
-            <div class="canvas-toolbar">
-                <span>Mode: <strong id="lblMode" style="color: var(--accent-blue);">READY (Drag Agent to Road)</strong></span>
-                <span style="color: var(--panel-border);">|</span>
-                <span>Time: <strong id="lblTime">0.0s</strong></span>
-            </div>
-
-            <!-- MOTION MODE SELECTION MODAL -->
-            <div class="modal-overlay" id="motionModal">
-                <div class="modal-box">
-                    <h3>Select Agent Motion Mode</h3>
-                    <button class="btn" onclick="selectMotionMode('freehand')">✏️ Freehand Draw Path (Click & Drag)</button>
-                    <button class="btn" onclick="selectMotionMode('random')">🎲 Continuous Random Walk</button>
-                    <button class="btn" onclick="selectMotionMode('static')">🛑 Stationary Object</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- RIGHT SIDEBAR: INVERTED LEGEND & TELEMETRY MATHEMATICAL ENGINE -->
-        <div class="panel">
-            <h2>Path Visualizer Legend</h2>
-            <div class="path-legend">
-                <div class="legend-row">
-                    <div class="legend-line" style="width: 24px; background: var(--accent-green);"></div>
-                    <span><strong>Past Traveled Path</strong> (Ground Truth)</span>
-                </div>
-                <div class="legend-row">
-                    <div class="legend-line" style="width: 24px; background: var(--accent-red);"></div>
-                    <span><strong>Live Replanned Path</strong> (AI Spline)</span>
-                </div>
-                <div class="legend-row">
-                    <div class="legend-line" style="width: 14px; height: 14px; border-radius: 50%; background: var(--accent-blue);"></div>
-                    <span>Autonomous Vehicle (Ego)</span>
-                </div>
-            </div>
-
-            <h2>Real-Time Risk & Telemetry Engine</h2>
-            <div class="metrics-grid">
-                <div class="metric-card red">
-                    <div class="metric-val" id="valDanger" style="color: var(--accent-red);">0.0%</div>
-                    <div class="metric-lbl">Collision Risk (P_danger)</div>
-                </div>
-                <div class="metric-card green">
-                    <div class="metric-val" id="valSafety" style="color: var(--accent-green);">100%</div>
-                    <div class="metric-lbl">Safety Index (S)</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-val" id="valElapsed">0.0s</div>
-                    <div class="metric-lbl">Elapsed Time</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-val" id="valETA">15.2s</div>
-                    <div class="metric-lbl">Est. Time to Goal (ETA)</div>
-                </div>
-                <div class="metric-card orange">
-                    <div class="metric-val" id="valClearance">-- m</div>
-                    <div class="metric-lbl">Min Obstacle Distance</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-val" id="valSpeed">3.5 m/s</div>
-                    <div class="metric-lbl">Ego Velocity</div>
-                </div>
-            </div>
-
-            <h2>Presets</h2>
-            <button class="btn" onclick="loadPreset(1)">Preset 1: Village Cattle Avoidance</button>
-            <button class="btn" onclick="loadPreset(2)">Preset 2: Urban Intersection Weaving</button>
-        </div>
+<div class="studio-container">
+  <!-- Left Sidebar -->
+  <div class="sidebar-left">
+    <div>
+      <div class="section-title">1. Drag & Drop Obstacles</div>
+      <div class="agent-palette">
+        <div class="draggable-agent" draggable="true" data-type="cattle">🐄 Cattle</div>
+        <div class="draggable-agent" draggable="true" data-type="auto">🛺 Auto</div>
+        <div class="draggable-agent" draggable="true" data-type="pedestrian">🚶 Pedestrian</div>
+        <div class="draggable-agent" draggable="true" data-type="static">🛑 Barricade</div>
+      </div>
     </div>
 
-    <script>
-        const canvas = document.getElementById('simCanvas');
-        const ctx = canvas.getContext('2d');
+    <div>
+      <div class="section-title">2. Static Object Size</div>
+      <div class="slider-group">
+        <label>Width: <span id="lblWidth">2.0</span>m</label>
+        <input type="range" id="sliderWidth" min="0.8" max="5.0" step="0.2" value="2.0" />
+      </div>
+      <div class="slider-group" style="margin-top: 8px;">
+        <label>Length: <span id="lblLength">2.0</span>m</label>
+        <input type="range" id="sliderLength" min="0.8" max="5.0" step="0.2" value="2.0" />
+      </div>
+    </div>
 
-        const SCALE = 18; // 18px = 1m
-        const OFFSET_X = 50;
-        const OFFSET_Y = 240;
+    <div style="flex: 1; overflow-y: auto;">
+      <div class="section-title">3. Active Road Obstacles</div>
+      <div id="activeAgentsList"></div>
+    </div>
+  </div>
 
-        let draggedType = null;
-        let staticWidth = 1.5;
-        let staticLength = 1.5;
+  <!-- Center Canvas -->
+  <div class="canvas-viewport" id="viewport">
+    <div class="canvas-topbar">
+      <div class="status-badge" id="modeBadge" style="color: var(--accent-cyan); font-weight:600;">Mode: READY (Drag Obstacle to Road)</div>
+      <div class="status-badge" id="stateBadge" style="font-weight:600;">Vehicle: IDLE</div>
+    </div>
+    <canvas id="simCanvas"></canvas>
 
-        let isSimulating = false;
-        let simTime = 0;
-        let animId = null;
+    <!-- Modal for Motion Type -->
+    <div class="modal-overlay" id="motionModal">
+      <div class="choice-card">
+        <div style="font-weight: 700; font-size: 0.95rem; text-align: center; color: var(--accent-cyan);">Choose Agent Motion</div>
+        <button id="btnChooseFreehand">✏️ Freehand Draw Path (Click & Drag)</button>
+        <button id="btnChooseRandom">🎲 Continuous Random Walk</button>
+        <button id="btnChooseStatic">📍 Keep Stationary</button>
+      </div>
+    </div>
+  </div>
 
-        let ego = { x: 2, y: 0, theta: 0, v: 3.5 };
-        let goal = { x: 55, y: 0 };
+  <!-- Right Sidebar -->
+  <div class="sidebar-right">
+    <div class="section-title">Visualizer Legend</div>
+    <div style="font-size: 0.78rem; display: flex; flex-direction: column; gap: 8px; background: var(--card-bg); padding: 12px; border-radius: 6px;">
+      <div><span style="color: var(--accent-green); font-weight: 900;">━━━</span> <strong>Past Traveled Path</strong> (Ground Truth)</div>
+      <div><span style="color: var(--accent-red); font-weight: 900;">━━━</span> <strong>Live AI Planned Path</strong> (Spline Horizon)</div>
+      <div><span style="color: var(--accent-cyan); font-weight: 900;">■</span> <strong>Ego Vehicle</strong> (Physics Body)</div>
+    </div>
 
-        let placedObjects = [];
-        let pendingAgent = null;
-        let isFreehandDrawing = false;
-        let currentDrawPath = [];
+    <div class="section-title">Telemetry & Dynamics Engine</div>
+    <div class="telemetry-grid">
+      <div class="telemetry-card danger">
+        <div class="telemetry-val" id="valDanger" style="color: var(--accent-red)">0.0%</div>
+        <div class="telemetry-lbl">Collision Risk (P_danger)</div>
+      </div>
+      <div class="telemetry-card safe">
+        <div class="telemetry-val" id="valSafety" style="color: var(--accent-green)">100%</div>
+        <div class="telemetry-lbl">Safety Index (S)</div>
+      </div>
+      <div class="telemetry-card info">
+        <div class="telemetry-val" id="valSpeed">0.0 km/h</div>
+        <div class="telemetry-lbl">Velocity</div>
+      </div>
+      <div class="telemetry-card info">
+        <div class="telemetry-val" id="valAccel">0.0 m/s²</div>
+        <div class="telemetry-lbl">Long. Accel</div>
+      </div>
+      <div class="telemetry-card">
+        <div class="telemetry-val" id="valElapsed">0.0s</div>
+        <div class="telemetry-lbl">Elapsed Time</div>
+      </div>
+      <div class="telemetry-card">
+        <div class="telemetry-val" id="valETA">--</div>
+        <div class="telemetry-lbl">Est. Arrival (ETA)</div>
+      </div>
+      <div class="telemetry-card" style="grid-column: span 2;">
+        <div class="telemetry-val" id="valClearance">-- m</div>
+        <div class="telemetry-lbl">Min Obstacle Distance</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-        let pastTraveledPath = [];
-        let liveReplannedPath = [];
+<script>
+(() => {
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  const viewport = document.getElementById('viewport');
 
-        function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
+  // Scale: 1 meter = 24 pixels
+  const PPM = 24;
+
+  let width, height;
+  function resizeCanvas() {
+    width = canvas.width = viewport.clientWidth;
+    height = canvas.height = viewport.clientHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // Road Configuration
+  const road = {
+    yTop: 0,
+    yBottom: 0,
+    yCenter: 0,
+    laneWidth: 3.75 * PPM,
+    numLanes: 2
+  };
+
+  function updateRoadBounds() {
+    road.yCenter = height / 2;
+    road.yTop = road.yCenter - road.laneWidth;
+    road.yBottom = road.yCenter + road.laneWidth;
+  }
+  updateRoadBounds();
+
+  // Ego Vehicle State with Dynamic Bicycle Dynamics
+  const ego = {
+    x: 60,
+    y: road.yCenter,
+    vx: 0,              // m/s
+    ax: 0,              // m/s²
+    targetSpeed: 10.0,  // m/s (~36 km/h)
+    maxAccel: 2.2,      // m/s²
+    maxBraking: 4.5,    // m/s²
+    width: 2.0 * PPM,
+    length: 4.2 * PPM,
+    yaw: 0,
+    history: [],        // Ground truth traveled path [{x, y}]
+    status: 'READY',
+    goalX: 0
+  };
+
+  let agents = [];
+  let simRunning = false;
+  let simTime = 0;
+  let lastTimestamp = null;
+  let pendingAgent = null;
+  let isDrawingFreehand = false;
+
+  // UI Elements
+  const modeBadge = document.getElementById('modeBadge');
+  const stateBadge = document.getElementById('stateBadge');
+  const motionModal = document.getElementById('motionModal');
+  const activeAgentsList = document.getElementById('activeAgentsList');
+
+  // Drag & Drop Setup
+  document.querySelectorAll('.draggable-agent').forEach(el => {
+    el.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('agentType', el.getAttribute('data-type'));
+    });
+  });
+
+  canvas.addEventListener('dragover', (e) => e.preventDefault());
+
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const dropX = e.clientX - rect.left;
+    const dropY = e.clientY - rect.top;
+    const type = e.dataTransfer.getData('agentType');
+
+    pendingAgent = {
+      id: Date.now(),
+      type: type,
+      x: dropX,
+      y: dropY,
+      width: parseFloat(document.getElementById('sliderWidth').value) * PPM,
+      length: parseFloat(document.getElementById('sliderLength').value) * PPM,
+      motion: 'static',
+      path: [{ x: dropX, y: dropY }],
+      pathProgress: 0,
+      speed: type === 'auto' ? 4.5 : (type === 'cattle' ? 1.0 : 1.2)
+    };
+
+    if (type === 'static') {
+      agents.push(pendingAgent);
+      pendingAgent = null;
+      renderAgentList();
+    } else {
+      motionModal.style.display = 'flex';
+    }
+  });
+
+  // Motion Modal Selection
+  document.getElementById('btnChooseFreehand').addEventListener('click', () => {
+    motionModal.style.display = 'none';
+    pendingAgent.motion = 'freehand';
+    isDrawingFreehand = true;
+    modeBadge.innerText = 'Mode: Click & Drag to Paint Agent Trajectory';
+  });
+
+  document.getElementById('btnChooseRandom').addEventListener('click', () => {
+    motionModal.style.display = 'none';
+    pendingAgent.motion = 'random';
+    let curX = pendingAgent.x;
+    let curY = pendingAgent.y;
+    for (let i = 0; i < 6; i++) {
+      curX += (Math.random() * 80 - 20);
+      curY += (Math.random() * 60 - 30);
+      curY = Math.max(road.yTop + 20, Math.min(road.yBottom - 20, curY));
+      pendingAgent.path.push({ x: curX, y: curY });
+    }
+    agents.push(pendingAgent);
+    pendingAgent = null;
+    renderAgentList();
+    modeBadge.innerText = 'Mode: READY';
+  });
+
+  document.getElementById('btnChooseStatic').addEventListener('click', () => {
+    motionModal.style.display = 'none';
+    pendingAgent.motion = 'static';
+    agents.push(pendingAgent);
+    pendingAgent = null;
+    renderAgentList();
+    modeBadge.innerText = 'Mode: READY';
+  });
+
+  // Freehand Trajectory Collector
+  canvas.addEventListener('mousedown', (e) => {
+    if (!isDrawingFreehand || !pendingAgent) return;
+    const rect = canvas.getBoundingClientRect();
+    pendingAgent.path = [{ x: e.clientX - rect.left, y: e.clientY - rect.top }];
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!isDrawingFreehand || !pendingAgent || e.buttons !== 1) return;
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = Math.max(road.yTop + 10, Math.min(road.yBottom - 10, e.clientY - rect.top));
+    
+    const last = pendingAgent.path[pendingAgent.path.length - 1];
+    if (Math.hypot(px - last.x, py - last.y) > 10) {
+      pendingAgent.path.push({ x: px, y: py });
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    if (isDrawingFreehand && pendingAgent) {
+      isDrawingFreehand = false;
+      if (pendingAgent.path.length < 2) {
+        pendingAgent.path.push({ x: pendingAgent.x + 40, y: pendingAgent.y });
+      }
+      agents.push(pendingAgent);
+      pendingAgent = null;
+      renderAgentList();
+      modeBadge.innerText = 'Mode: READY';
+    }
+  });
+
+  function renderAgentList() {
+    activeAgentsList.innerHTML = '';
+    agents.forEach((ag, idx) => {
+      const item = document.createElement('div');
+      item.className = 'agent-item';
+      item.innerHTML = `
+        <span>${idx + 1}. ${ag.type.toUpperCase()} (${ag.motion})</span>
+        <button onclick="window.removeAgent(${ag.id})">×</button>
+      `;
+      activeAgentsList.appendChild(item);
+    });
+  }
+
+  window.removeAgent = (id) => {
+    agents = agents.filter(a => a.id !== id);
+    renderAgentList();
+  };
+
+  // Slider Updates
+  document.getElementById('sliderWidth').addEventListener('input', (e) => {
+    document.getElementById('lblWidth').innerText = e.target.value;
+  });
+  document.getElementById('sliderLength').addEventListener('input', (e) => {
+    document.getElementById('lblLength').innerText = e.target.value;
+  });
+
+  // --- Monotonic Parametric Path Planner (Prevents Sawtooth Artifacts) ---
+  function computeLivePlannedPath() {
+    const plannedPoints = [];
+    ego.goalX = width - 50;
+
+    // Anchor Start
+    plannedPoints.push({ x: ego.x, y: ego.y });
+
+    // Sample along monotonic X grid
+    const stepX = 40;
+    for (let sampleX = ego.x + stepX; sampleX < ego.goalX; sampleX += stepX) {
+      let targetY = road.yCenter;
+      
+      for (const ag of agents) {
+        const agPos = getAgentPosition(ag);
+        const dx = agPos.x - sampleX;
+        const dy = agPos.y - targetY;
+        const dist = Math.hypot(dx, dy);
+
+        const influenceRadius = 75; // px
+        if (dist < influenceRadius) {
+          const pushDirection = (agPos.y > road.yCenter) ? -1 : 1;
+          const repulsion = (1.0 - dist / influenceRadius) * (road.laneWidth * 0.75);
+          targetY += pushDirection * repulsion;
         }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+      }
 
-        function handleDragStart(e, type) {
-            draggedType = type;
-            e.dataTransfer.setData('text/plain', type);
+      // Keep strictly within road lane bounds
+      targetY = Math.max(road.yTop + 20, Math.min(road.yBottom - 20, targetY));
+      plannedPoints.push({ x: sampleX, y: targetY });
+    }
+
+    // Terminal Goal Anchor
+    plannedPoints.push({ x: ego.goalX, y: road.yCenter });
+    return plannedPoints;
+  }
+
+  function getAgentPosition(ag) {
+    if (ag.motion === 'static' || ag.path.length <= 1) return { x: ag.x, y: ag.y };
+    const totalPoints = ag.path.length;
+    const idx = Math.floor(ag.pathProgress) % totalPoints;
+    const nextIdx = (idx + 1) % totalPoints;
+    const frac = ag.pathProgress - Math.floor(ag.pathProgress);
+    const p1 = ag.path[idx];
+    const p2 = ag.path[nextIdx];
+    return {
+      x: p1.x + (p2.x - p1.x) * frac,
+      y: p1.y + (p2.y - p1.y) * frac
+    };
+  }
+
+  // --- Vehicle Physics & Controller ---
+  function updateVehiclePhysics(dt, livePath) {
+    if (ego.status === 'ARRIVED') {
+      ego.vx = Math.max(0, ego.vx - ego.maxBraking * dt);
+      return;
+    }
+
+    let minDistance = Infinity;
+    for (const ag of agents) {
+      const pos = getAgentPosition(ag);
+      if (pos.x > ego.x - 20) {
+        const d = Math.hypot(pos.x - ego.x, pos.y - ego.y) / PPM;
+        if (d < minDistance) minDistance = d;
+      }
+    }
+
+    // Curvature slowing
+    let localCurvature = 0;
+    if (livePath.length >= 3) {
+      const dy1 = livePath[1].y - livePath[0].y;
+      const dy2 = livePath[2].y - livePath[1].y;
+      localCurvature = Math.abs(dy2 - dy1) / 40.0;
+    }
+
+    let desiredSpeed = ego.targetSpeed;
+    if (localCurvature > 0.3) desiredSpeed *= 0.55;
+
+    // Longitudinal Braking / Acceleration Model
+    const stopDistanceThreshold = 3.5;
+    if (minDistance < stopDistanceThreshold) {
+      ego.ax = -ego.maxBraking;
+    } else if (minDistance < 8.0) {
+      ego.ax = -ego.maxAccel * (1.0 - (minDistance - stopDistanceThreshold) / 4.5);
+    } else {
+      ego.ax = (desiredSpeed - ego.vx) * 0.8;
+      ego.ax = Math.max(-ego.maxBraking, Math.min(ego.maxAccel, ego.ax));
+    }
+
+    // Goal Arrival Lock
+    const distToGoal = (ego.goalX - ego.x) / PPM;
+    if (distToGoal < 5.0) {
+      ego.ax = -Math.min(ego.maxBraking, (ego.vx * ego.vx) / (2 * Math.max(0.5, distToGoal)));
+      if (distToGoal < 0.3 || ego.vx < 0.2) {
+        ego.vx = 0;
+        ego.ax = 0;
+        ego.status = 'ARRIVED';
+        stateBadge.innerText = 'Vehicle: ARRIVED (Goal Reached)';
+        return;
+      }
+    }
+
+    ego.vx = Math.max(0, ego.vx + ego.ax * dt);
+    const speedPixels = ego.vx * PPM;
+
+    // Pure Pursuit Steering & Yaw
+    if (livePath.length > 1) {
+      const target = livePath[1];
+      const targetAngle = Math.atan2(target.y - ego.y, target.x - ego.x);
+      ego.yaw += (targetAngle - ego.yaw) * Math.min(1.0, 8.0 * dt);
+
+      ego.x += Math.cos(ego.yaw) * speedPixels * dt;
+      ego.y += Math.sin(ego.yaw) * speedPixels * dt;
+    } else {
+      ego.x += speedPixels * dt;
+    }
+
+    // Record Traveled History
+    const lastHistory = ego.history[ego.history.length - 1];
+    if (!lastHistory || Math.hypot(ego.x - lastHistory.x, ego.y - lastHistory.y) > 4) {
+      ego.history.push({ x: ego.x, y: ego.y });
+    }
+  }
+
+  // --- Telemetry & Risk Calculation ---
+  function updateTelemetry() {
+    let minD = Infinity;
+    for (const ag of agents) {
+      const pos = getAgentPosition(ag);
+      const d = Math.hypot(pos.x - ego.x, pos.y - ego.y) / PPM;
+      if (d < minD) minD = d;
+    }
+
+    const sigmaSafe = 2.5;
+    const danger = minD === Infinity ? 0.0 : Math.min(100, Math.exp(-(minD * minD) / (2 * sigmaSafe * sigmaSafe)) * 100);
+    const safety = Math.max(0, 100 - danger);
+
+    document.getElementById('valDanger').innerText = `${danger.toFixed(1)}%`;
+    document.getElementById('valSafety').innerText = `${safety.toFixed(1)}%`;
+    document.getElementById('valSpeed').innerText = `${(ego.vx * 3.6).toFixed(1)} km/h`;
+    document.getElementById('valAccel').innerText = `${ego.ax.toFixed(2)} m/s²`;
+    document.getElementById('valElapsed').innerText = `${simTime.toFixed(1)}s`;
+    document.getElementById('valClearance').innerText = minD === Infinity ? '-- m' : `${minD.toFixed(2)} m`;
+
+    const remDist = Math.max(0, (ego.goalX - ego.x) / PPM);
+    const eta = ego.vx > 0.5 ? (remDist / ego.vx).toFixed(1) + 's' : '--';
+    document.getElementById('valETA').innerText = eta;
+  }
+
+  // --- Render Functions ---
+  function drawRoad() {
+    updateRoadBounds();
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0, road.yTop, width, road.laneWidth * road.numLanes);
+
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, road.yTop); ctx.lineTo(width, road.yTop);
+    ctx.moveTo(0, road.yBottom); ctx.lineTo(width, road.yBottom);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([16, 12]);
+    ctx.beginPath();
+    ctx.moveTo(0, road.yCenter); ctx.lineTo(width, road.yCenter);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawAgents() {
+    // Render Pending Agent during Drag/Drop
+    if (pendingAgent) {
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(pendingAgent.x, pendingAgent.y, 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (pendingAgent.path.length > 1) {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pendingAgent.path[0].x, pendingAgent.path[0].y);
+        for (let i = 1; i < pendingAgent.path.length; i++) {
+          ctx.lineTo(pendingAgent.path[i].x, pendingAgent.path[i].y);
         }
+        ctx.stroke();
+      }
+    }
 
-        const canvasContainer = document.getElementById('canvasContainer');
-        canvasContainer.addEventListener('dragover', (e) => e.preventDefault());
-        canvasContainer.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (isSimulating) return;
+    // Render Active Placed Agents
+    agents.forEach(ag => {
+      const pos = getAgentPosition(ag);
 
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+      if (ag.path && ag.path.length > 1) {
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(ag.path[0].x, ag.path[0].y);
+        for (let i = 1; i < ag.path.length; i++) ctx.lineTo(ag.path[i].x, ag.path[i].y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
 
-            const worldX = (mouseX - OFFSET_X) / SCALE;
-            const worldY = (mouseY - OFFSET_Y) / SCALE;
+      if (ag.type === 'static') {
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(pos.x - ag.width / 2, pos.y - ag.length / 2, ag.width, ag.length);
+        ctx.strokeStyle = '#fca5a5';
+        ctx.strokeRect(pos.x - ag.width / 2, pos.y - ag.length / 2, ag.width, ag.length);
+      } else {
+        ctx.fillStyle = ag.type === 'cattle' ? '#f97316' : (ag.type === 'auto' ? '#06b6d4' : '#eab308');
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
+        ctx.fill();
 
-            pendingAgent = {
-                id: Date.now(),
-                type: draggedType,
-                x: worldX,
-                y: worldY,
-                width: staticWidth,
-                length: staticLength,
-                waypoints: [{ x: worldX, y: worldY }],
-                motionMode: 'static',
-                currentWayIdx: 0
-            };
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(ag.type.toUpperCase(), pos.x, pos.y - 16);
+      }
+    });
+  }
 
-            if (draggedType === 'static') {
-                placedObjects.push(pendingAgent);
-                pendingAgent = null;
-                updateObsList();
-                replanSplinePath();
-                draw();
-            } else {
-                document.getElementById('motionModal').style.display = 'flex';
-            }
-        });
+  function drawTrailsAndVehicle(livePath) {
+    // 1. PAST TRAVELED PATH (BOLD GREEN LINE - GROUND TRUTH)
+    if (ego.history.length > 1) {
+      ctx.strokeStyle = '#00FF66';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ego.history[0].x, ego.history[0].y);
+      for (let i = 1; i < ego.history.length; i++) {
+        ctx.lineTo(ego.history[i].x, ego.history[i].y);
+      }
+      ctx.stroke();
+    }
 
-        function selectMotionMode(mode) {
-            document.getElementById('motionModal').style.display = 'none';
-            if (!pendingAgent) return;
+    // 2. LIVE AI PLANNED PATH HORIZON (THIN RED LINE)
+    if (livePath.length > 1) {
+      ctx.strokeStyle = '#FF3B30';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(livePath[0].x, livePath[0].y);
+      for (let i = 1; i < livePath.length; i++) {
+        const xc = (livePath[i].x + livePath[i - 1].x) / 2;
+        const yc = (livePath[i].y + livePath[i - 1].y) / 2;
+        ctx.quadraticCurveTo(livePath[i - 1].x, livePath[i - 1].y, xc, yc);
+      }
+      ctx.lineTo(livePath[livePath.length - 1].x, livePath[livePath.length - 1].y);
+      ctx.stroke();
+    }
 
-            pendingAgent.motionMode = mode;
+    // 3. EGO VEHICLE (CYAN BOX)
+    ctx.save();
+    ctx.translate(ego.x, ego.y);
+    ctx.rotate(ego.yaw);
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(-ego.length / 2, -ego.width / 2, ego.length, ego.width);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-ego.length / 2, -ego.width / 2, ego.length, ego.width);
 
-            if (mode === 'freehand') {
-                document.getElementById('lblMode').innerText = "DRAW TRAJECTORY (Click & Drag on Canvas)";
-                isFreehandDrawing = true;
-                currentDrawPath = [{ x: pendingAgent.x, y: pendingAgent.y }];
-            } else if (mode === 'random') {
-                // Generate random continuous walk
-                let waypoints = [{ x: pendingAgent.x, y: pendingAgent.y }];
-                let currX = pendingAgent.x;
-                let currY = pendingAgent.y;
-                for (let i = 0; i < 6; i++) {
-                    currX += 4 + Math.random() * 4;
-                    currY += (Math.random() - 0.5) * 4;
-                    waypoints.push({ x: currX, y: Math.min(3.5, Math.max(-3.5, currY)) });
-                }
-                pendingAgent.waypoints = waypoints;
-                placedObjects.push(pendingAgent);
-                pendingAgent = null;
-                updateObsList();
-                replanSplinePath();
-                draw();
-            } else {
-                placedObjects.push(pendingAgent);
-                pendingAgent = null;
-                updateObsList();
-                replanSplinePath();
-                draw();
-            }
+    // Headlights
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(ego.length / 2 - 3, -ego.width / 2 + 2, 3, 5);
+    ctx.fillRect(ego.length / 2 - 3, ego.width / 2 - 7, 3, 5);
+    ctx.restore();
+  }
+
+  function gameLoop(timestamp) {
+    if (!lastTimestamp) lastTimestamp = timestamp;
+    const dt = Math.min(0.05, (timestamp - lastTimestamp) / 1000);
+    lastTimestamp = timestamp;
+
+    ctx.clearRect(0, 0, width, height);
+    drawRoad();
+
+    if (simRunning) {
+      simTime += dt;
+      agents.forEach(ag => {
+        if (ag.motion !== 'static' && ag.path.length > 1) {
+          ag.pathProgress += (ag.speed * dt * 0.5);
         }
+      });
+    }
 
-        // Freehand Paintbrush Path Drawing Events
-        canvas.addEventListener('mousedown', (e) => {
-            if (isFreehandDrawing && pendingAgent) {
-                const rect = canvas.getBoundingClientRect();
-                const worldX = (e.clientX - rect.left - OFFSET_X) / SCALE;
-                const worldY = (e.clientY - rect.top - OFFSET_Y) / SCALE;
-                currentDrawPath.push({ x: worldX, y: worldY });
-            }
-        });
+    const livePlannedPath = computeLivePlannedPath();
 
-        canvas.addEventListener('mousemove', (e) => {
-            if (isFreehandDrawing && e.buttons === 1 && pendingAgent) {
-                const rect = canvas.getBoundingClientRect();
-                const worldX = (e.clientX - rect.left - OFFSET_X) / SCALE;
-                const worldY = (e.clientY - rect.top - OFFSET_Y) / SCALE;
-                
-                let lastPt = currentDrawPath[currentDrawPath.length - 1];
-                if (Math.hypot(worldX - lastPt.x, worldY - lastPt.y) > 0.4) {
-                    currentDrawPath.push({ x: worldX, y: worldY });
-                    draw();
-                }
-            }
-        });
+    if (simRunning) {
+      updateVehiclePhysics(dt, livePlannedPath);
+    }
 
-        canvas.addEventListener('mouseup', () => {
-            if (isFreehandDrawing && pendingAgent) {
-                isFreehandDrawing = false;
-                pendingAgent.waypoints = downsamplePath(currentDrawPath);
-                placedObjects.push(pendingAgent);
-                pendingAgent = null;
-                document.getElementById('lblMode').innerText = "READY (Drag Agent to Road)";
-                updateObsList();
-                replanSplinePath();
-                draw();
-            }
-        });
+    drawAgents();
+    drawTrailsAndVehicle(livePlannedPath);
+    updateTelemetry();
 
-        function downsamplePath(pts) {
-            if (pts.length <= 4) return pts;
-            let result = [pts[0]];
-            let step = Math.floor(pts.length / 8);
-            for (let i = step; i < pts.length - 1; i += step) {
-                result.push(pts[i]);
-            }
-            result.push(pts[pts.length - 1]);
-            return result;
-        }
+    requestAnimationFrame(gameLoop);
+  }
+  requestAnimationFrame(gameLoop);
 
-        function updateStaticSize() {
-            staticWidth = parseFloat(document.getElementById('sliderWidth').value);
-            staticLength = parseFloat(document.getElementById('sliderLength').value);
-            document.getElementById('lblWidth').innerText = staticWidth + 'm';
-            document.getElementById('lblLength').innerText = staticLength + 'm';
-        }
+  // Simulation Controls
+  document.getElementById('btnRun').addEventListener('click', () => {
+    simRunning = true;
+    ego.status = 'DRIVING';
+    stateBadge.innerText = 'Vehicle: AUTONOMOUS CRUISE';
+  });
 
-        function updateObsList() {
-            document.getElementById('obsCount').innerText = placedObjects.length;
-            const list = document.getElementById('obsList');
-            list.innerHTML = '';
-            placedObjects.forEach((obs, idx) => {
-                list.innerHTML += `<div class="obs-item">
-                    <span>${idx+1}. ${obs.type.toUpperCase()} (${obs.motionMode})</span>
-                    <div class="obs-actions">
-                        <button class="icon-btn" title="Redraw" onclick="redrawObs(${idx})">✏️</button>
-                        <button class="icon-btn" title="Delete" onclick="removeObs(${idx})">❌</button>
-                    </div>
-                </div>`;
-            });
-        }
-
-        function redrawObs(idx) {
-            pendingAgent = placedObjects[idx];
-            placedObjects.splice(idx, 1);
-            document.getElementById('motionModal').style.display = 'flex';
-        }
-
-        function removeObs(idx) {
-            placedObjects.splice(idx, 1);
-            updateObsList();
-            replanSplinePath();
-            draw();
-        }
-
-        // Smooth Spline Pathfinder (Cubic Catmull-Rom)
-        function replanSplinePath() {
-            let ctrlPts = [];
-            const numCtrl = 6;
-            for (let i = 0; i <= numCtrl; i++) {
-                let t = i / numCtrl;
-                let px = ego.x + t * (goal.x - ego.x);
-                let py = ego.y + t * (goal.y - ego.y);
-
-                let devY = 0;
-                placedObjects.forEach(obs => {
-                    let ox = obs.x;
-                    let oy = obs.y;
-                    let d = Math.hypot(px - ox, py - oy);
-                    let clearR = obs.type === 'cattle' ? 3.5 : (obs.type === 'static' ? Math.max(obs.width, obs.length) + 1.5 : 2.5);
-                    if (d < clearR) {
-                        devY += (py >= oy ? (clearR - d) * 0.8 : -(clearR - d) * 0.8);
-                    }
-                });
-
-                ctrlPts.push({ x: px, y: py + devY });
-            }
-
-            let splinePath = [];
-            for (let i = 0; i < ctrlPts.length - 1; i++) {
-                let p0 = ctrlPts[Math.max(0, i - 1)];
-                let p1 = ctrlPts[i];
-                let p2 = ctrlPts[i + 1];
-                let p3 = ctrlPts[Math.min(ctrlPts.length - 1, i + 2)];
-
-                for (let t = 0; t < 1; t += 0.1) {
-                    let t2 = t * t, t3 = t2 * t;
-                    let x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-                    let y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.x) * t3);
-                    splinePath.push({ x, y });
-                }
-            }
-            liveReplannedPath = splinePath;
-        }
-
-        function runSimulation() {
-            if (isSimulating) return;
-            isSimulating = true;
-            document.getElementById('btnRun').innerText = "⏸ PAUSE";
-            loop();
-        }
-
-        function resetStudio() {
-            isSimulating = false;
-            if (animId) cancelAnimationFrame(animId);
-            document.getElementById('btnRun').innerText = "▶ RUN SIMULATION";
-            ego = { x: 2, y: 0, theta: 0, v: 3.5 };
-            pastTraveledPath = [];
-            simTime = 0;
-            document.getElementById('lblTime').innerText = "0.0s";
-            document.getElementById('valElapsed').innerText = "0.0s";
-            
-            placedObjects.forEach(obs => {
-                if (obs.waypoints && obs.waypoints.length > 0) {
-                    obs.x = obs.waypoints[0].x;
-                    obs.y = obs.waypoints[0].y;
-                    obs.currentWayIdx = 0;
-                }
-            });
-
-            replanSplinePath();
-            draw();
-        }
-
-        function updateSim(dt) {
-            simTime += dt;
-            document.getElementById('lblTime').innerText = simTime.toFixed(1) + 's';
-            document.getElementById('valElapsed').innerText = simTime.toFixed(1) + 's';
-
-            // 1. PAST PATH TRAVELED (GROUND TRUTH)
-            pastTraveledPath.push({ x: ego.x, y: ego.y });
-
-            // 2. Move Dynamic Obstacles
-            placedObjects.forEach(obs => {
-                if (obs.waypoints && obs.waypoints.length > 1) {
-                    let targetWp = obs.waypoints[obs.currentWayIdx + 1];
-                    if (targetWp) {
-                        let dx = targetWp.x - obs.x;
-                        let dy = targetWp.y - obs.y;
-                        let dist = Math.hypot(dx, dy);
-                        if (dist < 0.3) {
-                            obs.currentWayIdx = (obs.currentWayIdx + 1) % (obs.waypoints.length - 1);
-                        } else {
-                            obs.x += (dx / dist) * 1.5 * dt;
-                            obs.y += (dy / dist) * 1.5 * dt;
-                        }
-                    }
-                }
-            });
-
-            // 3. Re-plan Live Path
-            replanSplinePath();
-
-            // 4. Vehicle Dynamics Integration
-            if (liveReplannedPath.length > 4) {
-                let target = liveReplannedPath[4];
-                let dx = target.x - ego.x;
-                let dy = target.y - ego.y;
-                let targetAngle = Math.atan2(dy, dx);
-
-                ego.theta += (targetAngle - ego.theta) * 0.15;
-                ego.x += ego.v * Math.cos(ego.theta) * dt;
-                ego.y += ego.v * Math.sin(ego.theta) * dt;
-            }
-
-            // 5. SAFETY & RISK MATH ENGINE COMPUTATIONS
-            let minDistance = 999;
-            placedObjects.forEach(obs => {
-                let d = Math.hypot(ego.x - obs.x, ego.y - obs.y);
-                if (d < minDistance) minDistance = d;
-            });
-
-            if (placedObjects.length > 0) {
-                // Collision Risk P_danger = exp(-d_min^2 / (2 * sigma_safe^2)) * 100%
-                let sigma_safe = 1.8;
-                let P_danger = Math.exp(-Math.pow(minDistance, 2) / (2 * Math.pow(sigma_safe, 2))) * 100;
-                document.getElementById('valDanger').innerText = P_danger.toFixed(1) + '%';
-
-                // Safety Index S = max(0, min(100, (d_min - d_stop) / d_nominal * 100))%
-                let d_stop = 0.8;
-                let d_nominal = 3.0;
-                let SafetyIndex = Math.max(0, Math.min(100, ((minDistance - d_stop) / d_nominal) * 100));
-                document.getElementById('valSafety').innerText = SafetyIndex.toFixed(0) + '%';
-                document.getElementById('valClearance').innerText = minDistance.toFixed(1) + ' m';
-            } else {
-                document.getElementById('valDanger').innerText = '0.0%';
-                document.getElementById('valSafety').innerText = '100%';
-                document.getElementById('valClearance').innerText = '-- m';
-            }
-
-            // Estimated Time to Goal (ETA = d_rem / v)
-            let remDist = Math.hypot(goal.x - ego.x, goal.y - ego.y);
-            let ETA = remDist / ego.v;
-            document.getElementById('valETA').innerText = ETA.toFixed(1) + 's';
-
-            // Goal check
-            if (remDist < 1.5) {
-                isSimulating = false;
-                document.getElementById('btnRun').innerText = "▶ RUN AGAIN";
-            }
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Road Surface
-            ctx.fillStyle = "#161d2b";
-            ctx.fillRect(0, OFFSET_Y - 70, canvas.width, 140);
-
-            ctx.strokeStyle = "#384766"; ctx.setLineDash([10, 10]);
-            ctx.beginPath(); ctx.moveTo(0, OFFSET_Y - 70); ctx.lineTo(canvas.width, OFFSET_Y - 70);
-            ctx.moveTo(0, OFFSET_Y + 70); ctx.lineTo(canvas.width, OFFSET_Y + 70); ctx.stroke();
-            ctx.setLineDash([]);
-
-            // 1. PAST TRAVELED PATH (BOLD WEIGHTED GREEN LINE - GROUND TRUTH)
-            if (pastTraveledPath.length > 1) {
-                ctx.strokeStyle = "#00FF66"; // Bold Green
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                pastTraveledPath.forEach((pt, i) => {
-                    let cx = OFFSET_X + pt.x * SCALE;
-                    let cy = OFFSET_Y + pt.y * SCALE;
-                    if (i === 0) ctx.moveTo(cx, cy);
-                    else ctx.lineTo(cx, cy);
-                });
-                ctx.stroke();
-            }
-
-            // 2. LIVE REPLANNED PATH (THIN HIGH-CONTRAST RED LINE - AI TRAJECTORY)
-            if (liveReplannedPath.length > 1) {
-                ctx.strokeStyle = "#FF3B30"; // Thin Red Line
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                liveReplannedPath.forEach((pt, i) => {
-                    let cx = OFFSET_X + pt.x * SCALE;
-                    let cy = OFFSET_Y + pt.y * SCALE;
-                    if (i === 0) ctx.moveTo(cx, cy);
-                    else ctx.lineTo(cx, cy);
-                });
-                ctx.stroke();
-            }
-
-            // Draw Freehand Drawing Trail
-            if (isFreehandDrawing && currentDrawPath.length > 1) {
-                ctx.strokeStyle = "rgba(0, 210, 255, 0.8)";
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                currentDrawPath.forEach((pt, i) => {
-                    let cx = OFFSET_X + pt.x * SCALE;
-                    let cy = OFFSET_Y + pt.y * SCALE;
-                    if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
-                });
-                ctx.stroke();
-            }
-
-            // Draw Placed Objects
-            placedObjects.forEach(obs => {
-                let ox = OFFSET_X + obs.x * SCALE;
-                let oy = OFFSET_Y + obs.y * SCALE;
-
-                // Object drawn path
-                if (obs.waypoints && obs.waypoints.length > 1) {
-                    ctx.strokeStyle = "rgba(255, 145, 0, 0.4)";
-                    ctx.setLineDash([4, 4]);
-                    ctx.beginPath();
-                    obs.waypoints.forEach((wp, idx) => {
-                        let wx = OFFSET_X + wp.x * SCALE;
-                        let wy = OFFSET_Y + wp.y * SCALE;
-                        if (idx === 0) ctx.moveTo(wx, wy); else ctx.lineTo(wx, wy);
-                    });
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                }
-
-                if (obs.type === 'static') {
-                    ctx.fillStyle = "#ff3d00";
-                    ctx.fillRect(ox - (obs.length*SCALE)/2, oy - (obs.width*SCALE)/2, obs.length*SCALE, obs.width*SCALE);
-                    ctx.strokeStyle = "#ffffff";
-                    ctx.strokeRect(ox - (obs.length*SCALE)/2, oy - (obs.width*SCALE)/2, obs.length*SCALE, obs.width*SCALE);
-                } else {
-                    ctx.fillStyle = obs.type === 'cattle' ? '#ff9100' : (obs.type === 'auto' ? '#e040fb' : '#ffea00');
-                    ctx.beginPath(); ctx.arc(ox, oy, 14, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = "#fff"; ctx.font = "10px sans-serif"; ctx.fillText(obs.type.toUpperCase(), ox - 16, oy - 18);
-                }
-            });
-
-            // Goal Marker
-            let gx = OFFSET_X + goal.x * SCALE;
-            let gy = OFFSET_Y + goal.y * SCALE;
-            ctx.fillStyle = "#00FF66";
-            ctx.beginPath(); ctx.arc(gx, gy, 12, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "#0b0f19"; ctx.fillText("GOAL", gx - 14, gy + 3);
-
-            // Ego Car
-            let ex = OFFSET_X + ego.x * SCALE;
-            let ey = OFFSET_Y + ego.y * SCALE;
-            ctx.save();
-            ctx.translate(ex, ey);
-            ctx.rotate(ego.theta);
-            ctx.fillStyle = "#00d2ff";
-            ctx.fillRect(-18, -10, 36, 20);
-            ctx.fillStyle = "#0b0f19";
-            ctx.fillRect(-6, -8, 12, 16);
-            ctx.restore();
-        }
-
-        function loadPreset(num) {
-            placedObjects = [];
-            if (num === 1) {
-                placedObjects.push({ type: 'cattle', x: 25, y: -4, motionMode: 'freehand', waypoints: [{x:25, y:-4}, {x:26, y:3}], currentWayIdx: 0 });
-                placedObjects.push({ type: 'static', x: 38, y: 1, width: 2.0, length: 2.0, motionMode: 'static' });
-            } else {
-                placedObjects.push({ type: 'auto', x: 28, y: 6, motionMode: 'freehand', waypoints: [{x:28, y:6}, {x:28, y:-5}], currentWayIdx: 0 });
-                placedObjects.push({ type: 'pedestrian', x: 35, y: -4, motionMode: 'freehand', waypoints: [{x:35, y:-4}, {x:35, y:2}], currentWayIdx: 0 });
-            }
-            updateObsList();
-            resetStudio();
-        }
-
-        function loop() {
-            if (isSimulating) updateSim(0.04);
-            draw();
-            animId = requestAnimationFrame(loop);
-        }
-
-        loadPreset(1);
-        loop();
-    </script>
+  document.getElementById('btnReset').addEventListener('click', () => {
+    simRunning = false;
+    simTime = 0;
+    ego.x = 60;
+    ego.y = road.yCenter;
+    ego.vx = 0;
+    ego.ax = 0;
+    ego.yaw = 0;
+    ego.history = [];
+    ego.status = 'READY';
+    stateBadge.innerText = 'Vehicle: IDLE';
+    agents.forEach(a => a.pathProgress = 0);
+  });
+})();
+</script>
 </body>
 </html>
