@@ -677,66 +677,87 @@ document.addEventListener('DOMContentLoaded', () => {
   let chartVxInstance = null;
   let chartAtInstance = null;
 
+// 1. Initialized Scenario with Calibrated Velocities & Waypoints
   function loadDefaultVillageScenario() {
     updateRoadBounds();
-    ego.x = 60;
+    ego.x = 50;
     ego.y = road.yCenter;
     ego.vx = 0;
     ego.ax = 0;
     ego.yaw = 0;
-    ego.history = [];
+    ego.history = [{ x: ego.x, y: ego.y }];
     ego.status = 'READY';
+    simTime = 0;
 
     agents = [
       {
-        id: 1,
-        type: 'cattle',
-        x: 200,
-        y: road.yTop + 10,
-        width: 1.5 * PPM,
-        length: 2.2 * PPM,
-        motion: 'freehand',
+        id: 1, type: 'cattle', name: 'Cattle (Crossing)',
+        x: 360, y: road.yCenter - 65,
+        speed: 35, // px per second
+        targetIdx: 1,
+        color: '#f97316', radius: 14,
         path: [
-          { x: 200, y: road.yTop + 10 },
-          { x: 240, y: road.yCenter - 10 },
-          { x: 280, y: road.yBottom - 20 }
-        ],
-        pathProgress: 0,
-        speed: 0.8
+          { x: 360, y: road.yCenter - 65 },
+          { x: 400, y: road.yCenter },
+          { x: 440, y: road.yCenter + 70 },
+          { x: 540, y: road.yCenter + 70 }
+        ]
       },
       {
-        id: 2,
-        type: 'pedestrian',
-        x: 420,
-        y: road.yBottom - 10,
-        width: 1.2 * PPM,
-        length: 1.2 * PPM,
-        motion: 'freehand',
+        id: 2, type: 'pedestrian', name: 'Pedestrian (Transverse)',
+        x: 600, y: road.yCenter + 65,
+        speed: 45, // px per second
+        targetIdx: 1,
+        color: '#eab308', radius: 10,
         path: [
-          { x: 420, y: road.yBottom - 10 },
-          { x: 420, y: road.yTop + 10 }
-        ],
-        pathProgress: 0,
-        speed: 1.2
+          { x: 600, y: road.yCenter + 65 },
+          { x: 600, y: road.yCenter - 70 },
+          { x: 680, y: road.yCenter - 70 }
+        ]
       },
       {
-        id: 3,
-        type: 'auto',
-        x: 520,
-        y: road.yCenter + 15,
-        width: 1.8 * PPM,
-        length: 3.0 * PPM,
-        motion: 'freehand',
+        id: 3, type: 'auto', name: 'Auto-Rickshaw (Weaving)',
+        x: 750, y: road.yCenter - 25,
+        speed: 75, // px per second
+        targetIdx: 1,
+        color: '#06b6d4', radius: 16,
         path: [
-          { x: 520, y: road.yCenter + 15 },
-          { x: 600, y: road.yCenter - 25 },
-          { x: 680, y: road.yCenter + 10 }
-        ],
-        pathProgress: 0,
-        speed: 3.5
+          { x: 750, y: road.yCenter - 25 },
+          { x: 840, y: road.yCenter + 30 },
+          { x: 930, y: road.yCenter - 25 },
+          { x: 1100, y: road.yCenter - 25 }
+        ]
       }
     ];
     renderAgentList();
+  }
+
+  // 2. Continuous Direction-Vector Motion Engine
+  function updateAgentPositions(dt) {
+    agents.forEach(agent => {
+      if (!agent.path || agent.path.length < 2 || agent.motion === 'static') return;
+
+      if (!agent.targetIdx) agent.targetIdx = 1;
+      const target = agent.path[agent.targetIdx];
+      const dx = target.x - agent.x;
+      const dy = target.y - agent.y;
+      const distToTarget = Math.hypot(dx, dy);
+
+      const step = agent.speed * dt;
+
+      if (distToTarget <= step) {
+        agent.x = target.x;
+        agent.y = target.y;
+        if (agent.targetIdx < agent.path.length - 1) {
+          agent.targetIdx++;
+        } else {
+          agent.x += step;
+        }
+      } else if (distToTarget > 0) {
+        agent.x += (dx / distToTarget) * step;
+        agent.y += (dy / distToTarget) * step;
+      }
+    });
   }
 
   // Drag & Drop Setup
@@ -1294,11 +1315,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (simRunning) {
       simTime += dt;
-      agents.forEach(ag => {
-        if (ag.motion !== 'static' && ag.path && ag.path.length > 1) {
-          ag.pathProgress = (ag.pathProgress || 0) + ((ag.speed || 1.2) * dt * 0.5);
-        }
-      });
+      updateAgentPositions(dt);
     }
 
     const livePlannedPath = computeLivePlannedPath();
