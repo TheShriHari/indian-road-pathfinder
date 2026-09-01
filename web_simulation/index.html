@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Interactive Autonomous Pathfinder Studio (PS 26037)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg-dark: #0a0f1d;
@@ -54,6 +55,8 @@
     .btn-run:hover { background: #059669; }
     .btn-reset { background: #ef4444; color: white; }
     .btn-reset:hover { background: #dc2626; }
+    .btn-export { background: #06b6d4; color: white; }
+    .btn-export:hover { background: #0891b2; }
 
     .studio-container {
       display: grid;
@@ -158,7 +161,7 @@
       backdrop-filter: blur(4px);
     }
 
-    canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+    canvas#simCanvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 
     .telemetry-grid {
       display: grid;
@@ -178,11 +181,12 @@
     .telemetry-val { font-size: 1.15rem; font-weight: 700; }
     .telemetry-lbl { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
 
+    /* Modals */
     .modal-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(0,0,0,0.65);
-      backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(5px);
       display: none;
       align-items: center;
       justify-content: center;
@@ -210,6 +214,62 @@
       text-align: left;
     }
     .choice-card button:hover { background: #374151; border-color: var(--accent-cyan); }
+
+    /* Post-Simulation Analytics Modal */
+    .analytics-modal {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      width: 90%;
+      max-width: 900px;
+      max-height: 90vh;
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+    }
+    .analytics-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+    .analytics-header h2 { font-size: 1.3rem; color: #38bdf8; }
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .kpi-card {
+      background: var(--card-bg);
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid var(--accent-cyan);
+    }
+    .kpi-card.green { border-left-color: var(--accent-green); }
+    .kpi-card.red { border-left-color: var(--accent-red); }
+    .kpi-card.orange { border-left-color: var(--accent-orange); }
+    .kpi-val { font-size: 1.2rem; font-weight: 700; }
+    .kpi-lbl { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
+
+    .charts-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .chart-box {
+      background: var(--card-bg);
+      padding: 12px;
+      border-radius: 8px;
+      height: 220px;
+    }
+    .chart-box.full-width {
+      grid-column: span 2;
+      height: 200px;
+    }
   </style>
 </head>
 <body>
@@ -217,6 +277,7 @@
 <header>
   <div class="title">Interactive Autonomous Pathfinder Studio (PS 26037)</div>
   <div class="header-actions">
+    <button class="btn btn-export" id="btnExportCSV">📥 Export Telemetry CSV</button>
     <button class="btn btn-run" id="btnRun">▶ RUN SIMULATION</button>
     <button class="btn btn-reset" id="btnReset">↺ RESET STUDIO</button>
   </div>
@@ -253,21 +314,67 @@
     </div>
   </div>
 
-  <!-- Center Canvas -->
+  <!-- Center Canvas Viewport -->
   <div class="canvas-viewport" id="viewport">
     <div class="canvas-topbar">
-      <div class="status-badge" id="modeBadge" style="color: var(--accent-cyan); font-weight:600;">Mode: READY (Drag Obstacle to Road)</div>
+      <div class="status-badge" id="modeBadge" style="color: var(--accent-cyan); font-weight:600;">Scenario: Indian Village Road (Default)</div>
       <div class="status-badge" id="stateBadge" style="font-weight:600;">Vehicle: IDLE</div>
     </div>
     <canvas id="simCanvas"></canvas>
 
-    <!-- Modal for Motion Type -->
+    <!-- Motion Mode Modal -->
     <div class="modal-overlay" id="motionModal">
       <div class="choice-card">
         <div style="font-weight: 700; font-size: 0.95rem; text-align: center; color: var(--accent-cyan);">Choose Agent Motion</div>
         <button id="btnChooseFreehand">✏️ Freehand Draw Path (Click & Drag)</button>
         <button id="btnChooseRandom">🎲 Continuous Random Walk</button>
         <button id="btnChooseStatic">📍 Keep Stationary</button>
+      </div>
+    </div>
+
+    <!-- Post-Simulation Diagnostics Analytics Modal -->
+    <div class="modal-overlay" id="analyticsModal">
+      <div class="analytics-modal">
+        <div class="analytics-header">
+          <h2>📊 Post-Simulation Diagnostics & Analytics</h2>
+          <button class="btn btn-reset" onclick="closeAnalyticsModal()">Close</button>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-card" id="kpiMissionCard">
+            <div class="kpi-val" id="kpiTime">18.4s</div>
+            <div class="kpi-lbl">Total Mission Time</div>
+          </div>
+          <div class="kpi-card green" id="kpiSafetyCard">
+            <div class="kpi-val" id="kpiMinSafety">92.4%</div>
+            <div class="kpi-lbl">Min Safety Score (S_min)</div>
+          </div>
+          <div class="kpi-card green" id="kpiStatusCard">
+            <div class="kpi-val" id="kpiStatus">CLEAN MISSION</div>
+            <div class="kpi-lbl">Collision Status</div>
+          </div>
+          <div class="kpi-card orange">
+            <div class="kpi-val" id="kpiPeakAccel">2.2 / -1.8 m/s²</div>
+            <div class="kpi-lbl">Peak Accel / Decel</div>
+          </div>
+        </div>
+
+        <div class="charts-container">
+          <div class="chart-box">
+            <canvas id="chartVt"></canvas>
+          </div>
+          <div class="chart-box">
+            <canvas id="chartVx"></canvas>
+          </div>
+          <div class="chart-box full-width">
+            <canvas id="chartAt"></canvas>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+          <button class="btn btn-export" onclick="exportTelemetryCSV()">📥 Export Telemetry CSV</button>
+          <button class="btn btn-run" onclick="closeAnalyticsModal()">Done & Re-Run</button>
+        </div>
       </div>
     </div>
   </div>
@@ -348,7 +455,7 @@
   }
   updateRoadBounds();
 
-  // Ego Vehicle State with Dynamic Bicycle Dynamics
+  // Ego Vehicle State
   const ego = {
     x: 60,
     y: road.yCenter,
@@ -360,7 +467,7 @@
     width: 2.0 * PPM,
     length: 4.2 * PPM,
     yaw: 0,
-    history: [],        // Ground truth traveled path [{x, y}]
+    history: [],        // [{x, y}]
     status: 'READY',
     goalX: 0
   };
@@ -372,11 +479,85 @@
   let pendingAgent = null;
   let isDrawingFreehand = false;
 
+  // Telemetry Log Store
+  let telemetryLog = {
+    t: [],
+    x: [],
+    v: [],
+    a: [],
+    S: [],
+    Dmin: []
+  };
+
   // UI Elements
   const modeBadge = document.getElementById('modeBadge');
   const stateBadge = document.getElementById('stateBadge');
   const motionModal = document.getElementById('motionModal');
+  const analyticsModal = document.getElementById('analyticsModal');
   const activeAgentsList = document.getElementById('activeAgentsList');
+
+  // Chart Instances
+  let chartVtInstance = null;
+  let chartVxInstance = null;
+  let chartAtInstance = null;
+
+  // 1. AUTOMATED DEFAULT "INDIAN VILLAGE ROAD" SCENARIO SETUP
+  function loadDefaultVillageScenario() {
+    updateRoadBounds();
+    agents = [
+      // 1. Stray Cattle (Slow Diagonal Crossing & Linger)
+      {
+        id: 1,
+        type: 'cattle',
+        x: 180,
+        y: road.yTop + 10,
+        width: 1.5 * PPM,
+        length: 2.2 * PPM,
+        motion: 'freehand',
+        path: [
+          { x: 180, y: road.yTop + 10 },
+          { x: 220, y: road.yCenter - 10 },
+          { x: 250, y: road.yBottom - 20 }
+        ],
+        pathProgress: 0,
+        speed: 0.8
+      },
+      // 2. Pedestrian / Pushcart (Transverse Perpendicular Crossing)
+      {
+        id: 2,
+        type: 'pedestrian',
+        x: 380,
+        y: road.yBottom - 10,
+        width: 1.2 * PPM,
+        length: 1.2 * PPM,
+        motion: 'freehand',
+        path: [
+          { x: 380, y: road.yBottom - 10 },
+          { x: 380, y: road.yTop + 10 }
+        ],
+        pathProgress: 0,
+        speed: 1.2
+      },
+      // 3. Erratic Auto-Rickshaw (Overtake & Lane Merge)
+      {
+        id: 3,
+        type: 'auto',
+        x: 480,
+        y: road.yCenter + 15,
+        width: 1.8 * PPM,
+        length: 3.0 * PPM,
+        motion: 'freehand',
+        path: [
+          { x: 480, y: road.yCenter + 15 },
+          { x: 560, y: road.yCenter - 25 },
+          { x: 640, y: road.yCenter + 10 }
+        ],
+        pathProgress: 0,
+        speed: 3.5
+      }
+    ];
+    renderAgentList();
+  }
 
   // Drag & Drop Setup
   document.querySelectorAll('.draggable-agent').forEach(el => {
@@ -438,7 +619,7 @@
     agents.push(pendingAgent);
     pendingAgent = null;
     renderAgentList();
-    modeBadge.innerText = 'Mode: READY';
+    modeBadge.innerText = 'Mode: Indian Village Road';
   });
 
   document.getElementById('btnChooseStatic').addEventListener('click', () => {
@@ -447,7 +628,7 @@
     agents.push(pendingAgent);
     pendingAgent = null;
     renderAgentList();
-    modeBadge.innerText = 'Mode: READY';
+    modeBadge.innerText = 'Mode: Indian Village Road';
   });
 
   // Freehand Trajectory Collector
@@ -478,7 +659,7 @@
       agents.push(pendingAgent);
       pendingAgent = null;
       renderAgentList();
-      modeBadge.innerText = 'Mode: READY';
+      modeBadge.innerText = 'Mode: Indian Village Road';
     }
   });
 
@@ -508,15 +689,13 @@
     document.getElementById('lblLength').innerText = e.target.value;
   });
 
-  // --- Monotonic Parametric Path Planner (Prevents Sawtooth Artifacts) ---
+  // --- Monotonic Parametric Path Planner ---
   function computeLivePlannedPath() {
     const plannedPoints = [];
     ego.goalX = width - 50;
 
-    // Anchor Start
     plannedPoints.push({ x: ego.x, y: ego.y });
 
-    // Sample along monotonic X grid
     const stepX = 40;
     for (let sampleX = ego.x + stepX; sampleX < ego.goalX; sampleX += stepX) {
       let targetY = road.yCenter;
@@ -527,7 +706,7 @@
         const dy = agPos.y - targetY;
         const dist = Math.hypot(dx, dy);
 
-        const influenceRadius = 75; // px
+        const influenceRadius = 75;
         if (dist < influenceRadius) {
           const pushDirection = (agPos.y > road.yCenter) ? -1 : 1;
           const repulsion = (1.0 - dist / influenceRadius) * (road.laneWidth * 0.75);
@@ -535,12 +714,10 @@
         }
       }
 
-      // Keep strictly within road lane bounds
       targetY = Math.max(road.yTop + 20, Math.min(road.yBottom - 20, targetY));
       plannedPoints.push({ x: sampleX, y: targetY });
     }
 
-    // Terminal Goal Anchor
     plannedPoints.push({ x: ego.goalX, y: road.yCenter });
     return plannedPoints;
   }
@@ -561,21 +738,33 @@
 
   // --- Vehicle Physics & Controller ---
   function updateVehiclePhysics(dt, livePath) {
-    if (ego.status === 'ARRIVED') {
+    if (ego.status === 'ARRIVED' || ego.status === 'COLLISION') {
       ego.vx = Math.max(0, ego.vx - ego.maxBraking * dt);
       return;
     }
 
     let minDistance = Infinity;
+    let closestObsType = '';
     for (const ag of agents) {
       const pos = getAgentPosition(ag);
-      if (pos.x > ego.x - 20) {
-        const d = Math.hypot(pos.x - ego.x, pos.y - ego.y) / PPM;
-        if (d < minDistance) minDistance = d;
+      const d = Math.hypot(pos.x - ego.x, pos.y - ego.y) / PPM;
+      if (d < minDistance) {
+        minDistance = d;
+        closestObsType = ag.type;
       }
     }
 
-    // Curvature slowing
+    // Critical Collision Check (< 0.6 meters clearance)
+    if (minDistance < 0.6) {
+      ego.vx = 0;
+      ego.ax = 0;
+      ego.status = 'COLLISION';
+      stateBadge.innerText = `CRITICAL COLLISION with ${closestObsType.toUpperCase()}`;
+      triggerPostSimulationAnalytics(false, closestObsType);
+      return;
+    }
+
+    // Dynamic curvature slowing
     let localCurvature = 0;
     if (livePath.length >= 3) {
       const dy1 = livePath[1].y - livePath[0].y;
@@ -586,20 +775,18 @@
     let desiredSpeed = ego.targetSpeed;
     if (localCurvature > 0.3) desiredSpeed *= 0.55;
 
-    // Intelligent Driver Braking / Overtake Model
-    const stopDistanceThreshold = 1.8; // Reduced so vehicle maneuvers around obstacles before braking
+    // Intelligent Driver Braking Model
+    const stopDistanceThreshold = 1.8;
     if (minDistance < stopDistanceThreshold) {
       ego.ax = -ego.maxBraking;
     } else if (minDistance < 4.0 && localCurvature > 0.4) {
-      // Slow down slightly while dodging closely
       ego.ax = -ego.maxAccel * 0.5;
     } else {
-      // Accelerate towards cruise speed
       ego.ax = (desiredSpeed - ego.vx) * 0.8;
       ego.ax = Math.max(-ego.maxBraking, Math.min(ego.maxAccel, ego.ax));
     }
 
-    // Goal Arrival Lock
+    // Terminal Goal Lock
     const distToGoal = (ego.goalX - ego.x) / PPM;
     if (distToGoal < 5.0) {
       ego.ax = -Math.min(ego.maxBraking, (ego.vx * ego.vx) / (2 * Math.max(0.5, distToGoal)));
@@ -608,6 +795,7 @@
         ego.ax = 0;
         ego.status = 'ARRIVED';
         stateBadge.innerText = 'Vehicle: ARRIVED (Goal Reached)';
+        triggerPostSimulationAnalytics(true, '');
         return;
       }
     }
@@ -632,10 +820,23 @@
     if (!lastHistory || Math.hypot(ego.x - lastHistory.x, ego.y - lastHistory.y) > 4) {
       ego.history.push({ x: ego.x, y: ego.y });
     }
+
+    // 2. TELEMETRY LOGGING ENGINE (Every tick)
+    telemetryLog.t.push(parseFloat(simTime.toFixed(2)));
+    telemetryLog.x.push(parseFloat((ego.x / PPM).toFixed(2)));
+    telemetryLog.v.push(parseFloat(ego.vx.toFixed(2)));
+    telemetryLog.a.push(parseFloat(ego.ax.toFixed(2)));
+
+    const sigmaSafe = 2.5;
+    const danger = minDistance === Infinity ? 0.0 : Math.min(100, Math.exp(-(minDistance * minDistance) / (2 * sigmaSafe * sigmaSafe)) * 100);
+    const safety = Math.max(0, 100 - danger);
+
+    telemetryLog.S.push(parseFloat(safety.toFixed(1)));
+    telemetryLog.Dmin.push(minDistance === Infinity ? 99 : parseFloat(minDistance.toFixed(2)));
   }
 
-  // --- Telemetry & Risk Calculation ---
-  function updateTelemetry() {
+  // --- Telemetry UI Update ---
+  function updateTelemetryUI() {
     let minD = Infinity;
     for (const ag of agents) {
       const pos = getAgentPosition(ag);
@@ -658,6 +859,142 @@
     const eta = ego.vx > 0.5 ? (remDist / ego.vx).toFixed(1) + 's' : '--';
     document.getElementById('valETA').innerText = eta;
   }
+
+  // 3. POST-SIMULATION DIAGNOSTICS ANALYTICS MODAL & CHARTS
+  function triggerPostSimulationAnalytics(isClean, collisionType) {
+    simRunning = false;
+    analyticsModal.style.display = 'flex';
+
+    // Calculate KPI Statistics
+    const finalTime = simTime.toFixed(1);
+    const minSafety = Math.min(...telemetryLog.S);
+    const minSafetyIdx = telemetryLog.S.indexOf(minSafety);
+    const minSafetyPos = telemetryLog.x[minSafetyIdx] || 0;
+
+    const maxAccel = Math.max(...telemetryLog.a).toFixed(2);
+    const minAccel = Math.min(...telemetryLog.a).toFixed(2);
+
+    document.getElementById('kpiTime').innerText = `${finalTime}s`;
+    document.getElementById('kpiMinSafety').innerText = `${minSafety.toFixed(1)}% (at x=${minSafetyPos.toFixed(1)}m)`;
+    document.getElementById('kpiPeakAccel').innerText = `${maxAccel} / ${minAccel} m/s²`;
+
+    const statusCard = document.getElementById('kpiStatusCard');
+    if (isClean) {
+      document.getElementById('kpiStatus').innerText = 'CLEAN MISSION';
+      statusCard.className = 'kpi-card green';
+    } else {
+      document.getElementById('kpiStatus').innerText = `CRITICAL COLLISION (${collisionType.toUpperCase()})`;
+      statusCard.className = 'kpi-card red';
+    }
+
+    // Render Telemetry Charts
+    renderAnalyticsCharts();
+  }
+
+  function renderAnalyticsCharts() {
+    const timeLabels = telemetryLog.t;
+    const vKmhData = telemetryLog.v.map(v => (v * 3.6).toFixed(1));
+    const xPosData = telemetryLog.x;
+    const accelData = telemetryLog.a;
+
+    // 1. Chart v(t): Velocity vs Time
+    if (chartVtInstance) chartVtInstance.destroy();
+    chartVtInstance = new Chart(document.getElementById('chartVt'), {
+      type: 'line',
+      data: {
+        labels: timeLabels,
+        datasets: [{
+          label: 'Velocity (km/h) vs Time (s)',
+          data: vKmhData,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f3f4f6' } } },
+        scales: {
+          x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+          y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+        }
+      }
+    });
+
+    // 2. Chart v(x): Velocity vs Position (Spatial Deceleration Zones)
+    if (chartVxInstance) chartVxInstance.destroy();
+    chartVxInstance = new Chart(document.getElementById('chartVx'), {
+      type: 'line',
+      data: {
+        labels: xPosData,
+        datasets: [{
+          label: 'Velocity (km/h) vs Position (m)',
+          data: vKmhData,
+          borderColor: '#06b6d4',
+          backgroundColor: 'rgba(6, 182, 212, 0.1)',
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f3f4f6' } } },
+        scales: {
+          x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+          y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+        }
+      }
+    });
+
+    // 3. Chart a(t): Acceleration & Braking Profile vs Time
+    if (chartAtInstance) chartAtInstance.destroy();
+    chartAtInstance = new Chart(document.getElementById('chartAt'), {
+      type: 'line',
+      data: {
+        labels: timeLabels,
+        datasets: [{
+          label: 'Longitudinal Accel (m/s²) vs Time (s)',
+          data: accelData,
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          fill: true,
+          tension: 0.2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f3f4f6' } } },
+        scales: {
+          x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+          y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+        }
+      }
+    });
+  }
+
+  window.closeAnalyticsModal = () => {
+    analyticsModal.style.display = 'none';
+  };
+
+  // 4. CSV TELEMETRY EXPORTER
+  window.exportTelemetryCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,time,x_pos,velocity,acceleration,safety_index,min_clearance\n";
+    for (let i = 0; i < telemetryLog.t.length; i++) {
+      csvContent += `${telemetryLog.t[i]},${telemetryLog.x[i]},${telemetryLog.v[i]},${telemetryLog.a[i]},${telemetryLog.S[i]},${telemetryLog.Dmin[i]}\n`;
+    }
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "simulation_telemetry.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  document.getElementById('btnExportCSV').addEventListener('click', window.exportTelemetryCSV);
 
   // --- Render Functions ---
   function drawRoad() {
@@ -682,7 +1019,6 @@
   }
 
   function drawAgents() {
-    // Render Pending Agent during Drag/Drop
     if (pendingAgent) {
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 2;
@@ -704,7 +1040,6 @@
       }
     }
 
-    // Render Active Placed Agents
     agents.forEach(ag => {
       const pos = getAgentPosition(ag);
 
@@ -739,7 +1074,7 @@
   }
 
   function drawTrailsAndVehicle(livePath) {
-    // 1. PAST TRAVELED PATH (BOLD GREEN LINE - GROUND TRUTH)
+    // 1. PAST TRAVELED PATH (BOLD GREEN LINE)
     if (ego.history.length > 1) {
       ctx.strokeStyle = '#00FF66';
       ctx.lineWidth = 4;
@@ -752,7 +1087,7 @@
       ctx.stroke();
     }
 
-    // 2. LIVE AI PLANNED PATH HORIZON (THIN RED LINE)
+    // 2. LIVE AI PLANNED PATH (THIN RED LINE)
     if (livePath.length > 1) {
       ctx.strokeStyle = '#FF3B30';
       ctx.lineWidth = 1.8;
@@ -809,7 +1144,7 @@
 
     drawAgents();
     drawTrailsAndVehicle(livePlannedPath);
-    updateTelemetry();
+    updateTelemetryUI();
 
     requestAnimationFrame(gameLoop);
   }
@@ -833,8 +1168,13 @@
     ego.history = [];
     ego.status = 'READY';
     stateBadge.innerText = 'Vehicle: IDLE';
+    telemetryLog = { t: [], x: [], v: [], a: [], S: [], Dmin: [] };
     agents.forEach(a => a.pathProgress = 0);
+    loadDefaultVillageScenario();
   });
+
+  // Load default scenario on start
+  loadDefaultVillageScenario();
 })();
 </script>
 </body>
