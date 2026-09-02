@@ -99,4 +99,22 @@ main_simulation
 ```
 
 ### Option B: Interactive Web Visualizer
-Open `web_simulation/index.html` in any web browser to interactively test all 5 scenarios, view real-time latency/smoothness metrics, and toggle sensor FOVs.
+Open `web_simulation/index.html` in any web browser (or run `python server.py` and open `http://localhost:8000`) to interactively test all 5 scenarios, view real-time latency/smoothness metrics, toggle sensor dropout, and export telemetry.
+
+---
+
+## 7. Project Attribution & Open-Source Reference Acknowledgments
+
+This solution was custom-designed and implemented for **SIH Problem Statement 26037 (MathWorks Smart Vehicles)**. In building our path planning, behavioral decision, and control pipelines, we studied and adapted established industry standards from open-source autonomous vehicle stacks:
+
+1. **Baidu Apollo (`apollo`)**:
+   - **Adapted**: $S$-$T$ Graph spatio-temporal boundary construction (`speed_decider`) and piecewise jerk profile principles for longitudinal speed optimization.
+2. **Autoware Universe (`autoware_universe`)**:
+   - **Adapted**: Virtual stop line margin insertion (`behavior_velocity_planner`) and crosswalk pedestrian yield state machines.
+3. **PythonRobotics**:
+   - **Adapted**: Frenet coordinate frame transformations ($s$-$d$ polynomial representation), Stanley front-axle lateral tracking formulation, and cubic spline curvature equations.
+4. **Custom Innovations (Built for PS 26037)**:
+   - **Unstructured Indian Traffic Dynamics**: Dynamic obstacle models tailored for erratic cattle crossing, auto-rickshaw lane weaving, and non-lane village road geometries.
+   - **Potential Field & Spline Integration**: Deformable spline waypoints using artificial potential field hazard inflation for sub-50ms replanning.
+   - **Interactive Pathfinder Studio**: Standalone web simulation visualizer with real-time telemetry logging, Chart.js diagnostic graphs, and sensor dropout fallback mode.
+
