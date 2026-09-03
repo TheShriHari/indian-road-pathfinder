@@ -23,11 +23,22 @@ function [virtual_stop_active, stop_pose, bottleneck_info] = universal_bottlenec
 %   stop_pose           : [x_stop, y_stop, theta_stop] Virtual Stop Line coordinates
 %   bottleneck_info     : Struct with bottleneck station s, bottleneck width, and reason
 
+% ── Build defaults, then merge any caller-supplied fields on top ──────────
+% Same pattern as behavior_state_machine.m — prevents missing-field crashes
+% when the bridge passes only a subset (e.g. only virtual_stop_active).
+defaults_ubd.vehicle_width = 1.85; % Standard sedan width (m)
+defaults_ubd.min_clearance = 0.35; % Lateral margin each side (m)
+defaults_ubd.scan_horizon  = 30.0; % Forward scan horizon (m)
+defaults_ubd.stop_buffer   = 3.5;  % Halt this many metres upstream of pinch
 if nargin < 6 || isempty(params)
-    params.vehicle_width = 1.85; % Standard sedan width (m)
-    params.min_clearance = 0.35; % Margin on each side (m)
-    params.scan_horizon  = 30.0; % Forward scan horizon (m)
-    params.stop_buffer   = 3.5;  % Halt 3.5m upstream of pinch point
+    params = defaults_ubd;
+else
+    fnames_ubd = fieldnames(defaults_ubd);
+    for fi_ubd = 1:length(fnames_ubd)
+        if ~isfield(params, fnames_ubd{fi_ubd})
+            params.(fnames_ubd{fi_ubd}) = defaults_ubd.(fnames_ubd{fi_ubd});
+        end
+    end
 end
 
 min_traversable_width = params.vehicle_width + 2 * params.min_clearance; % ~2.55m
@@ -74,8 +85,36 @@ for idx = 1:length(s_eval)
     
     corridor_width = left_dist + right_dist;
     
-    % Check if corridor is squeezed below vehicle passage threshold
+    % ── Dynamic Conflict Gate ────────────────────────────────────────────────
+    % FIX: Static pothole geometry alone must NOT trigger a virtual stop line.
+    % Potholes narrow the lane but are solvable by the Hybrid A* planner.
+    % A virtual stop line is only appropriate when a DYNAMIC agent is also
+    % predicted to occupy the squeezed corridor at arrival time, creating an
+    % active conflict that the planner cannot resolve by rerouting alone.
+    % Without this gate the vehicle deadlocked on every pothole squeeze.
+    has_dynamic_agent_in_corridor = false;
     if corridor_width < min_traversable_width
+        t_arrive = s / max(ego_state(4), 1.0);
+        h_check  = max(1, min(20, round(t_arrive / 0.1)));
+        for a_chk = 1:length(dynamic_predictions)
+            wpc = dynamic_predictions(a_chk).waypoints;
+            if isempty(wpc), continue; end
+            h_use = min(h_check, size(wpc,1));
+            for hh = 1:h_use
+                dx_c = wpc(hh,1) - pt(1);
+                dy_c = wpc(hh,2) - pt(2);
+                if hypot(dx_c, dy_c) < 2.5   % within 2.5 m of squeeze point
+                    has_dynamic_agent_in_corridor = true;
+                    break;
+                end
+            end
+            if has_dynamic_agent_in_corridor, break; end
+        end
+    end
+    
+    % Only trigger virtual stop if geometry is squeezed AND a dynamic agent
+    % is actively contending the corridor (not a static pothole alone).
+    if corridor_width < min_traversable_width && has_dynamic_agent_in_corridor
         virtual_stop_active = true;
         
         % Place stop pose upstream by params.stop_buffer

@@ -1,7 +1,8 @@
-function [path, costmap, latency_ms] = adaptive_path_planner(start_pose, goal_pose, static_map, dynamic_predictions, grid_res)
+function [path, costmap, latency_ms] = adaptive_path_planner(start_pose, goal_pose, static_map, dynamic_predictions, grid_res, grid_origin)
 % ADAPTIVE_PATH_PLANNER  Hybrid A* path planning with cubic spline smoothing.
 %   [path, costmap, latency_ms] = adaptive_path_planner(start_pose, goal_pose,
 %                                     static_map, dynamic_predictions, grid_res)
+%                                     [, grid_origin])
 %
 % ALGORITHM ATTRIBUTION:
 %   Adapted from PythonRobotics/PathPlanning/HybridAStar/hybrid_a_star.py
@@ -17,6 +18,9 @@ function [path, costmap, latency_ms] = adaptive_path_planner(start_pose, goal_po
 %     - Post-search pchip spline smoothing applied to A*-found waypoints (NOT
 %       a naive straight line as in the previous heuristic version)
 %     - Fallback to potential-field straight-line path if search exhausts MAX_ITER
+%     - [FIX] Optional grid_origin=[x_min, y_min] parameter: the costmap is a
+%       rolling window not anchored at [0,-10]; without this fix queries against
+%       the costmap matrix use wrong world-to-cell indices for ego_x > 10 m.
 %
 % Inputs:
 %   start_pose         : [x, y, theta]  start position (m, m, rad)
@@ -24,6 +28,8 @@ function [path, costmap, latency_ms] = adaptive_path_planner(start_pose, goal_po
 %   static_map         : binary occupancy grid (rows=Y, cols=X), 1 = obstacle
 %   dynamic_predictions: struct array from dynamic_obstacle_predictor (may be [])
 %   grid_res           : costmap cell size (m), default 0.2
+%   grid_origin        : [x_min, y_min] world coords of costmap cell (1,1).
+%                        Default [0.0, -10.0] for backward compatibility.
 %
 % Outputs:
 %   path       : (N x 2) smoothed path waypoints [x, y]  (N=80 by default)
@@ -32,6 +38,13 @@ function [path, costmap, latency_ms] = adaptive_path_planner(start_pose, goal_po
 
 tic;
 if nargin < 5, grid_res = 0.2; end
+% FIX: Use caller-supplied rolling window origin.  Old code hardcoded [0, -10]
+% which made all costmap cell lookups wrong once ego_x exceeded 10 m.
+if nargin < 6 || isempty(grid_origin)
+    grid_origin = [0.0, -10.0];   % backward-compatible default
+end
+x_min = grid_origin(1);
+y_min = grid_origin(2);
 
 [cmap_rows, cmap_cols] = size(static_map);
 costmap = double(static_map) * 255;
@@ -100,9 +113,7 @@ STEER_WT   = 0.25;      % weight: steer angle penalty (prefer straight driving)
 SC_WT      = 0.15;      % weight: steer-change penalty (prefer smooth turns)
 MAX_ITER   = 40000;     % max iterations before giving up and falling back
 
-% World bounds
-x_min = 0.0;
-y_min = -10.0;
+% World bounds — now taken from grid_origin (rolling window)
 x_max = x_min + (cmap_cols - 1) * grid_res;
 y_max = y_min + (cmap_rows - 1) * grid_res;
 
@@ -282,11 +293,12 @@ else
 end
 raw_ctrl = [ctrl_x, ctrl_y];
 
-% Push interior control points along potential field gradient (UNCHANGED)
+% Push interior control points along potential field gradient (UNCHANGED logic;
+% FIX: use grid_origin-relative cell index instead of hardcoded y+10 offset)
 for k = 2:(num_ctrl-1)
     pt = raw_ctrl(k, :);
-    gx = round(pt(1)/grid_res);
-    gy = round((pt(2) + 10)/grid_res);
+    gx = round((pt(1) - x_min)/grid_res) + 1;
+    gy = round((pt(2) - y_min)/grid_res) + 1;
 
     if gx >= 3 && gx <= cmap_cols-2 && gy >= 3 && gy <= cmap_rows-2
         grad_x = costmap(gy, gx+2) - costmap(gy, gx-2);

@@ -31,17 +31,32 @@ function [new_state, v_ref, debug_info] = behavior_state_machine(current_state, 
 %   v_ref      : reference velocity for this timestep (m/s)
 %   debug_info : struct with nearest agent distance, lat/lon decomposition
 
+% ── Build defaults, then merge any caller-supplied fields on top ──────────
+% Merging (not replacing) guarantees every field exists even when the caller
+% passes a partial struct (e.g. only virtual_stop_active and stop_line_dist).
+defaults.v_cruise      = 5.0;   % m/s  nominal cruise speed
+defaults.v_nudge       = 3.5;   % m/s  reduced speed during NUDGE
+defaults.v_decel       = 1.5;   % m/s  slow yield approach
+defaults.v_wait        = 0.2;   % m/s  near-stop during YIELD_WAIT (not zero to avoid deadlock)
+defaults.v_resume      = 2.5;   % m/s  initial resume speed
+defaults.d_nudge       = 7.0;   % m  threshold to enter NUDGE
+defaults.d_decel       = 4.5;   % m  threshold to enter YIELD_DECEL
+defaults.d_wait        = 2.5;   % m  threshold to enter YIELD_WAIT
+defaults.d_clear       = 8.0;   % m  agent must exceed this to allow RESUME->CRUISE
+% FIX: was 3.0 m — too wide; caught cattle walking on dirt verge (|y|>2.5 m)
+% outside the 5 m pavement, causing false in-path detection.  1.8 m matches
+% half-lane width (2.5 m) minus one vehicle body width (1.85 m / 2 ≈ 0.9 m).
+defaults.d_lat_path    = 1.8;   % m  max lateral offset to consider agent "in path"
 if nargin < 5 || isempty(params)
-    params.v_cruise      = 5.0;   % m/s  nominal cruise speed
-    params.v_nudge       = 3.5;   % m/s  reduced speed during NUDGE
-    params.v_decel       = 1.5;   % m/s  slow yield approach
-    params.v_wait        = 0.2;   % m/s  near-stop during YIELD_WAIT (not zero to avoid deadlock)
-    params.v_resume      = 2.5;   % m/s  initial resume speed
-    params.d_nudge       = 7.0;   % m  threshold to enter NUDGE
-    params.d_decel       = 4.5;   % m  threshold to enter YIELD_DECEL
-    params.d_wait        = 2.5;   % m  threshold to enter YIELD_WAIT
-    params.d_clear       = 8.0;   % m  agent must exceed this to allow RESUME->CRUISE
-    params.d_lat_path    = 3.0;   % m  max lateral offset to consider agent "in path"
+    params = defaults;
+else
+    % Fill in any field that is absent from the caller's partial struct
+    fnames = fieldnames(defaults);
+    for fi = 1:length(fnames)
+        if ~isfield(params, fnames{fi})
+            params.(fnames{fi}) = defaults.(fnames{fi});
+        end
+    end
 end
 
 ego_x     = ego_state(1);

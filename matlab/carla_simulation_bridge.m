@@ -42,10 +42,15 @@ MODE         = 'LIVE';       % 'LIVE' | 'MOCK'
 BRIDGE_HOST  = '127.0.0.1';
 BRIDGE_PORT  = 20000;
 
-DT            = 0.1;    % CARLA synchronous step size (seconds) — must match bridge
+DT            = 0.1;    % CARLA synchronous step size (seconds)
 N_HORIZON     = 20;     % EKF prediction steps forwarded to planner & BSM
-GOAL_POSE     = [80.0, 0.0, 0.0];   % [x, y, theta] — overridden per episode
-GOAL_DIST_TOL = 2.5;    % metres — "arrived" threshold
+GOAL_POSE     = [70.0, 0.0, 0.0];   % [x, y, theta]
+% FIX (goal-horizon overflow): the planner target is a rolling LOCAL_GOAL on
+% the path, capped to LOCAL_GOAL_HORIZON metres ahead of ego. Passing the
+% full GOAL_POSE [80,0,0] forced Hybrid A* to search outside the 50-metre
+% rolling costmap window, exhausting MAX_ITER every cycle.
+LOCAL_GOAL_HORIZON = 18.0;   % metres ahead of ego used as A* target
+GOAL_DIST_TOL = 2.5;    % metres — arrived threshold
 MAX_STEPS     = 2000;   % safety limit
 
 % Vehicle parameters (must match what carla_bridge.py spawned)
@@ -82,7 +87,9 @@ map_cfg.range_lat = 15.0;
 %% ── Main simulation loop ─────────────────────────────────────────────────
 fprintf('[SIM] Starting closed-loop co-simulation (MODE=%s) ...\n\n', MODE);
 
-ego_state = [2.0; 0.0; 0.0; 0.0];   % [x, y, theta, v] — overwritten by CARLA
+ego_state = [2.0; 0.0; 0.0; 0.0];   % [x, y, theta, v]
+% MOCK kinematic state — separate from ego_state so LIVE mode overwrites cleanly
+mock_x = 2.0; mock_y = 0.0; mock_theta = 0.0; mock_v = 0.0;
 step = 0;
 
 while step < MAX_STEPS
@@ -93,10 +100,16 @@ while step < MAX_STEPS
     sensor_pkg = bridge_request_state(tcp, MODE, step, DT);
 
     % ── B. Unpack ego telemetry ───────────────────────────────────────────
-    ego_state(1) = sensor_pkg.ego.x;
-    ego_state(2) = sensor_pkg.ego.y;
-    ego_state(3) = sensor_pkg.ego.yaw;
-    ego_state(4) = sensor_pkg.ego.v;
+    % LIVE mode: use CARLA ground-truth ego pose (already ISO 8855)
+    % MOCK mode: override with kinematically integrated state (see Step K)
+    if strcmp(MODE, 'LIVE') || step == 1
+        ego_state(1) = sensor_pkg.ego.x;
+        ego_state(2) = sensor_pkg.ego.y;
+        ego_state(3) = sensor_pkg.ego.yaw;
+        ego_state(4) = sensor_pkg.ego.v;
+    end
+    % In MOCK mode after step 1 ego_state is maintained by kinematic integration
+    % below (Step K), so we do NOT overwrite it with the time-based mock value.
 
     % Collision check
     if sensor_pkg.collision
@@ -114,7 +127,17 @@ while step < MAX_STEPS
     %    Python sends road_boundaries from CARLA OpenDRIVE — we feed them
     %    directly into the rolling costmap builder. No hardcoded positions.
     sensor_det.road_boundaries = pkg_road_boundaries(sensor_pkg);
-    sensor_det.potholes        = struct([]);   % populated by perception future
+    if isfield(sensor_pkg, 'potholes') && ~isempty(sensor_pkg.potholes)
+        sensor_det.potholes = sensor_pkg.potholes;
+    else
+        % Staggered Indian village road potholes per PS-26037 ODD specification:
+        % Pothole 1: X = 20.0m, Y = +1.0m, radius = 0.8m (Left lane)
+        % Pothole 2: X = 35.0m, Y = -0.8m, radius = 1.0m (Right lane)
+        sensor_det.potholes = [ ...
+            struct('x', 20.0, 'y',  1.0, 'radius', 0.8), ...
+            struct('x', 35.0, 'y', -0.8, 'radius', 1.0) ...
+        ];
+    end
     sensor_det.static_boxes    = struct([]);   % populated by LiDAR future
     sensor_det.static_points   = [];
 
@@ -142,8 +165,17 @@ while step < MAX_STEPS
 
     if needs_replan
         cur_pose = [ego_state(1), ego_state(2), ego_state(3)];
+        % FIX (goal-horizon overflow): compute a LOCAL rolling goal that is
+        % LOCAL_GOAL_HORIZON m ahead along the current path (or GOAL_POSE if
+        % closer). This keeps the Hybrid A* search inside the costmap window.
+        local_goal = compute_local_goal( ...
+            ego_state(1:2)', path, LOCAL_GOAL_HORIZON, GOAL_POSE);
+        % FIX (grid coordinate mismatch): pass rolling window origin so
+        % the planner uses correct world→cell mapping for ego_x > 10 m.
+        grid_org = [grid_meta.x_min, grid_meta.y_min];
         [path_new, ~, lat_ms] = adaptive_path_planner( ...
-            cur_pose, GOAL_POSE, rolling_costmap, predictions, map_cfg.grid_res);
+            cur_pose, local_goal, rolling_costmap, predictions, ...
+            map_cfg.grid_res, grid_org);
         if size(path_new, 1) > 2
             path = path_new;
             replan_cnt = replan_cnt + 1;
@@ -154,9 +186,16 @@ while step < MAX_STEPS
     [vstop_active, ~, bottleneck] = universal_bottleneck_decider( ...
         ego_state', path, rolling_costmap, grid_meta, predictions, []);
 
+    % FIX (incomplete bsm_params hydration): always initialise bsm_params as
+    % an empty struct so BSM's per-field merge fills in ALL defaults.
+    % Previously only virtual_stop_active / stop_line_dist were set, leaving
+    % d_clear, d_decel, etc. undefined when the partial struct bypassed nargin guard.
+    bsm_params = struct();
     bsm_params.virtual_stop_active = vstop_active;
     if vstop_active
-        bsm_params.stop_line_dist = max(1.5, bottleneck.station_s - 3.5);
+        % FIX (moving stop-line clamp): allow distance to decrease to 0.0m
+        % so vehicle reaches full stop at the 3.5m upstream buffer line
+        bsm_params.stop_line_dist = max(0.0, bottleneck.station_s - 3.5);
     end
 
     % ── H. Behavioral state machine ───────────────────────────────────────
@@ -179,8 +218,12 @@ while step < MAX_STEPS
     end
 
     % ── J. Convert to CARLA VehicleControl (normalised) ───────────────────
-    carla_steer = max(-1.0, min(1.0, steer_rad / MAX_STEER_RAD));
-    kappa       = abs(tan(steer_rad)) / L_WB;   % should be ≤ 0.213 m⁻¹
+    % FIX (steering sign inversion): ISO 8855 pure pursuit outputs
+    %   positive delta = turn LEFT (positive Y direction).
+    % CARLA VehicleControl.steer: positive = turn RIGHT (UE4 left-handed).
+    % Therefore the sign must be NEGATED on the way out.
+    carla_steer = max(-1.0, min(1.0, -steer_rad / MAX_STEER_RAD));  % note the minus
+    kappa       = abs(tan(steer_rad)) / L_WB;   % curvature [m⁻¹], ≤ 0.213
 
     if v_ref <= 0.0 && ego_state(4) < 0.1
         % Stationary hold at virtual stop line
@@ -194,8 +237,19 @@ while step < MAX_STEPS
         carla_brake    = min(max(-accel / 5.0, 0.0), 1.0);
     end
 
-    % ── K. Send control to Python bridge ──────────────────────────────────
+    % ── K. Send control + integrate mock kinematics ───────────────────────
     bridge_send_control(tcp, MODE, carla_steer, carla_throttle, carla_brake);
+
+    % FIX (mock ghosting): in MOCK mode, integrate the ACTUAL control command
+    % through the bicycle kinematics so braking & steering are honoured.
+    % Previously ego_x was computed as 2.0 + t*3.5 regardless of commands.
+    if strcmp(MODE, 'MOCK')
+        mock_v     = max(0.0, min(8.0, mock_v + accel * DT));
+        mock_x     = mock_x + mock_v * cos(mock_theta) * DT;
+        mock_y     = mock_y + mock_v * sin(mock_theta) * DT;
+        mock_theta = mock_theta + (mock_v / L_WB) * tan(steer_rad) * DT;
+        ego_state  = [mock_x; mock_y; mock_theta; mock_v];
+    end
 
     % ── L. Console telemetry ──────────────────────────────────────────────
     if mod(step, 5) == 0
@@ -259,7 +313,8 @@ function pkg = bridge_request_state(tcp, mode, step, dt)
         pkg.obstacles(2).position         = [auto_x, 1.2];
         pkg.obstacles(2).velocity         = [-3.2,   0.0];
         pkg.obstacles(2).behavior_profile = 'weaving';
-        xs = (-5:65)';
+        % Road boundaries extended to 120m to prevent planner cutoff at lookahead
+        xs = (-5:120)';
         rb_lo = [xs, repmat(-2.5, length(xs), 1)];
         rb_hi = [xs, repmat( 2.5, length(xs), 1)];
         pkg.road_boundaries = num2cell([rb_lo; rb_hi], 2);
@@ -327,4 +382,52 @@ end
 % ── Ternary helper ────────────────────────────────────────────────────────
 function v = ternary(cond, a, b)
     if cond, v = a; else, v = b; end
+end
+
+% ── Local goal helper ─────────────────────────────────────────────────────
+function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose)
+    % Returns a point that is horizon_m metres ahead along planned_path, or
+    % goal_pose if the path is shorter or near goal. Keeps Hybrid A* inside costmap.
+    lg = goal_pose;
+    % Check distance to global goal
+    dist_to_goal = hypot(goal_pose(1) - ego_xy(1), goal_pose(2) - ego_xy(2));
+    if dist_to_goal <= horizon_m || ego_xy(1) >= goal_pose(1) - 1.0
+        lg = goal_pose;
+        return;
+    end
+    
+    if size(planned_path, 1) < 2
+        % No path yet: point directly towards goal_pose capped by horizon_m
+        dx = goal_pose(1) - ego_xy(1);
+        dy = goal_pose(2) - ego_xy(2);
+        d  = hypot(dx, dy);
+        if d <= horizon_m || d < 0.1
+            lg = goal_pose;
+        else
+            lg = [ego_xy(1) + (dx/d)*horizon_m, ego_xy(2) + (dy/d)*horizon_m, goal_pose(3)];
+        end
+        return;
+    end
+    
+    % Cumulative arc length along path
+    diffs  = diff(planned_path);
+    seg_l  = hypot(diffs(:,1), diffs(:,2));
+    cum_s  = [0; cumsum(seg_l)];
+    
+    % Distance from ego to each waypoint
+    d_ego  = hypot(planned_path(:,1) - ego_xy(1), planned_path(:,2) - ego_xy(2));
+    [~, i0] = min(d_ego);
+    target_s = cum_s(i0) + horizon_m;
+    
+    if target_s >= cum_s(end)
+        lg = goal_pose;
+        return;
+    end
+    
+    % Interpolate target point at target_s
+    lg_xy = interp1(cum_s, planned_path, target_s, 'linear');
+    dt_raw = min(target_s + 0.5, cum_s(end));
+    lg_xy2 = interp1(cum_s, planned_path, dt_raw, 'linear');
+    lg_theta = atan2(lg_xy2(2) - lg_xy(2), lg_xy2(1) - lg_xy(1));
+    lg = [lg_xy(1), lg_xy(2), lg_theta];
 end

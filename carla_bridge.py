@@ -574,21 +574,40 @@ def get_camera_meta(rgb_frame):
 class MockWorld:
     """
     Synthetic world that mirrors what the live pipeline produces.
-    All detections come from MockDetector, so the EKF velocity estimate will
-    correctly converge to near-zero initially (no velocity field injected).
+    Integrates bicycle kinematics so braking commands (B=1.0) halt the vehicle
+    and steering (steer!=0) curves the path instead of open-loop time ghosting.
     """
     def __init__(self):
         self._step   = 0
         self._fuser  = PerceptionFuser(IM_WIDTH, IM_HEIGHT,
                                        CAM_FX, CAM_FY, CAM_CX, CAM_CY)
         self._det    = MockDetector()
+        self.x       = 2.0
+        self.y       = 0.0
+        self.yaw     = 0.0
+        self.v       = 3.5
+        self.steer   = 0.0
+        self.throttle = 0.0
+        self.brake   = 0.0
 
     def tick(self):
         self._step += 1
+        dt = 0.1
+        # Closed-loop longitudinal response
+        accel = (self.throttle * 3.0) - (self.brake * 5.0)
+        self.v = max(0.0, min(8.0, self.v + accel * dt))
+        # Closed-loop lateral bicycle kinematics
+        self.x += self.v * math.cos(self.yaw) * dt
+        self.y += self.v * math.sin(self.yaw) * dt
+        # Max steer angle 30 deg = pi/6; steer is in CARLA convention
+        steer_rad = -self.steer * (math.pi / 6.0)
+        self.yaw += (self.v / 2.7) * math.tan(steer_rad) * dt
 
     def get_ego_telemetry(self):
-        return {"x": round(2.0 + self._step * 0.4, 3),
-                "y": 0.0, "yaw": 0.0, "v": 4.0}
+        return {"x": round(self.x, 4),
+                "y": round(self.y, 4),
+                "yaw": round(self.yaw, 5),
+                "v": round(self.v, 4)}
 
     def get_obstacles(self):
         # Produce synthetic depth so that MockDetector gives plausible ranges
@@ -599,10 +618,13 @@ class MockWorld:
         return self._fuser.project(dets, depth_buf)
 
     def get_road_boundaries(self):
-        xs = list(range(-5, 65))
+        xs = list(range(-5, 120))
         return [[x, -2.5] for x in xs] + [[x, 2.5] for x in xs]
 
-    def apply_control(self, _s, _t, _b): pass
+    def apply_control(self, s, t, b):
+        self.steer    = s
+        self.throttle = t
+        self.brake    = b
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -666,6 +688,45 @@ def run_bridge(args):
                                CAM_FX, CAM_FY, CAM_CX, CAM_CY)
     mock     = MockWorld() if mock_mode else None
 
+    # Helper to generate synchronized state packet
+    def generate_state_packet():
+        if mock_mode:
+            mock.tick()
+            return {
+                "ego":             mock.get_ego_telemetry(),
+                "obstacles":       mock.get_obstacles(),
+                "road_boundaries": mock.get_road_boundaries(),
+                "collision":       False,
+                "camera":          {"width": IM_WIDTH, "height": IM_HEIGHT,
+                                    "mean_rgb": [120, 100, 80], "ready": True}
+            }
+        else:
+            world_obj.tick()   # advance CARLA one step
+
+            # Grab a synchronized snapshot of both camera frames
+            rgb_bgr, depth_m = sensors.snapshot()
+
+            # Run neural detector on RGB frame
+            detections = []
+            if rgb_bgr is not None and depth_m is not None:
+                detections = detector.detect(rgb_bgr)
+
+            # Project 2D boxes → 3D ISO obstacle positions
+            obstacles = []
+            if depth_m is not None:
+                obstacles = fuser.project(detections, depth_m)
+
+            with _lock:
+                collision = _collision_flag
+
+            return {
+                "ego":             get_ego_telemetry(ego_vehicle),
+                "obstacles":       obstacles,
+                "road_boundaries": get_road_boundaries(world_obj, ego_vehicle),
+                "collision":       collision,
+                "camera":          get_camera_meta(rgb_bgr)
+            }
+
     # ── TCP server for MATLAB ──────────────────────────────────────────────
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -697,49 +758,32 @@ def run_bridge(args):
                     print(f'[BRIDGE] Bad JSON: {line[:80]}')
                     continue
 
-                # ── GET_STATE ──────────────────────────────────────────────
-                if msg.get('request') == 'GET_STATE':
+                # ── Single-trip STEP (Eliminates two-trip TCP latency) ──────
+                # Combines control actuation and state capture in one synchronous step
+                if msg.get('request') == 'STEP':
+                    steer    = max(-1.0, min(1.0, float(msg.get('steer',    0.0))))
+                    throttle = max( 0.0, min(1.0, float(msg.get('throttle', 0.0))))
+                    brake    = max( 0.0, min(1.0, float(msg.get('brake',    0.0))))
 
                     if mock_mode:
-                        mock.tick()
-                        packet = {
-                            "ego":             mock.get_ego_telemetry(),
-                            "obstacles":       mock.get_obstacles(),
-                            "road_boundaries": mock.get_road_boundaries(),
-                            "collision":       False,
-                            "camera":          {"width": IM_WIDTH, "height": IM_HEIGHT,
-                                                "mean_rgb": [120, 100, 80], "ready": True}
-                        }
+                        mock.apply_control(steer, throttle, brake)
                     else:
-                        world_obj.tick()   # advance CARLA one step
+                        ctrl           = carla.VehicleControl()
+                        ctrl.steer     = steer
+                        ctrl.throttle  = throttle
+                        ctrl.brake     = brake
+                        ctrl.hand_brake = False
+                        ego_vehicle.apply_control(ctrl)
 
-                        # Grab a synchronized snapshot of both camera frames
-                        rgb_bgr, depth_m = sensors.snapshot()
-
-                        # Run neural detector on RGB frame
-                        detections = []
-                        if rgb_bgr is not None and depth_m is not None:
-                            detections = detector.detect(rgb_bgr)
-
-                        # Project 2D boxes → 3D ISO obstacle positions
-                        obstacles = []
-                        if depth_m is not None:
-                            obstacles = fuser.project(detections, depth_m)
-
-                        with _lock:
-                            collision = _collision_flag
-
-                        packet = {
-                            "ego":             get_ego_telemetry(ego_vehicle),
-                            "obstacles":       obstacles,
-                            "road_boundaries": get_road_boundaries(world_obj, ego_vehicle),
-                            "collision":       collision,
-                            "camera":          get_camera_meta(rgb_bgr)
-                        }
-
+                    packet = generate_state_packet()
                     conn.sendall((json.dumps(packet) + '\n').encode('utf-8'))
 
-                # ── CONTROL command ────────────────────────────────────────
+                # ── GET_STATE (Standard two-trip state acquisition) ────────
+                elif msg.get('request') == 'GET_STATE':
+                    packet = generate_state_packet()
+                    conn.sendall((json.dumps(packet) + '\n').encode('utf-8'))
+
+                # ── CONTROL command (Standard two-trip actuation) ──────────
                 elif 'steer' in msg:
                     steer    = max(-1.0, min(1.0, float(msg.get('steer',    0.0))))
                     throttle = max( 0.0, min(1.0, float(msg.get('throttle', 0.0))))
