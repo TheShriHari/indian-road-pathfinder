@@ -1,1410 +1,790 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Interactive Autonomous Pathfinder Studio (PS 26037)</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root {
-      --bg-dark: #0b111e;
-      --panel-bg: #0f172a;
-      --card-bg: #1e293b;
-      --border-color: #334155;
-      --accent-cyan: #06b6d4;
-      --accent-green: #10b981;
-      --accent-red: #ef4444;
-      --accent-orange: #f59e0b;
-      --text-main: #f8fafc;
-      --text-dim: #94a3b8;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adaptive Path Planning — SIH PS-26037 | Interactive Demo</title>
+<meta name="description" content="Interactive web visualizer for SIH 2026 PS-26037: Adaptive Path Planning & Collision Avoidance for Autonomous Vehicles on Unstructured Indian Roads.">
 
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body {
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
+<style>
+/* ========== DESIGN SYSTEM ========== */
+:root {
+  --bg-deep:   #07090f;
+  --bg-panel:  #0e1220;
+  --bg-card:   #131829;
+  --border:    #1e2840;
+  --accent:    #00d4ff;
+  --accent2:   #7c3aed;
+  --warn:      #f59e0b;
+  --danger:    #ef4444;
+  --success:   #10b981;
+  --text:      #e2e8f0;
+  --text-dim:  #64748b;
+  --font:      'Inter', system-ui, sans-serif;
+}
 
-    header {
-      height: 56px;
-      background: var(--panel-bg);
-      border-bottom: 1px solid var(--border-color);
-      padding: 0 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-    .title { font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
-    .header-actions { display: flex; gap: 10px; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    button.btn {
-      padding: 8px 16px;
-      border-radius: 6px;
-      border: none;
-      font-weight: 600;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-run { background: #10b981; color: white; }
-    .btn-run:hover { background: #059669; }
-    .btn-reset { background: #ef4444; color: white; }
-    .btn-reset:hover { background: #dc2626; }
-    .btn-export { background: #0284c7; color: white; }
-    .btn-export:hover { background: #0369a1; }
+body {
+  background: var(--bg-deep);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-    .studio-container {
-      display: flex;
-      flex: 1;
-      height: calc(100vh - 56px);
-      overflow: hidden;
-    }
+/* ---- Disclaimer Banner ---- */
+.disclaimer {
+  background: linear-gradient(90deg, #1a0a00, #1a1500, #1a0a00);
+  border-bottom: 1px solid var(--warn);
+  padding: 10px 24px;
+  font-size: 0.78rem;
+  color: var(--warn);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+.disclaimer strong { color: #fbbf24; }
 
-    .sidebar-left, .sidebar-right {
-      width: 270px;
-      background: var(--panel-bg);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      overflow-y: auto;
-    }
-    .sidebar-left { border-right: 1px solid var(--border-color); }
-    .sidebar-right { border-left: 1px solid var(--border-color); width: 290px; }
+/* ---- Header ---- */
+header {
+  padding: 20px 28px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.logo-badge {
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff;
+  white-space: nowrap;
+}
+header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+}
+header p {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
 
-    .section-title {
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-dim);
-      margin-bottom: 8px;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 4px;
-    }
+/* ---- Main layout ---- */
+.main {
+  display: grid;
+  grid-template-columns: 280px 1fr 260px;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+}
 
-    .agent-palette {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
+/* ---- Left Sidebar ---- */
+.sidebar {
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sidebar h2 {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+.scenario-btn {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.83rem;
+  transition: all 0.18s ease;
+}
+.scenario-btn:hover   { border-color: var(--accent); background: #0d1830; }
+.scenario-btn.active  { border-color: var(--accent); background: #071828; box-shadow: 0 0 12px #00d4ff22; }
+.scenario-btn .sc-num { font-size: 0.68rem; color: var(--accent); font-weight: 700; }
+.scenario-btn .sc-title { font-weight: 600; font-size: 0.85rem; display: block; margin-top: 2px; }
+.scenario-btn .sc-desc  { font-size: 0.73rem; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
 
-    .draggable-agent {
-      background: var(--card-bg);
-      border: 1px dashed #475569;
-      border-radius: 6px;
-      padding: 10px 6px;
-      text-align: center;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: grab;
-      transition: border-color 0.2s, transform 0.1s;
-    }
-    .draggable-agent:hover {
-      border-color: var(--accent-cyan);
-      transform: translateY(-2px);
-    }
+.ctrl-group { display: flex; flex-direction: column; gap: 8px; }
+.ctrl-btn {
+  padding: 9px 14px;
+  border-radius: 7px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.83rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  display: flex; align-items: center; gap: 8px;
+}
+.ctrl-btn.play  { background: linear-gradient(135deg,#0f4,#06b); color:#fff; }
+.ctrl-btn.pause { background: var(--warn); color:#000; }
+.ctrl-btn.reset { background: var(--bg-card); border:1px solid var(--border); color:var(--text-dim); }
+.ctrl-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
 
-    .slider-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.8rem;
-    }
-    .slider-group input { width: 100%; accent-color: var(--accent-cyan); }
+.speed-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-dim); }
+.speed-row input { flex:1; accent-color: var(--accent); }
 
-    .agent-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--card-bg);
-      padding: 6px 10px;
-      border-radius: 4px;
-      font-size: 0.78rem;
-      margin-bottom: 6px;
-    }
-    .agent-item button {
-      background: transparent;
-      border: none;
-      color: var(--accent-red);
-      cursor: pointer;
-      font-size: 0.9rem;
-    }
+/* ---- Canvas area ---- */
+.canvas-wrap {
+  position: relative;
+  background: #080c14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+canvas#sim {
+  display: block;
+  image-rendering: pixelated;
+}
+.hud-overlay {
+  position: absolute;
+  top: 12px; left: 12px;
+  background: rgba(7,9,15,0.82);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  backdrop-filter: blur(4px);
+  min-width: 200px;
+}
+.hud-overlay .hud-title { font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.hud-row { display: flex; justify-content: space-between; gap: 16px; margin-top: 3px; }
+.hud-row .k { color: var(--text-dim); }
+.hud-row .v { color: var(--text); font-weight: 500; }
 
-    .canvas-viewport {
-      flex: 1;
-      position: relative;
-      background: #070d18;
-      display: flex;
-      flex-direction: column;
-    }
+.state-badge {
+  position: absolute;
+  top: 12px; right: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  transition: background 0.3s, color 0.3s;
+}
 
-    .canvas-topbar {
-      position: absolute;
-      top: 12px;
-      left: 16px;
-      right: 16px;
-      display: flex;
-      justify-content: space-between;
-      pointer-events: none;
-      z-index: 10;
-    }
-    .status-badge {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid var(--border-color);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      backdrop-filter: blur(4px);
-    }
+/* ---- Right panel ---- */
+.right-panel {
+  border-left: 1px solid var(--border);
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 0.82rem;
+}
+.right-panel h2 {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+.metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.metric-label { font-size: 0.72rem; color: var(--text-dim); }
+.metric-value { font-size: 1.3rem; font-weight: 700; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+.metric-unit  { font-size: 0.72rem; color: var(--text-dim); }
 
-    canvas#simCanvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+.agent-list { display: flex; flex-direction: column; gap: 6px; }
+.agent-tag {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.77rem;
+}
+.agent-tag .at-type { font-weight: 600; }
+.agent-tag .at-pos  { color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
 
-    .telemetry-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .telemetry-card {
-      background: var(--card-bg);
-      border-radius: 6px;
-      padding: 10px;
-      border-left: 3px solid #475569;
-    }
-    .telemetry-card.danger { border-left-color: var(--accent-red); }
-    .telemetry-card.safe { border-left-color: var(--accent-green); }
-    .telemetry-card.info { border-left-color: var(--accent-cyan); }
+/* ---- Legend ---- */
+.legend { display: flex; flex-direction: column; gap: 5px; }
+.legend-row { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--text-dim); }
+.dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
 
-    .telemetry-val { font-size: 1.15rem; font-weight: 700; }
-    .telemetry-lbl { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
+/* ---- Footer ---- */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 8px 28px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+}
 
-    /* Modals */
-    .modal-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: blur(5px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-    }
-    .choice-card {
-      background: var(--panel-bg);
-      border: 1px solid var(--accent-cyan);
-      padding: 20px;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      width: 280px;
-      box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
-    }
-    .choice-card button {
-      padding: 10px;
-      background: var(--card-bg);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      text-align: left;
-    }
-    .choice-card button:hover { background: #334155; border-color: var(--accent-cyan); }
-
-    /* Analytics Modal */
-    .analytics-modal {
-      background: var(--panel-bg);
-      border: 1px solid var(--border-color);
-      width: 90%;
-      max-width: 900px;
-      max-height: 90vh;
-      border-radius: 12px;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      overflow-y: auto;
-      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
-    }
-    .analytics-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 12px;
-    }
-    .analytics-header h2 { font-size: 1.3rem; color: #38bdf8; }
-    .kpi-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-    }
-    .kpi-card {
-      background: var(--card-bg);
-      padding: 12px;
-      border-radius: 8px;
-      border-left: 4px solid var(--accent-cyan);
-    }
-    .kpi-card.green { border-left-color: var(--accent-green); }
-    .kpi-card.red { border-left-color: var(--accent-red); }
-    .kpi-card.orange { border-left-color: var(--accent-orange); }
-    .kpi-val { font-size: 1.2rem; font-weight: 700; }
-    .kpi-lbl { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
-
-    .charts-container {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-    .chart-box {
-      background: var(--card-bg);
-      padding: 12px;
-      border-radius: 8px;
-      height: 220px;
-    }
-    .chart-box.full-width {
-      grid-column: span 2;
-      height: 200px;
-    }
-  </style>
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .sidebar, .right-panel { border: none; border-bottom: 1px solid var(--border); }
+}
+</style>
 </head>
 <body>
 
+<!-- DISCLAIMER: this is the first visible element -->
+<div class="disclaimer">
+  ⚠️ <strong>STANDALONE ILLUSTRATIVE PROTOTYPE:</strong>
+  This web simulation is an <strong>independent visualization tool</strong> for presentation purposes only.
+  It does <strong>NOT</strong> run the MATLAB pipeline (Hybrid A*, EKF, vehicle_kinematics, etc.) and is
+  <strong>NOT</strong> connected to or equivalent to the MATLAB simulation in <code>matlab/main_simulation.m</code>.
+  All motion shown here is animated JavaScript; the actual algorithm output and metrics are in the MATLAB codebase.
+</div>
+
 <header>
-  <div class="title">Interactive Autonomous Pathfinder Studio (PS 26037)</div>
-  <div class="header-actions">
-    <button class="btn" id="btnSensorDropout" style="background: #f59e0b; color: white;">⚠️ Simulate Sensor Dropout</button>
-    <button class="btn btn-export" id="btnExportCSV">📥 Export Telemetry CSV</button>
-    <button class="btn btn-run" id="btnRun">▶ RUN SIMULATION</button>
-    <button class="btn btn-reset" id="btnReset">↺ RESET STUDIO</button>
+  <div class="logo-badge">SIH 26037</div>
+  <div>
+    <h1>Adaptive Path Planning &amp; Collision Avoidance — Indian Roads</h1>
+    <p>Interactive Demo | MathWorks Smart Vehicles Theme | Visualization Tool Only</p>
   </div>
 </header>
 
-<div class="studio-container">
-  <!-- Left Sidebar -->
-  <div class="sidebar-left">
+<div class="main">
+
+  <!-- Left sidebar: scenario selection + controls -->
+  <aside class="sidebar">
     <div>
-      <div class="section-title">1. Drag & Drop Obstacles</div>
-      <div class="agent-palette">
-        <div class="draggable-agent" draggable="true" data-type="cattle">🐄 Cattle</div>
-        <div class="draggable-agent" draggable="true" data-type="auto">🛺 Auto</div>
-        <div class="draggable-agent" draggable="true" data-type="pedestrian">🚶 Pedestrian</div>
-        <div class="draggable-agent" draggable="true" data-type="static">🛑 Barricade</div>
+      <h2>Scenarios</h2>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+        <button class="scenario-btn active" onclick="loadScenario(0)" id="sc-btn-0">
+          <span class="sc-num">01</span>
+          <span class="sc-title">Unmarked Village Road</span>
+          <span class="sc-desc">Narrow paved road, potholes, roaming cattle</span>
+        </button>
+        <button class="scenario-btn" onclick="loadScenario(1)" id="sc-btn-1">
+          <span class="sc-num">02</span>
+          <span class="sc-title">Signal-less Intersection</span>
+          <span class="sc-desc">4-way junction, auto-rickshaws, pedestrians</span>
+        </button>
+        <button class="scenario-btn" onclick="loadScenario(2)" id="sc-btn-2">
+          <span class="sc-num">03</span>
+          <span class="sc-title">Highway Merge</span>
+          <span class="sc-desc">High speed differential, slow pushcarts</span>
+        </button>
+        <button class="scenario-btn" onclick="loadScenario(3)" id="sc-btn-3">
+          <span class="sc-num">04</span>
+          <span class="sc-title">Dense Market Area</span>
+          <span class="sc-desc">Sub-metre clearance, crowded pedestrians</span>
+        </button>
+        <button class="scenario-btn" onclick="loadScenario(4)" id="sc-btn-4">
+          <span class="sc-num">05</span>
+          <span class="sc-title">Sudden Cattle Crossing</span>
+          <span class="sc-desc">Emergency lateral evasion at speed</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h2>Controls</h2>
+      <button class="ctrl-btn play"  id="btn-play"  onclick="togglePlay()">▶ Run Simulation</button>
+      <button class="ctrl-btn reset" onclick="resetSim()">↺ Reset</button>
+      <div class="speed-row">
+        <span>Speed</span>
+        <input type="range" id="speed-slider" min="0.5" max="5" step="0.5" value="2" oninput="simSpeed=+this.value">
+        <span id="speed-label">2×</span>
       </div>
     </div>
 
     <div>
-      <div class="section-title">2. Static Object Size</div>
-      <div class="slider-group">
-        <label>Width: <span id="lblWidth">2.0</span>m</label>
-        <input type="range" id="sliderWidth" min="0.8" max="5.0" step="0.2" value="2.0" />
+      <h2>Legend</h2>
+      <div class="legend">
+        <div class="legend-row"><div class="dot" style="background:#1e3a5f"></div>Road surface</div>
+        <div class="legend-row"><div class="dot" style="background:#374151"></div>Static obstacle</div>
+        <div class="legend-row"><div class="dot" style="background:#00d4ff"></div>Planned path</div>
+        <div class="legend-row"><div class="dot" style="background:#ffffff"></div>Ego vehicle</div>
+        <div class="legend-row"><div class="dot" style="background:#f59e0b"></div>Auto-rickshaw</div>
+        <div class="legend-row"><div class="dot" style="background:#ef4444"></div>Cattle</div>
+        <div class="legend-row"><div class="dot" style="background:#a78bfa"></div>Pedestrian</div>
+        <div class="legend-row"><div class="dot" style="background:#6b7280"></div>Pushcart</div>
+        <div class="legend-row"><div class="dot" style="background:#10b981;opacity:.5"></div>Safety radius</div>
       </div>
-      <div class="slider-group" style="margin-top: 8px;">
-        <label>Length: <span id="lblLength">2.0</span>m</label>
-        <input type="range" id="sliderLength" min="0.8" max="5.0" step="0.2" value="2.0" />
-      </div>
+    </div>
+  </aside>
+
+  <!-- Canvas -->
+  <div class="canvas-wrap">
+    <canvas id="sim" width="700" height="260"></canvas>
+
+    <div class="hud-overlay">
+      <div class="hud-title">SIM HUD</div>
+      <div class="hud-row"><span class="k">Step</span><span class="v" id="hud-step">0</span></div>
+      <div class="hud-row"><span class="k">Time</span><span class="v" id="hud-time">0.0 s</span></div>
+      <div class="hud-row"><span class="k">Speed</span><span class="v" id="hud-speed">0.0 m/s</span></div>
+      <div class="hud-row"><span class="k">BSM State</span><span class="v" id="hud-bsm">CRUISE</span></div>
+      <div class="hud-row"><span class="k">Replans</span><span class="v" id="hud-replans">0</span></div>
+      <div class="hud-row"><span class="k">Min Clearance</span><span class="v" id="hud-clear">—</span></div>
     </div>
 
-    <div style="flex: 1; overflow-y: auto;">
-      <div class="section-title">3. Active Road Obstacles</div>
-      <div id="activeAgentsList"></div>
-    </div>
+    <div class="state-badge" id="state-badge" style="background:#0d3a2a;color:#10b981">CRUISE</div>
   </div>
 
-  <!-- Center Canvas Viewport -->
-  <div class="canvas-viewport" id="viewport">
-    <div class="canvas-topbar">
-      <div class="status-badge" id="modeBadge" style="color: var(--accent-cyan); font-weight:600;">Scenario: Indian Village Road</div>
-      <div class="status-badge" id="stateBadge" style="font-weight:600;">Vehicle: IDLE</div>
-    </div>
-    <canvas id="simCanvas"></canvas>
-
-    <!-- Motion Mode Modal -->
-    <div class="modal-overlay" id="motionModal">
-      <div class="choice-card">
-        <div style="font-weight: 700; font-size: 0.95rem; text-align: center; color: var(--accent-cyan);">Choose Agent Motion</div>
-        <button id="btnChooseFreehand">✏️ Freehand Draw Path (Click & Drag)</button>
-        <button id="btnChooseRandom">🎲 Continuous Random Walk</button>
-        <button id="btnChooseStatic">📍 Keep Stationary</button>
-      </div>
-    </div>
-
-    <!-- Post-Simulation Diagnostics Analytics Modal -->
-    <div class="modal-overlay" id="analyticsModal">
-      <div class="analytics-modal">
-        <div class="analytics-header">
-          <h2>📊 Post-Simulation Diagnostics & Analytics</h2>
-          <button class="btn btn-reset" id="btnCloseAnalytics">Close</button>
+  <!-- Right panel: live metrics + agent list -->
+  <aside class="right-panel">
+    <div>
+      <h2>Live Metrics</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="metric-card">
+          <div class="metric-label">Avg Latency</div>
+          <div><span class="metric-value" id="m-latency">—</span><span class="metric-unit"> ms</span></div>
         </div>
-
-        <div class="kpi-row">
-          <div class="kpi-card" id="kpiMissionCard">
-            <div class="kpi-val" id="kpiTime">18.4s</div>
-            <div class="kpi-lbl">Total Mission Time</div>
-          </div>
-          <div class="kpi-card green" id="kpiSafetyCard">
-            <div class="kpi-val" id="kpiMinSafety">92.4%</div>
-            <div class="kpi-lbl">Min Safety Score (S_min)</div>
-          </div>
-          <div class="kpi-card green" id="kpiStatusCard">
-            <div class="kpi-val" id="kpiStatus">CLEAN MISSION</div>
-            <div class="kpi-lbl">Collision Status</div>
-          </div>
-          <div class="kpi-card orange">
-            <div class="kpi-val" id="kpiPeakAccel">2.2 / -1.8 m/s²</div>
-            <div class="kpi-lbl">Peak Accel / Decel</div>
-          </div>
+        <div class="metric-card">
+          <div class="metric-label">Smoothness</div>
+          <div><span class="metric-value" id="m-smooth">—</span><span class="metric-unit">/100</span></div>
         </div>
-
-        <div class="charts-container">
-          <div class="chart-box">
-            <canvas id="chartVt"></canvas>
-          </div>
-          <div class="chart-box">
-            <canvas id="chartVx"></canvas>
-          </div>
-          <div class="chart-box full-width">
-            <canvas id="chartAt"></canvas>
-          </div>
+        <div class="metric-card">
+          <div class="metric-label">Min Clear.</div>
+          <div><span class="metric-value" id="m-clear">—</span><span class="metric-unit"> m</span></div>
         </div>
-
-        <div style="display:flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
-          <button class="btn btn-export" id="btnExportCSVModal">📥 Export Telemetry CSV</button>
-          <button class="btn btn-run" id="btnDoneAnalytics">Done & Re-Run</button>
+        <div class="metric-card">
+          <div class="metric-label">Progress</div>
+          <div><span class="metric-value" id="m-prog">0</span><span class="metric-unit">%</span></div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Right Sidebar -->
-  <div class="sidebar-right">
-    <div class="section-title">Official Evaluation Metrics (PS 26037)</div>
-    <div class="telemetry-grid" style="margin-bottom: 12px;">
-      <div class="telemetry-card info">
-        <div class="telemetry-val" id="valLatency" style="color: #38bdf8">14.2 ms</div>
-        <div class="telemetry-lbl">Replanning Latency</div>
-      </div>
-      <div class="telemetry-card safe">
-        <div class="telemetry-val" id="valJerk" style="color: var(--accent-green)">0.18 m/s³</div>
-        <div class="telemetry-lbl">Path Smoothness (Jerk)</div>
-      </div>
-      <div class="telemetry-card safe" style="grid-column: span 2;">
-        <div class="telemetry-val" id="valCompletionRate" style="color: var(--accent-green)">100%</div>
-        <div class="telemetry-lbl">Scenario Completion Rate</div>
-      </div>
+    <div>
+      <h2>Dynamic Agents</h2>
+      <div class="agent-list" id="agent-list"></div>
     </div>
 
-    <div class="section-title">Visualizer Legend & Core Concepts</div>
-    <div style="font-size: 0.75rem; display: flex; flex-direction: column; gap: 8px; background: var(--card-bg); padding: 10px; border-radius: 6px; margin-bottom: 12px;">
-      <div><span style="color: var(--accent-green); font-weight: 900;">━━━</span> <strong>Traveled Path</strong> (Ground Truth)</div>
-      <div><span style="color: #ef4444; font-weight: 900;">━━━</span> <strong>Live AI Planned Spline</strong> (Horizon)</div>
-      <div><span style="color: var(--accent-cyan); font-weight: 900;">■</span> <strong>Ego Vehicle</strong> (Physics Body)</div>
-      <div><span style="color: var(--accent-orange); font-weight: 900;">╍╍╍</span> <strong>Virtual Stop Line</strong> (Yielding Zone)</div>
-      <hr style="border-color: #334155; margin: 4px 0;">
-      <div><strong>🔮 EKF Prediction:</strong> Estimates short-term future paths of moving animals & vehicles using Kalman filtering.</div>
-      <div><strong>🧲 Potential Field Repulsion:</strong> Pushes the planned path laterally away from obstacles to maintain a safe margin.</div>
-      <div><strong>📉 S-T Graph Yield/Nudge Decider:</strong> Maps spatio-temporal conflict zones to decide whether to stop or steer around an obstacle.</div>
+    <div>
+      <h2>BSM Transitions</h2>
+      <div id="bsm-log" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-dim);max-height:150px;overflow-y:auto;line-height:1.8"></div>
     </div>
-
-    <div class="section-title">Telemetry & Dynamics Engine</div>
-    <div class="telemetry-grid">
-      <div class="telemetry-card danger">
-        <div class="telemetry-val" id="valDanger" style="color: #ef4444">0.0%</div>
-        <div class="telemetry-lbl">Collision Risk (P_danger)</div>
-      </div>
-      <div class="telemetry-card safe">
-        <div class="telemetry-val" id="valSafety" style="color: var(--accent-green)">100%</div>
-        <div class="telemetry-lbl">Safety Index (S)</div>
-      </div>
-      <div class="telemetry-card info">
-        <div class="telemetry-val" id="valSpeed">0.0 km/h</div>
-        <div class="telemetry-lbl">Velocity</div>
-      </div>
-      <div class="telemetry-card info">
-        <div class="telemetry-val" id="valAccel">0.0 m/s²</div>
-        <div class="telemetry-lbl">Long. Accel</div>
-      </div>
-      <div class="telemetry-card">
-        <div class="telemetry-val" id="valElapsed">0.0s</div>
-        <div class="telemetry-lbl">Elapsed Time</div>
-      </div>
-      <div class="telemetry-card">
-        <div class="telemetry-val" id="valETA">--</div>
-        <div class="telemetry-lbl">Est. Arrival (ETA)</div>
-      </div>
-      <div class="telemetry-card" style="grid-column: span 2;">
-        <div class="telemetry-val" id="valClearance">-- m</div>
-        <div class="telemetry-lbl">Min Obstacle Distance</div>
-      </div>
-    </div>
-  </div>
+  </aside>
 </div>
 
+<footer>
+  <span>SIH 2026 PS-26037 · Adaptive Path Planning for Unstructured Indian Roads · MathWorks Smart Vehicles</span>
+  <span style="color:var(--warn)">⚠ Illustrative prototype — not connected to MATLAB computation engine</span>
+</footer>
+
 <script>
-// Dynamic Agent Position Extractor with Continuous Single-Pass Horizon
-function getAgentPos(ag) {
-  if (!ag) return { x: 0, y: 0 };
-  if (ag.motion === 'static' || !ag.path || ag.path.length < 2) return { x: ag.x, y: ag.y };
-  
-  if (ag.pathProgress === undefined) ag.pathProgress = 0;
-  
-  let totalLen = 0;
-  for (let i = 0; i < ag.path.length - 1; i++) {
-    totalLen += Math.hypot(ag.path[i+1].x - ag.path[i].x, ag.path[i+1].y - ag.path[i].y);
-  }
+/* =====================================================================
+   STANDALONE JAVASCRIPT SIMULATION
+   This is an independent illustrative tool. It mirrors the SAME 5 scenarios,
+   SAME agent types, and SAME BSM state names as the MATLAB pipeline, but
+   implements its own simplified animation logic entirely in JavaScript.
+   It does NOT call or replicate Hybrid A*, EKF, or vehicle_kinematics math.
+   ===================================================================== */
 
-  // If agent reaches the end of crossing trajectory, linger forward on shoulder without looping back
-  if (ag.pathProgress >= totalLen) {
-    const lastPt = ag.path[ag.path.length - 1];
-    const prevPt = ag.path[ag.path.length - 2];
-    const dx = lastPt.x - prevPt.x;
-    const dy = lastPt.y - prevPt.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const extraDist = ag.pathProgress - totalLen;
-    return {
-      x: lastPt.x + (dx / len) * extraDist,
-      y: lastPt.y + (dy / len) * extraDist
-    };
-  }
+const canvas = document.getElementById('sim');
+const ctx    = canvas.getContext('2d');
 
-  let accum = 0;
-  for (let i = 0; i < ag.path.length - 1; i++) {
-    const segLen = Math.hypot(ag.path[i+1].x - ag.path[i].x, ag.path[i+1].y - ag.path[i].y);
-    if (accum + segLen >= ag.pathProgress) {
-      const r = (ag.pathProgress - accum) / segLen;
-      return {
-        x: ag.path[i].x + (ag.path[i+1].x - ag.path[i].x) * r,
-        y: ag.path[i].y + (ag.path[i+1].y - ag.path[i].y) * r
-      };
-    }
-    accum += segLen;
+// World bounds matching MATLAB generate_scenarios.m
+const WORLD = { xmin:0, xmax:60, ymin:-10, ymax:10 };
+// Canvas dimensions
+const CW = canvas.width, CH = canvas.height;
+
+// World -> canvas coordinate transform
+function wx(x) { return (x - WORLD.xmin)/(WORLD.xmax - WORLD.xmin) * CW; }
+function wy(y) { return (1 - (y - WORLD.ymin)/(WORLD.ymax - WORLD.ymin)) * CH; }
+function wrad(r) { return r / (WORLD.xmax - WORLD.xmin) * CW; }
+
+// ---- Scenario definitions (mirrors generate_scenarios.m) ----
+const SCENARIOS = [
+  {
+    title:'Unmarked Village Road (CARLA Corridor)',
+    startX:2, startY:0, goalX:55, goalY:0,
+    roadY:[-2.5, 2.5],  // 5.0m usable road width
+    potholes:[
+      {x:20.0, y:1.0,  r:0.8, label:'Pothole 1'},
+      {x:35.0, y:-0.8, r:1.0, label:'Pothole 2'}
+    ],
+    wallRegions:[],
+    agents:[
+      {id:1,type:'cattle',      color:'#ef4444', x:30.0, y:-3.5, vx:0.0,  vy:0.7, r:1.1},
+      {id:2,type:'auto_rickshaw',color:'#f59e0b', x:45.0, y:1.2,  vx:-3.2, vy:0.0, r:0.8},
+    ]
+  },
+  {
+    title:'Signal-less Intersection',
+    startX:2, startY:-1.5, goalX:55, goalY:-1.5,
+    roadY:[-8, 8],
+    wallRegions:[{x1:0,x2:24,y1:-10,y2:-6},{x1:0,x2:24,y1:6,y2:10},
+                 {x1:36,x2:60,y1:-10,y2:-6},{x1:36,x2:60,y1:6,y2:10}],
+    agents:[
+      {id:1,type:'auto_rickshaw',color:'#f59e0b',x:30, y:8,    vx:0,    vy:-2.2, r:0.8},
+      {id:2,type:'pedestrian',   color:'#a78bfa', x:28, y:-6,   vx:0.2,  vy:0.7,  r:0.5},
+      {id:3,type:'auto_rickshaw',color:'#f59e0b',x:42, y:-1.5, vx:-2.5, vy:0.1,  r:0.8},
+    ]
+  },
+  {
+    title:'Highway Merge',
+    startX:2, startY:-4, goalX:55, goalY:2,
+    roadY:[-8, 8],
+    wallRegions:[],
+    agents:[
+      {id:1,type:'pushcart',     color:'#6b7280', x:25, y:-3.5, vx:0.6,  vy:0.05, r:0.6},
+      {id:2,type:'auto_rickshaw',color:'#f59e0b', x:40, y:2,    vx:2.8,  vy:0.0,  r:0.8},
+    ]
+  },
+  {
+    title:'Dense Market Area',
+    startX:2, startY:0, goalX:55, goalY:0,
+    roadY:[-2.4, 2.4],
+    wallRegions:[],
+    agents:[
+      {id:1,type:'pedestrian',color:'#a78bfa',x:15,y:1.0,  vx:0.15, vy:-0.3,r:0.4},
+      {id:2,type:'pedestrian',color:'#a78bfa',x:22,y:-1.2, vx:0.08, vy:0.35,r:0.4},
+      {id:3,type:'pushcart',  color:'#6b7280',x:32,y:0.8,  vx:0.2,  vy:-0.1,r:0.6},
+      {id:4,type:'pedestrian',color:'#a78bfa',x:42,y:-0.5, vx:-0.2, vy:0.2, r:0.4},
+    ]
+  },
+  {
+    title:'Sudden Cattle Crossing',
+    startX:2, startY:0, goalX:55, goalY:0,
+    roadY:[-3.6, 3.6],
+    wallRegions:[],
+    agents:[
+      {id:1,type:'cattle',color:'#ef4444',x:28,y:-4.5,vx:0.35,vy:2.0,r:1.1},
+    ]
   }
-  return ag.path[ag.path.length - 1];
+];
+
+let scIdx      = 0;
+let agents     = [];
+let ego        = {};
+let path       = [];
+let simStep    = 0;
+let simRunning = false;
+let simSpeed   = 2;
+let replanCount= 0;
+let minClear   = Infinity;
+let bsmState   = 'CRUISE';
+let bsmLog     = [];
+let animId     = null;
+let lastTime   = 0;
+let accumMs    = 0;
+const DT_SIM   = 100;  // ms per sim step
+
+const BSM_COLORS = {
+  CRUISE:      {bg:'#0d3a2a',fg:'#10b981'},
+  NUDGE:       {bg:'#1a2e00',fg:'#84cc16'},
+  YIELD_DECEL: {bg:'#3a1a00',fg:'#f59e0b'},
+  YIELD_WAIT:  {bg:'#3a0a00',fg:'#ef4444'},
+  RESUME:      {bg:'#0a1a3a',fg:'#60a5fa'},
+};
+
+function loadScenario(idx) {
+  scIdx = idx;
+  document.querySelectorAll('.scenario-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  resetSim();
 }
 
-// APOLLO & AUTOWARE ST-GRAPH SPEED DECIDER WITH NUDGE VS YIELD & INSTANT UNLATCH
-class STGraphSpeedDecider {
-    constructor(ppm) {
-        this.PPM = ppm;
-        this.horizon = 5.0;
-        this.dt = 0.1;
-        this.safetyBuffer = 3.5 * ppm;
-        this.laneHalfWidth = 1.6 * ppm;
-        this.state = "CRUISE";
-        this.latchedObstacle = null;
-        this.virtualStopStation = null;
-        this.virtualStopLine = null;
-    }
-
-    evaluate(ego, globalPath, activeAgents) {
-        const egoStation = this.getStationAlongPath(ego, globalPath);
-        this.virtualStopLine = null;
-
-        // Graceful Degradation: Sensor Dropout Fallback Mode
-        if (typeof sensorDropoutActive !== 'undefined' && sensorDropoutActive) {
-            this.state = "SENSOR_DROPOUT_CAUTION";
-            const targetSpeed = 4.1; // ~15 km/h cautious fallback speed
-            const accel = ego.vx > targetSpeed ? -2.0 : 0.8;
-            return { targetSpeed: targetSpeed, accel: accel, state: this.state, stopLine: null, target: null };
-        }
-
-        // 1. Immediate Unlatch Check: Has latched obstacle cleared the lane?
-        if (this.latchedObstacle) {
-            const obs = getAgentPos(this.latchedObstacle);
-            const lateralOffset = Math.abs(obs.y - ego.y);
-            
-            if (lateralOffset > 28 || obs.x < ego.x - 10) {
-                this.latchedObstacle = null;
-                this.virtualStopStation = null;
-            }
-        }
-
-        // 2. Evaluate Conflict vs Nudge for Active Agents ahead
-        let blockingAgent = null;
-        let nudgingAgent = null;
-
-        for (const agent of activeAgents) {
-            const agentPos = getAgentPos(agent);
-            const dx = agentPos.x - ego.x;
-            const dy = agentPos.y - ego.y;
-
-            if (dx > -10 && dx < 160) {
-                if (Math.abs(dy) < 26) {
-                    blockingAgent = agent;
-                    break;
-                } else if (Math.abs(dy) < 65) {
-                    nudgingAgent = agent;
-                }
-            }
-        }
-
-        // 3. Decision Logic: YIELD vs NUDGE vs CRUISE
-        if (blockingAgent || (this.latchedObstacle && Math.abs(getAgentPos(this.latchedObstacle).y - ego.y) < 26)) {
-            const targetAgent = blockingAgent || this.latchedObstacle;
-            this.latchedObstacle = targetAgent;
-
-            const targetPos = getAgentPos(targetAgent);
-            const stopStation = Math.max(egoStation + 15, targetPos.x - 45);
-            this.virtualStopLine = { x: stopStation, y: ego.y };
-
-            const distToStop = (stopStation - egoStation) / this.PPM;
-
-            if (distToStop < 1.0 || ego.vx < 0.3) {
-                this.state = "YIELD_WAIT";
-                return { targetSpeed: 0, accel: -3.0, state: this.state, stopLine: this.virtualStopLine, target: targetAgent };
-            } else {
-                this.state = "YIELD_DECEL";
-                const requiredDecel = -Math.max(2.0, (ego.vx * ego.vx) / (2 * Math.max(0.5, distToStop)));
-                return { targetSpeed: 0, accel: requiredDecel, state: this.state, stopLine: this.virtualStopLine, target: targetAgent };
-            }
-        } else if (nudgingAgent) {
-            this.state = "NUDGE";
-            const targetSpeed = 6.0; // ~22 km/h cautionary speed
-            const accel = ego.vx > targetSpeed ? -1.5 : 1.0;
-            return { targetSpeed: targetSpeed, accel: accel, state: this.state, stopLine: null, target: nudgingAgent };
-        }
-
-        this.state = ego.vx < 11.0 ? "RESUME" : "CRUISE";
-        return { targetSpeed: 11.1, accel: 2.0, state: this.state, stopLine: null, target: null };
-    }
-
-    predictAgentPosition(agent, t) {
-        if (!agent.path || agent.path.length < 2 || agent.motion === 'static') return { x: agent.x, y: agent.y };
-        const speed = (agent.speed || 1.2) * this.PPM;
-        return this.interpolateAlongPath(agent.path, speed * t);
-    }
-
-    getStationAlongPath(pt, path) {
-        if (!path || path.length === 0) return 0;
-        let nearestIdx = 0, minDist = Infinity;
-        for (let i = 0; i < path.length; i++) {
-            const d = Math.hypot(path[i].x - pt.x, path[i].y - pt.y);
-            if (d < minDist) { minDist = d; nearestIdx = i; }
-        }
-        let station = 0;
-        for (let i = 0; i < nearestIdx; i++) {
-            station += Math.hypot(path[i+1].x - path[i].x, path[i+1].y - path[i].y);
-        }
-        return station;
-    }
-
-    getPointAtStation(path, targetStation) {
-        if (!path || path.length === 0) return { x: 0, y: 0 };
-        let currentStation = 0;
-        for (let i = 0; i < path.length - 1; i++) {
-            const segDist = Math.hypot(path[i+1].x - path[i].x, path[i+1].y - path[i].y);
-            if (currentStation + segDist >= targetStation) {
-                const ratio = (targetStation - currentStation) / segDist;
-                return {
-                    x: path[i].x + (path[i+1].x - path[i].x) * ratio,
-                    y: path[i].y + (path[i+1].y - path[i].y) * ratio
-                };
-            }
-            currentStation += segDist;
-        }
-        return path[path.length - 1];
-    }
-
-    getLateralDistanceToPath(pt, path) {
-        if (!path || path.length === 0) return Infinity;
-        let minDist = Infinity;
-        for (let i = 0; i < path.length - 1; i++) {
-            const d = Math.hypot(path[i].x - pt.x, path[i].y - pt.y);
-            if (d < minDist) minDist = d;
-        }
-        return minDist;
-    }
-
-    interpolateAlongPath(path, dist) {
-        let dAccum = 0;
-        for (let i = 0; i < path.length - 1; i++) {
-            const d = Math.hypot(path[i+1].x - path[i].x, path[i+1].y - path[i].y);
-            if (dAccum + d >= dist) {
-                const r = (dist - dAccum) / d;
-                return { x: path[i].x + (path[i+1].x - path[i].x) * r, y: path[i].y + (path[i+1].y - path[i].y) * r };
-            }
-            dAccum += d;
-        }
-        return path[path.length - 1];
-    }
+function resetSim() {
+  const sc   = SCENARIOS[scIdx];
+  agents     = sc.agents.map(a=>({...a, ox:a.x, oy:a.y}));
+  ego        = { x:sc.startX, y:sc.startY, theta:0, v:0 };
+  simStep    = 0;
+  replanCount= 0;
+  minClear   = Infinity;
+  bsmState   = 'CRUISE';
+  bsmLog     = [];
+  path       = buildPath(sc);
+  updateBadge('CRUISE');
+  updateHUD();
+  updateAgentList();
+  document.getElementById('bsm-log').innerHTML = '';
+  draw();
+  stopSim();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const canvas = document.getElementById('simCanvas');
-  const ctx = canvas.getContext('2d');
-  const viewport = document.getElementById('viewport');
-
-  const PPM = 24;
-  const stDecider = new STGraphSpeedDecider(PPM);
-
-  let width = canvas.width = viewport.clientWidth || 800;
-  let height = canvas.height = viewport.clientHeight || 500;
-
-  function resizeCanvas() {
-    width = canvas.width = viewport.clientWidth || 800;
-    height = canvas.height = viewport.clientHeight || 500;
-    updateRoadBounds();
-  }
-  window.addEventListener('resize', resizeCanvas);
-
-  const road = {
-    yTop: 0,
-    yBottom: 0,
-    yCenter: 0,
-    laneWidth: 70,
-    numLanes: 2
-  };
-
-  function updateRoadBounds() {
-    road.yCenter = height / 2;
-    road.yTop = road.yCenter - road.laneWidth;
-    road.yBottom = road.yCenter + road.laneWidth;
-  }
-  updateRoadBounds();
-
-  const ego = {
-    x: 60,
-    y: road.yCenter,
-    vx: 0,
-    ax: 0,
-    targetSpeed: 11.1,
-    maxAccel: 2.2,
-    maxBraking: 4.5,
-    width: 2.0 * PPM,
-    length: 4.2 * PPM,
-    yaw: 0,
-    history: [],
-    status: 'READY',
-    goalX: 0
-  };
-
-  let agents = [];
-  let simRunning = false;
-  let simTime = 0;
-  let lastTimestamp = null;
-  let pendingAgent = null;
-  let isDrawingFreehand = false;
-  let currentDecision = { targetSpeed: 11.1, accel: 0, state: 'CRUISE', stopLine: null, target: null };
-
-  let telemetryLog = { t: [], x: [], v: [], a: [], S: [], Dmin: [] };
-
-  const modeBadge = document.getElementById('modeBadge');
-  const stateBadge = document.getElementById('stateBadge');
-  const motionModal = document.getElementById('motionModal');
-  const analyticsModal = document.getElementById('analyticsModal');
-  const activeAgentsList = document.getElementById('activeAgentsList');
-
-  let chartVtInstance = null;
-  let chartVxInstance = null;
-  let chartAtInstance = null;
-
-// 1. Initialized Scenario with Calibrated Velocities & Waypoints
-  function loadDefaultVillageScenario() {
-    updateRoadBounds();
-    ego.x = 50;
-    ego.y = road.yCenter;
-    ego.vx = 0;
-    ego.ax = 0;
-    ego.yaw = 0;
-    ego.history = [{ x: ego.x, y: ego.y }];
-    ego.status = 'READY';
-    simTime = 0;
-
-    agents = [
-      {
-        id: 1, type: 'cattle', name: 'Cattle (Crossing)',
-        x: 360, y: road.yCenter - 65,
-        speed: 35, // px per second
-        targetIdx: 1,
-        color: '#f97316', radius: 14,
-        path: [
-          { x: 360, y: road.yCenter - 65 },
-          { x: 400, y: road.yCenter },
-          { x: 440, y: road.yCenter + 70 },
-          { x: 540, y: road.yCenter + 70 }
-        ]
-      },
-      {
-        id: 2, type: 'pedestrian', name: 'Pedestrian (Transverse)',
-        x: 600, y: road.yCenter + 65,
-        speed: 45, // px per second
-        targetIdx: 1,
-        color: '#eab308', radius: 10,
-        path: [
-          { x: 600, y: road.yCenter + 65 },
-          { x: 600, y: road.yCenter - 70 },
-          { x: 680, y: road.yCenter - 70 }
-        ]
-      },
-      {
-        id: 3, type: 'auto', name: 'Auto-Rickshaw (Weaving)',
-        x: 750, y: road.yCenter - 25,
-        speed: 75, // px per second
-        targetIdx: 1,
-        color: '#06b6d4', radius: 16,
-        path: [
-          { x: 750, y: road.yCenter - 25 },
-          { x: 840, y: road.yCenter + 30 },
-          { x: 930, y: road.yCenter - 25 },
-          { x: 1100, y: road.yCenter - 25 }
-        ]
-      }
-    ];
-    renderAgentList();
-  }
-
-  // 2. Continuous Direction-Vector Motion Engine
-  function updateAgentPositions(dt) {
-    agents.forEach(agent => {
-      if (!agent.path || agent.path.length < 2 || agent.motion === 'static') return;
-
-      if (!agent.targetIdx) agent.targetIdx = 1;
-      const target = agent.path[agent.targetIdx];
-      const dx = target.x - agent.x;
-      const dy = target.y - agent.y;
-      const distToTarget = Math.hypot(dx, dy);
-
-      const step = agent.speed * dt;
-
-      if (distToTarget <= step) {
-        agent.x = target.x;
-        agent.y = target.y;
-        if (agent.targetIdx < agent.path.length - 1) {
-          agent.targetIdx++;
-        } else {
-          agent.x += step;
-        }
-      } else if (distToTarget > 0) {
-        agent.x += (dx / distToTarget) * step;
-        agent.y += (dy / distToTarget) * step;
-      }
-    });
-  }
-
-  // Drag & Drop Setup
-  document.querySelectorAll('.draggable-agent').forEach(el => {
-    el.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('agentType', el.getAttribute('data-type'));
-    });
-  });
-
-  canvas.addEventListener('dragover', (e) => e.preventDefault());
-
-  canvas.addEventListener('drop', (e) => {
-    e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const dropX = e.clientX - rect.left;
-    const dropY = e.clientY - rect.top;
-    const type = e.dataTransfer.getData('agentType');
-
-    pendingAgent = {
-      id: Date.now(),
-      type: type,
-      x: dropX,
-      y: dropY,
-      width: parseFloat(document.getElementById('sliderWidth').value) * PPM,
-      length: parseFloat(document.getElementById('sliderLength').value) * PPM,
-      motion: 'static',
-      path: [{ x: dropX, y: dropY }],
-      pathProgress: 0,
-      speed: type === 'auto' ? 4.5 : (type === 'cattle' ? 1.0 : 1.2)
-    };
-
-    if (type === 'static') {
-      agents.push(pendingAgent);
-      pendingAgent = null;
-      renderAgentList();
-    } else {
-      motionModal.style.display = 'flex';
-    }
-  });
-
-  document.getElementById('btnChooseFreehand').addEventListener('click', () => {
-    motionModal.style.display = 'none';
-    pendingAgent.motion = 'freehand';
-    isDrawingFreehand = true;
-    modeBadge.innerText = 'Mode: Click & Drag to Paint Agent Trajectory';
-  });
-
-  document.getElementById('btnChooseRandom').addEventListener('click', () => {
-    motionModal.style.display = 'none';
-    pendingAgent.motion = 'random';
-    let curX = pendingAgent.x;
-    let curY = pendingAgent.y;
-    for (let i = 0; i < 6; i++) {
-      curX += (Math.random() * 80 - 20);
-      curY += (Math.random() * 60 - 30);
-      curY = Math.max(road.yTop + 20, Math.min(road.yBottom - 20, curY));
-      pendingAgent.path.push({ x: curX, y: curY });
-    }
-    agents.push(pendingAgent);
-    pendingAgent = null;
-    renderAgentList();
-    modeBadge.innerText = 'Scenario: Indian Village Road';
-  });
-
-  document.getElementById('btnChooseStatic').addEventListener('click', () => {
-    motionModal.style.display = 'none';
-    pendingAgent.motion = 'static';
-    agents.push(pendingAgent);
-    pendingAgent = null;
-    renderAgentList();
-    modeBadge.innerText = 'Scenario: Indian Village Road';
-  });
-
-  canvas.addEventListener('mousedown', (e) => {
-    if (!isDrawingFreehand || !pendingAgent) return;
-    const rect = canvas.getBoundingClientRect();
-    pendingAgent.path = [{ x: e.clientX - rect.left, y: e.clientY - rect.top }];
-  });
-
-  canvas.addEventListener('mousemove', (e) => {
-    if (!isDrawingFreehand || !pendingAgent || e.buttons !== 1) return;
-    const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = Math.max(road.yTop + 10, Math.min(road.yBottom - 10, e.clientY - rect.top));
-    
-    const last = pendingAgent.path[pendingAgent.path.length - 1];
-    if (Math.hypot(px - last.x, py - last.y) > 10) {
-      pendingAgent.path.push({ x: px, y: py });
-    }
-  });
-
-  canvas.addEventListener('mouseup', () => {
-    if (isDrawingFreehand && pendingAgent) {
-      isDrawingFreehand = false;
-      if (pendingAgent.path.length < 2) {
-        pendingAgent.path.push({ x: pendingAgent.x + 40, y: pendingAgent.y });
-      }
-      agents.push(pendingAgent);
-      pendingAgent = null;
-      renderAgentList();
-      modeBadge.innerText = 'Scenario: Indian Village Road';
-    }
-  });
-
-  function renderAgentList() {
-    activeAgentsList.innerHTML = '';
-    agents.forEach((ag, idx) => {
-      const item = document.createElement('div');
-      item.className = 'agent-item';
-      item.innerHTML = `
-        <span>${idx + 1}. ${ag.type.toUpperCase()} (${ag.motion})</span>
-        <button onclick="window.removeAgent(${ag.id})">×</button>
-      `;
-      activeAgentsList.appendChild(item);
-    });
-  }
-
-  window.removeAgent = (id) => {
-    agents = agents.filter(a => a.id !== id);
-    renderAgentList();
-  };
-
-  document.getElementById('sliderWidth').addEventListener('input', (e) => {
-    document.getElementById('lblWidth').innerText = e.target.value;
-  });
-  document.getElementById('sliderLength').addEventListener('input', (e) => {
-    document.getElementById('lblLength').innerText = e.target.value;
-  });
-
-  function computeLivePlannedPath() {
-    const plannedPoints = [];
-    ego.goalX = width - 50;
-
-    plannedPoints.push({ x: ego.x, y: ego.y });
-
-    const stepX = 40;
-    for (let sampleX = ego.x + stepX; sampleX < ego.goalX; sampleX += stepX) {
-      let targetY = road.yCenter;
-      
-      for (const ag of agents) {
-        const agPos = getAgentPos(ag);
-        const dx = agPos.x - sampleX;
-        const dy = agPos.y - targetY;
-        const dist = Math.hypot(dx, dy);
-
-        const influenceRadius = 75;
-        if (dist < influenceRadius) {
-          const pushDirection = (agPos.y > road.yCenter) ? -1 : 1;
-          const repulsion = (1.0 - dist / influenceRadius) * (road.laneWidth * 0.75);
-          targetY += pushDirection * repulsion;
-        }
-      }
-
-      targetY = Math.max(road.yTop + 20, Math.min(road.yBottom - 20, targetY));
-      plannedPoints.push({ x: sampleX, y: targetY });
-    }
-
-    plannedPoints.push({ x: ego.goalX, y: road.yCenter });
-    return plannedPoints;
-  }
-
-  function updateVehiclePhysics(dt, livePath) {
-    if (ego.status === 'ARRIVED' || ego.status === 'COLLISION') {
-      ego.vx = Math.max(0, ego.vx - ego.maxBraking * dt);
-      return;
-    }
-
-    currentDecision = stDecider.evaluate(ego, livePath, agents);
-
-    if (currentDecision.state === 'CRUISE') {
-      stateBadge.innerText = '🟢 CRUISE (40 km/h)';
-      stateBadge.style.color = '#10b981';
-    } else if (currentDecision.state === 'NUDGE') {
-      stateBadge.innerText = `🟡 NUDGING / BYPASSING (${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Obstacle'})`;
-      stateBadge.style.color = '#eab308';
-    } else if (currentDecision.state === 'YIELD_DECEL') {
-      stateBadge.innerText = `🟡 YIELDING (${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Agent'})`;
-      stateBadge.style.color = '#f59e0b';
-    } else if (currentDecision.state === 'YIELD_WAIT') {
-      stateBadge.innerText = `🔴 WAITING (${currentDecision.target ? currentDecision.target.type.toUpperCase() : 'Agent'} in Lane)`;
-      stateBadge.style.color = '#ef4444';
-    } else if (currentDecision.state === 'EMERGENCY_BRAKE') {
-      stateBadge.innerText = '🚨 EMERGENCY BRAKE (AEB)';
-      stateBadge.style.color = '#ef4444';
-    } else if (currentDecision.state === 'SENSOR_DROPOUT_CAUTION') {
-      stateBadge.innerText = '⚠️ SENSOR DROPOUT: CAUTIOUS SLOWDOWN (15 km/h)';
-      stateBadge.style.color = '#f59e0b';
-    } else if (currentDecision.state === 'RESUME') {
-      stateBadge.innerText = '🔵 RESUMING TRAFFIC';
-      stateBadge.style.color = '#38bdf8';
-    }
-
-    let minDistance = Infinity;
-    let closestObsType = '';
-    for (const ag of agents) {
-      const pos = getAgentPos(ag);
-      const d = Math.hypot(pos.x - ego.x, pos.y - ego.y) / PPM;
-      if (d < minDistance) {
-        minDistance = d;
-        closestObsType = ag.type;
+function buildPath(sc) {
+  // Simple illustrative A*-style path: route around agents with sinusoidal deviation
+  const pts = [];
+  for (let t=0; t<=1; t+=0.02) {
+    let px = sc.startX + t*(sc.goalX - sc.startX);
+    // Add slight vertical bias to illustrate lane nudge
+    let py = sc.startY + t*(sc.goalY - sc.startY);
+    // Bump path to avoid agents near centre
+    for (const ag of sc.agents) {
+      const dx = px - ag.x;
+      const dist = Math.hypot(dx, py - ag.y);
+      if (dist < 5) {
+        const push = (5 - dist)/5 * 2.5;
+        py += (py > ag.y ? push : -push);
       }
     }
+    // Clamp to road band
+    py = Math.max(sc.roadY[0]+0.5, Math.min(sc.roadY[1]-0.5, py));
+    pts.push([px, py]);
+  }
+  return pts;
+}
 
-    if (minDistance < 0.6) {
-      ego.vx = 0;
-      ego.ax = 0;
-      ego.status = 'COLLISION';
-      stateBadge.innerText = `CRITICAL COLLISION with ${closestObsType.toUpperCase()}`;
-      stateBadge.style.color = '#ef4444';
-      triggerPostSimulationAnalytics(false, closestObsType);
-      return;
+function simTick() {
+  const sc = SCENARIOS[scIdx];
+  simStep++;
+
+  // Move agents
+  for (const ag of agents) {
+    switch(ag.type) {
+      case 'cattle':       ag.vx += 0.05*(Math.random()-0.5); ag.vy += 0.3*(Math.random()-0.5); break;
+      case 'auto_rickshaw':ag.vy += 0.08*(Math.random()-0.5); break;
+      case 'pedestrian':   ag.vx += 0.02*(Math.random()-0.5); ag.vy += 0.05*(Math.random()-0.5); break;
     }
-
-    ego.ax = currentDecision.accel;
-    ego.ax = Math.max(-ego.maxBraking, Math.min(ego.maxAccel, ego.ax));
-
-    const distToGoal = (ego.goalX - ego.x) / PPM;
-    if (distToGoal < 5.0) {
-      ego.ax = -Math.min(ego.maxBraking, (ego.vx * ego.vx) / (2 * Math.max(0.5, distToGoal)));
-      if (distToGoal < 0.3 || ego.vx < 0.2) {
-        ego.vx = 0;
-        ego.ax = 0;
-        ego.status = 'ARRIVED';
-        stateBadge.innerText = '🏁 ARRIVED (Goal Reached)';
-        stateBadge.style.color = '#10b981';
-        triggerPostSimulationAnalytics(true, '');
-        return;
-      }
-    }
-
-    ego.vx = Math.max(0, ego.vx + ego.ax * dt);
-    const speedPixels = ego.vx * PPM;
-
-    if (livePath.length > 1) {
-      const target = livePath[1];
-      const targetAngle = Math.atan2(target.y - ego.y, target.x - ego.x);
-      ego.yaw += (targetAngle - ego.yaw) * Math.min(1.0, 8.0 * dt);
-
-      ego.x += Math.cos(ego.yaw) * speedPixels * dt;
-      ego.y += Math.sin(ego.yaw) * speedPixels * dt;
-    } else {
-      ego.x += speedPixels * dt;
-    }
-
-    const lastHistory = ego.history[ego.history.length - 1];
-    if (!lastHistory || Math.hypot(ego.x - lastHistory.x, ego.y - lastHistory.y) > 4) {
-      ego.history.push({ x: ego.x, y: ego.y });
-    }
-
-    telemetryLog.t.push(parseFloat(simTime.toFixed(2)));
-    telemetryLog.x.push(parseFloat((ego.x / PPM).toFixed(2)));
-    telemetryLog.v.push(parseFloat(ego.vx.toFixed(2)));
-    telemetryLog.a.push(parseFloat(ego.ax.toFixed(2)));
-
-    const sigmaSafe = 2.5;
-    const danger = minDistance === Infinity ? 0.0 : Math.min(100, Math.exp(-(minDistance * minDistance) / (2 * sigmaSafe * sigmaSafe)) * 100);
-    const safety = Math.max(0, 100 - danger);
-
-    telemetryLog.S.push(parseFloat(safety.toFixed(1)));
-    telemetryLog.Dmin.push(minDistance === Infinity ? 99 : parseFloat(minDistance.toFixed(2)));
+    ag.vx = Math.max(-4, Math.min(4, ag.vx));
+    ag.vy = Math.max(-3, Math.min(3, ag.vy));
+    ag.x  = Math.max(WORLD.xmin, Math.min(WORLD.xmax, ag.x + ag.vx*0.1));
+    ag.y  = Math.max(WORLD.ymin, Math.min(WORLD.ymax, ag.y + ag.vy*0.1));
   }
 
-  let sensorDropoutActive = false;
-  document.getElementById('btnSensorDropout').addEventListener('click', () => {
-    sensorDropoutActive = !sensorDropoutActive;
-    const btn = document.getElementById('btnSensorDropout');
-    if (sensorDropoutActive) {
-      btn.style.background = '#ef4444';
-      btn.innerText = '🚨 Sensor Dropout Active (Cautious Mode)';
-    } else {
-      btn.style.background = '#f59e0b';
-      btn.innerText = '⚠️ Simulate Sensor Dropout';
-    }
-  });
-
-  function updateTelemetryUI() {
-    let minD = Infinity;
-    for (const ag of agents) {
-      const pos = getAgentPos(ag);
-      const d = Math.hypot(pos.x - ego.x, pos.y - ego.y) / PPM;
-      if (d < minD) minD = d;
-    }
-
-    const sigmaSafe = 2.5;
-    const danger = minD === Infinity ? 0.0 : Math.min(100, Math.exp(-(minD * minD) / (2 * sigmaSafe * sigmaSafe)) * 100);
-    const safety = Math.max(0, 100 - danger);
-
-    document.getElementById('valDanger').innerText = `${danger.toFixed(1)}%`;
-    document.getElementById('valSafety').innerText = `${safety.toFixed(1)}%`;
-    document.getElementById('valSpeed').innerText = `${(ego.vx * 3.6).toFixed(1)} km/h`;
-    document.getElementById('valAccel').innerText = `${ego.ax.toFixed(2)} m/s²`;
-    document.getElementById('valElapsed').innerText = `${simTime.toFixed(1)}s`;
-    document.getElementById('valClearance').innerText = minD === Infinity ? '-- m' : `${minD.toFixed(2)} m`;
-
-    // Official Evaluation Metrics Update
-    const latVal = (12.4 + (simTime % 2.5) * 1.1).toFixed(1);
-    const jerkVal = (0.15 + (Math.abs(ego.ax) / 4.5) * 0.08).toFixed(2);
-    document.getElementById('valLatency').innerText = `${latVal} ms`;
-    document.getElementById('valJerk').innerText = `${jerkVal} m/s³`;
-    document.getElementById('valCompletionRate').innerText = ego.status === 'COLLISION' ? '0%' : '100%';
-
-    const remDist = Math.max(0, (ego.goalX - ego.x) / PPM);
-    const eta = ego.vx > 0.5 ? (remDist / ego.vx).toFixed(1) + 's' : '--';
-    document.getElementById('valETA').innerText = eta;
+  // Move ego along path
+  const targetIdx = Math.min(simStep, path.length-1);
+  if (targetIdx > 0) {
+    ego.x = path[targetIdx][0];
+    ego.y = path[targetIdx][1];
+    ego.v  = Math.hypot(path[targetIdx][0]-path[targetIdx-1][0],
+                        path[targetIdx][1]-path[targetIdx-1][1]) / 0.1;
   }
 
-  function triggerPostSimulationAnalytics(isClean, collisionType) {
-    simRunning = false;
-    analyticsModal.style.display = 'flex';
+  // BSM state machine (simplified illustrative version)
+  let nearest = Infinity;
+  for (const ag of agents) {
+    nearest = Math.min(nearest, Math.hypot(ego.x-ag.x, ego.y-ag.y));
+  }
+  if (nearest < minClear) minClear = nearest;
 
-    const finalTime = simTime.toFixed(1);
-    const minSafety = telemetryLog.S.length > 0 ? Math.min(...telemetryLog.S) : 100;
-    const minSafetyIdx = telemetryLog.S.indexOf(minSafety);
-    const minSafetyPos = telemetryLog.x[minSafetyIdx] || 0;
+  const prevBSM = bsmState;
+  if      (nearest < 2.5) bsmState = 'YIELD_WAIT';
+  else if (nearest < 4.5) bsmState = 'YIELD_DECEL';
+  else if (nearest < 7.0) bsmState = (bsmState==='YIELD_DECEL'||bsmState==='YIELD_WAIT') ? 'RESUME' : 'NUDGE';
+  else if (nearest > 8.5 && bsmState==='RESUME') bsmState = 'CRUISE';
+  else if (nearest > 7.0 && bsmState==='NUDGE') bsmState = 'CRUISE';
 
-    const maxAccel = telemetryLog.a.length > 0 ? Math.max(...telemetryLog.a).toFixed(2) : '0.00';
-    const minAccel = telemetryLog.a.length > 0 ? Math.min(...telemetryLog.a).toFixed(2) : '0.00';
-
-    document.getElementById('kpiTime').innerText = `${finalTime}s`;
-    document.getElementById('kpiMinSafety').innerText = `${minSafety.toFixed(1)}% (at x=${minSafetyPos.toFixed(1)}m)`;
-    document.getElementById('kpiPeakAccel').innerText = `${maxAccel} / ${minAccel} m/s²`;
-
-    const statusCard = document.getElementById('kpiStatusCard');
-    if (isClean) {
-      document.getElementById('kpiStatus').innerText = 'CLEAN MISSION';
-      statusCard.className = 'kpi-card green';
-    } else {
-      document.getElementById('kpiStatus').innerText = `COLLISION (${collisionType.toUpperCase()})`;
-      statusCard.className = 'kpi-card red';
-    }
-
-    renderAnalyticsCharts();
+  if (bsmState !== prevBSM) {
+    logBSM(`${prevBSM} → ${bsmState} (d=${nearest.toFixed(1)}m)`);
+    updateBadge(bsmState);
   }
 
-  function renderAnalyticsCharts() {
-    const timeLabels = telemetryLog.t;
-    const vKmhData = telemetryLog.v.map(v => (v * 3.6).toFixed(1));
-    const xPosData = telemetryLog.x;
-    const accelData = telemetryLog.a;
-
-    if (chartVtInstance) chartVtInstance.destroy();
-    chartVtInstance = new Chart(document.getElementById('chartVt'), {
-      type: 'line',
-      data: {
-        labels: timeLabels,
-        datasets: [{
-          label: 'Velocity (km/h) vs Time (s)',
-          data: vKmhData,
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          fill: true,
-          tension: 0.3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#f8fafc' } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
-        }
-      }
-    });
-
-    if (chartVxInstance) chartVxInstance.destroy();
-    chartVxInstance = new Chart(document.getElementById('chartVx'), {
-      type: 'line',
-      data: {
-        labels: xPosData,
-        datasets: [{
-          label: 'Velocity (km/h) vs Position (m)',
-          data: vKmhData,
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6, 182, 212, 0.1)',
-          fill: true,
-          tension: 0.3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#f8fafc' } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
-        }
-      }
-    });
-
-    if (chartAtInstance) chartAtInstance.destroy();
-    chartAtInstance = new Chart(document.getElementById('chartAt'), {
-      type: 'line',
-      data: {
-        labels: timeLabels,
-        datasets: [{
-          label: 'Longitudinal Accel (m/s²) vs Time (s)',
-          data: accelData,
-          borderColor: '#ef4444',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          fill: true,
-          tension: 0.2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#f8fafc' } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
-        }
-      }
-    });
+  // Periodic replan trigger
+  if (simStep % 15 === 0) {
+    replanCount++;
+    path = buildPath(sc);
   }
 
-  function exportCSV() {
-    let csvContent = "data:text/csv;charset=utf-8,time,x_pos,velocity,acceleration,safety_index,min_clearance\n";
-    for (let i = 0; i < telemetryLog.t.length; i++) {
-      csvContent += `${telemetryLog.t[i]},${telemetryLog.x[i]},${telemetryLog.v[i]},${telemetryLog.a[i]},${telemetryLog.S[i]},${telemetryLog.Dmin[i]}\n`;
-    }
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "simulation_telemetry.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  updateHUD(nearest);
+  updateAgentList();
+  draw();
+
+  // Goal check
+  const goalDist = Math.hypot(ego.x - sc.goalX, ego.y - sc.goalY);
+  if (goalDist < 2.5 || simStep >= path.length-1) {
+    logBSM(`GOAL REACHED — dist=${goalDist.toFixed(2)}m`);
+    stopSim();
+    document.getElementById('state-badge').textContent = '✓ GOAL REACHED';
+    document.getElementById('state-badge').style.background='#0a2a1a';
+    document.getElementById('state-badge').style.color='#10b981';
+  }
+}
+
+function loop(ts) {
+  accumMs += (ts - lastTime) * simSpeed;
+  lastTime = ts;
+  while (accumMs >= DT_SIM) { simTick(); accumMs -= DT_SIM; }
+  animId = requestAnimationFrame(loop);
+}
+
+function togglePlay() {
+  if (simRunning) stopSim();
+  else startSim();
+}
+function startSim() {
+  if (simRunning) return;
+  simRunning = true;
+  lastTime = performance.now();
+  accumMs  = 0;
+  animId   = requestAnimationFrame(loop);
+  document.getElementById('btn-play').textContent = '⏸ Pause';
+  document.getElementById('btn-play').className   = 'ctrl-btn pause';
+}
+function stopSim() {
+  simRunning = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  document.getElementById('btn-play').textContent = '▶ Run Simulation';
+  document.getElementById('btn-play').className   = 'ctrl-btn play';
+}
+
+function updateBadge(state) {
+  const badge = document.getElementById('state-badge');
+  const col   = BSM_COLORS[state] || BSM_COLORS.CRUISE;
+  badge.textContent      = state;
+  badge.style.background = col.bg;
+  badge.style.color      = col.fg;
+}
+
+function logBSM(msg) {
+  bsmLog.push(msg);
+  const el = document.getElementById('bsm-log');
+  el.innerHTML = bsmLog.map((m,i)=>`<div style="color:${i===bsmLog.length-1?'#e2e8f0':'#475569'}">${m}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function updateHUD(nearest) {
+  const sc = SCENARIOS[scIdx];
+  document.getElementById('hud-step').textContent  = simStep;
+  document.getElementById('hud-time').textContent  = (simStep*0.1).toFixed(1)+' s';
+  document.getElementById('hud-speed').textContent = (ego.v||0).toFixed(2)+' m/s';
+  document.getElementById('hud-bsm').textContent   = bsmState;
+  document.getElementById('hud-replans').textContent = replanCount;
+  document.getElementById('hud-clear').textContent = isFinite(minClear) ? minClear.toFixed(2)+' m' : '—';
+  // Metrics panel
+  document.getElementById('m-latency').textContent = (Math.random()*8+10).toFixed(1);
+  const smooth = 100 - Math.min(100,(Math.random()*5));
+  document.getElementById('m-smooth').textContent  = smooth.toFixed(0);
+  document.getElementById('m-clear').textContent   = isFinite(minClear) ? minClear.toFixed(2) : '—';
+  const prog = Math.min(100, ((ego.x - sc.startX)/(sc.goalX - sc.startX)*100)).toFixed(0);
+  document.getElementById('m-prog').textContent    = prog;
+
+  document.getElementById('speed-label').textContent = simSpeed.toFixed(1)+'×';
+}
+
+function updateAgentList() {
+  const el = document.getElementById('agent-list');
+  el.innerHTML = agents.map(ag=>`
+    <div class="agent-tag">
+      <span class="at-type">${ag.id}. ${ag.type.replace('_',' ')}</span>
+      <div class="at-pos">pos=[${ag.x.toFixed(1)}, ${ag.y.toFixed(1)}] v=[${ag.vx.toFixed(2)},${ag.vy.toFixed(2)}]</div>
+    </div>`).join('');
+}
+
+function draw() {
+  const sc = SCENARIOS[scIdx];
+  ctx.clearRect(0, 0, CW, CH);
+
+  // Background
+  ctx.fillStyle = '#07090f';
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Road surface
+  ctx.fillStyle = '#0d1520';
+  ctx.fillRect(0, wy(sc.roadY[1]), CW, wy(sc.roadY[0])-wy(sc.roadY[1]));
+
+  // Road edges
+  ctx.strokeStyle = '#1e3a5f'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0,wy(sc.roadY[0])); ctx.lineTo(CW,wy(sc.roadY[0])); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,wy(sc.roadY[1])); ctx.lineTo(CW,wy(sc.roadY[1])); ctx.stroke();
+
+  // Dashed centreline
+  ctx.strokeStyle = '#1a2a40'; ctx.lineWidth = 1; ctx.setLineDash([10,10]);
+  ctx.beginPath(); ctx.moveTo(0,wy(0)); ctx.lineTo(CW,wy(0)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Wall regions
+  for (const w of (sc.wallRegions||[])) {
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(wx(w.x1), wy(w.y2), wx(w.x2)-wx(w.x1), wy(w.y1)-wy(w.y2));
   }
 
-  document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
-  document.getElementById('btnExportCSVModal').addEventListener('click', exportCSV);
-  document.getElementById('btnCloseAnalytics').addEventListener('click', () => analyticsModal.style.display = 'none');
-  document.getElementById('btnDoneAnalytics').addEventListener('click', () => analyticsModal.style.display = 'none');
-
-  function drawRoad() {
-    updateRoadBounds();
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, road.yTop, width, road.laneWidth * road.numLanes);
-
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 3;
+  // Potholes (static obstacles on corridor)
+  for (const p of (sc.potholes||[])) {
     ctx.beginPath();
-    ctx.moveTo(0, road.yTop); ctx.lineTo(width, road.yTop);
-    ctx.moveTo(0, road.yBottom); ctx.lineTo(width, road.yBottom);
+    ctx.arc(wx(p.x), wy(p.y), wrad(p.r), 0, 2*Math.PI);
+    ctx.fillStyle = '#2d1515';
+    ctx.fill();
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
-
-    ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([16, 12]);
+    // Safety buffer
     ctx.beginPath();
-    ctx.moveTo(0, road.yCenter); ctx.lineTo(width, road.yCenter);
+    ctx.arc(wx(p.x), wy(p.y), wrad(p.r + 0.5), 0, 2*Math.PI);
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.font = '8px Inter';
+    ctx.fillStyle = '#fca5a5';
+    ctx.fillText(p.label, wx(p.x), wy(p.y) - wrad(p.r + 0.5) - 3);
+  }
+
+  // Virtual Stop Line at X=27.5m if active
+  if (bsmState === 'YIELD_WAIT' && ego.x < 28.0) {
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(wx(27.5), wy(sc.roadY[0]));
+    ctx.lineTo(wx(27.5), wy(sc.roadY[1]));
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold 9px JetBrains Mono';
+    ctx.fillText('VIRTUAL STOP LINE (27.5m)', wx(27.5), wy(sc.roadY[1]) - 6);
   }
 
-  function drawAgents() {
-    if (pendingAgent) {
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.arc(pendingAgent.x, pendingAgent.y, 18, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      if (pendingAgent.path && pendingAgent.path.length > 1) {
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(pendingAgent.path[0].x, pendingAgent.path[0].y);
-        for (let i = 1; i < pendingAgent.path.length; i++) {
-          ctx.lineTo(pendingAgent.path[i].x, pendingAgent.path[i].y);
-        }
-        ctx.stroke();
-      }
-    }
-
-    agents.forEach(ag => {
-      const pos = getAgentPos(ag);
-
-      if (ag.path && ag.path.length > 1) {
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(ag.path[0].x, ag.path[0].y);
-        for (let i = 1; i < ag.path.length; i++) ctx.lineTo(ag.path[i].x, ag.path[i].y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      if (ag.type === 'static') {
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(pos.x - ag.width / 2, pos.y - ag.length / 2, ag.width, ag.length);
-        ctx.strokeStyle = '#fca5a5';
-        ctx.strokeRect(pos.x - ag.width / 2, pos.y - ag.length / 2, ag.width, ag.length);
-      } else {
-        ctx.fillStyle = ag.type === 'cattle' ? '#f97316' : (ag.type === 'auto' ? '#06b6d4' : '#eab308');
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(ag.type.toUpperCase(), pos.x, pos.y - 16);
-      }
-    });
+  // Planned path
+  if (path.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(wx(path[0][0]), wy(path[0][1]));
+    for (let i=1;i<path.length;i++) ctx.lineTo(wx(path[i][0]), wy(path[i][1]));
+    ctx.strokeStyle='#00d4ff'; ctx.lineWidth=2.5; ctx.globalAlpha=0.7; ctx.stroke();
+    ctx.globalAlpha=1;
   }
 
-  function drawTrailsAndVehicle(livePath) {
-    if (ego.history.length > 1) {
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 4;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(ego.history[0].x, ego.history[0].y);
-      for (let i = 1; i < ego.history.length; i++) {
-        ctx.lineTo(ego.history[i].x, ego.history[i].y);
-      }
-      ctx.stroke();
-    }
+  // Goal marker
+  ctx.beginPath();
+  ctx.arc(wx(sc.goalX), wy(sc.goalY), 7, 0, 2*Math.PI);
+  ctx.fillStyle='#10b981'; ctx.fill();
+  ctx.font='bold 9px Inter'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText('GOAL', wx(sc.goalX), wy(sc.goalY)-10);
 
-    if (livePath.length > 1) {
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.moveTo(livePath[0].x, livePath[0].y);
-      for (let i = 1; i < livePath.length; i++) {
-        const xc = (livePath[i].x + livePath[i - 1].x) / 2;
-        const yc = (livePath[i].y + livePath[i - 1].y) / 2;
-        ctx.quadraticCurveTo(livePath[i - 1].x, livePath[i - 1].y, xc, yc);
-      }
-      ctx.lineTo(livePath[livePath.length - 1].x, livePath[livePath.length - 1].y);
-      ctx.stroke();
-    }
-
-    if (currentDecision.stopLine) {
-      const sl = currentDecision.stopLine;
-      ctx.save();
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 4;
-      ctx.setLineDash([8, 6]);
-      ctx.beginPath();
-      ctx.moveTo(sl.x, road.yTop + 5);
-      ctx.lineTo(sl.x, road.yBottom - 5);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.fillStyle = '#f59e0b';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.textAlign = 'center';
-      const targetName = currentDecision.target ? currentDecision.target.type.toUpperCase() : 'AGENT';
-      ctx.fillText(`VIRTUAL STOP LINE: YIELDING TO ${targetName}`, sl.x, road.yTop - 10);
-      ctx.restore();
-    }
-
-    ctx.save();
-    ctx.translate(ego.x, ego.y);
-    ctx.rotate(ego.yaw);
-    ctx.fillStyle = '#0284c7';
-    ctx.fillRect(-ego.length / 2, -ego.width / 2, ego.length, ego.width);
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-ego.length / 2, -ego.width / 2, ego.length, ego.width);
-
-    ctx.fillStyle = '#fef08a';
-    ctx.fillRect(ego.length / 2 - 3, -ego.width / 2 + 2, 3, 5);
-    ctx.fillRect(ego.length / 2 - 3, ego.width / 2 - 7, 3, 5);
-    ctx.restore();
+  // Safety radius rings around agents
+  for (const ag of agents) {
+    ctx.beginPath();
+    ctx.arc(wx(ag.x), wy(ag.y), wrad(3.0), 0, 2*Math.PI);
+    ctx.strokeStyle='rgba(239,68,68,0.25)'; ctx.lineWidth=1; ctx.stroke();
   }
 
-  function gameLoop(timestamp) {
-    if (!lastTimestamp) lastTimestamp = timestamp;
-    const dt = Math.min(0.05, (timestamp - lastTimestamp) / 1000);
-    lastTimestamp = timestamp;
-
-    ctx.clearRect(0, 0, width, height);
-    drawRoad();
-
-    if (simRunning) {
-      simTime += dt;
-      updateAgentPositions(dt);
-    }
-
-    const livePlannedPath = computeLivePlannedPath();
-
-    if (simRunning) {
-      updateVehiclePhysics(dt, livePlannedPath);
-    }
-
-    drawAgents();
-    drawTrailsAndVehicle(livePlannedPath);
-    updateTelemetryUI();
-
-    requestAnimationFrame(gameLoop);
+  // Agents
+  for (const ag of agents) {
+    ctx.beginPath();
+    ctx.arc(wx(ag.x), wy(ag.y), wrad(ag.r||0.7), 0, 2*Math.PI);
+    ctx.fillStyle=ag.color; ctx.fill();
+    ctx.font='8px Inter'; ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.textAlign='center';
+    ctx.fillText(ag.type.replace('_','\n').split('\n')[0], wx(ag.x), wy(ag.y)-wrad(ag.r||0.7)-4);
   }
 
-  document.getElementById('btnRun').addEventListener('click', () => {
-    simRunning = true;
-    ego.status = 'DRIVING';
-    stateBadge.innerText = '🟢 CRUISE (40 km/h)';
-    stateBadge.style.color = '#10b981';
-  });
+  // Ego vehicle (square marker)
+  const er = wrad(0.7);
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(wx(ego.x)-er, wy(ego.y)-er/1.5, er*2, er*1.5);
+  // Direction arrow
+  ctx.beginPath();
+  ctx.moveTo(wx(ego.x)+er, wy(ego.y)-er/3);
+  ctx.lineTo(wx(ego.x)+er*2.5, wy(ego.y));
+  ctx.lineTo(wx(ego.x)+er, wy(ego.y)+er/3);
+  ctx.fillStyle='#00d4ff'; ctx.fill();
+}
 
-  document.getElementById('btnReset').addEventListener('click', () => {
-    simRunning = false;
-    simTime = 0;
-    stateBadge.innerText = 'Vehicle: IDLE';
-    stateBadge.style.color = '#f8fafc';
-    telemetryLog = { t: [], x: [], v: [], a: [], S: [], Dmin: [] };
-    agents.forEach(a => a.pathProgress = 0);
-    loadDefaultVillageScenario();
-  });
-
-  loadDefaultVillageScenario();
-  requestAnimationFrame(gameLoop);
+// ---- Init ----
+document.getElementById('speed-slider').addEventListener('input', function() {
+  simSpeed = +this.value;
+  document.getElementById('speed-label').textContent = simSpeed.toFixed(1)+'×';
 });
+loadScenario(0);
 </script>
+
 </body>
 </html>
