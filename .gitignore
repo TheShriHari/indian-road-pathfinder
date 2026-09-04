@@ -6,3 +6,5 @@ __pycache__/
 Thumbs.db
 trial*_trace.txt
 trial*.txt
+*.log
+*.csv
