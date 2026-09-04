@@ -1,17 +1,18 @@
-# Eclipse SUMO & MATLAB Simulation Setup Guide
+# Webots 3D, Eclipse SUMO & MATLAB Simulation Setup Guide
 
 **SIH Problem Statement 26037 · Adaptive Path Planning for Unstructured Indian Roads**
 
-This guide provides the exact commands to clone the `sumo` branch, install the open-source **Eclipse SUMO** environment and **Python TraCI** bindings, and run the simulation either **standalone in Python** or **co-simulated with MATLAB**.
+This guide provides the exact commands to run the **Cyberbotics Webots 3D simulation** or **Eclipse SUMO** environment, either **standalone in Python** or **co-simulated with MATLAB**.
 
 ---
 
 ## 📋 Quick Table of Options
 
-| Mode | What to Run | Requirements | Description |
-| :--- | :--- | :--- | :--- |
-| **Option A: Standalone Autonomous Mode** | `python sumo_sim.py --gui` | Python only (no MATLAB needed) | Autonomous path planning, obstacle nudge, and yielding directly in SUMO GUI. |
-| **Option B: Full Co-Simulation** | **Terminal 1**: `python sumo_sim.py --gui --bridge`<br>**Terminal 2**: `matlab -batch "cd('matlab'); sumo_simulation_bridge"` | Python + MATLAB | SUMO runs physical world & TraCI; MATLAB runs Hybrid A*, EKF predictor, and state machine. |
+| Simulation Platform | Standalone Autonomous Mode | MATLAB Co-Simulation Mode |
+| :--- | :--- | :--- |
+| **Webots 3D Simulator (Recommended)** | `python webots_sim.py`<br>*(or `.\run_webots_sim.bat`)* | **Terminal 1**: `python webots_sim.py --bridge`<br>**Terminal 2**: `matlab -batch "cd('matlab'); webots_simulation_bridge"` |
+| **Eclipse SUMO Simulator** | `python sumo_sim.py --gui` | **Terminal 1**: `python sumo_sim.py --gui --bridge`<br>**Terminal 2**: `matlab -batch "cd('matlab'); sumo_simulation_bridge"` |
+
 
 ---
 
