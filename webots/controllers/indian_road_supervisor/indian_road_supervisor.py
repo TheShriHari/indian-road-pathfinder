@@ -52,15 +52,15 @@ CONFIG = {
         "x": 35.0,
         "start_y": -3.5,
         "target_y": 3.5,
-        "speed": 0.95,
-        "trigger_ego_x": 25.5
+        "speed": 1.20,
+        "trigger_ego_x": 20.5
     },
     "pedestrian_2": {
         "x": 52.0,
         "start_y": 3.5,
         "target_y": -3.5,
-        "speed": 0.90,
-        "trigger_ego_x": 42.0
+        "speed": 1.15,
+        "trigger_ego_x": 37.0
     },
     "auto_rickshaw": {
         "start_x": 70.0,
@@ -115,14 +115,18 @@ class PurePursuitPlanner:
                   obstacles: List[Dict[str, Any]], dt: float) -> Tuple[float, float, float, str]:
         _, target_v, state = self.get_target_path(ego_x)
 
-        # Yield check for crossing pedestrian ahead
+        # Yield / Stop check for crossing pedestrian ahead
         for obs in obstacles:
             if "pedestrian" in obs["type"]:
                 dx = obs["pos"][0] - ego_x
                 lat = abs(obs["pos"][1] - ego_y)
-                if 0.5 < dx < 6.5 and lat < 1.3:
-                    target_v = min(target_v, 2.2)
-                    state = "YIELD_PEDESTRIAN"
+                if 0.2 < dx < 7.5 and lat < 1.35:
+                    if dx < 3.2:
+                        target_v = 0.0
+                        state = "STOP_PEDESTRIAN"
+                    else:
+                        target_v = min(target_v, 1.2)
+                        state = "YIELD_PEDESTRIAN"
 
         # Pure Pursuit Lookahead calculation
         look_x = ego_x + self.lookahead * math.cos(ego_yaw)
@@ -138,14 +142,14 @@ class PurePursuitPlanner:
         delta = target_steer - self.current_steer
         self.current_steer += max(-max_delta, min(max_delta, delta))
 
-        # Longitudinal control
+        # Longitudinal control with firm AEB braking
         speed_err = target_v - ego_v
         if target_v < 0.15:
-            throttle, brake = 0.0, 0.85 if ego_v > 0.1 else 0.3
+            throttle, brake = 0.0, 0.95 if ego_v > 0.05 else 0.5
         elif speed_err > 0.2:
             throttle, brake = min(1.0, 0.32 + speed_err * 0.2), 0.0
         elif speed_err < -0.3:
-            throttle, brake = 0.0, min(0.6, -speed_err * 0.2)
+            throttle, brake = 0.0, min(0.85, -speed_err * 0.35)
         else:
             throttle, brake = 0.22, 0.0
 
