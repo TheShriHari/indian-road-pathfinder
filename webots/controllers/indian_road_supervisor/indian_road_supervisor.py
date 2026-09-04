@@ -49,23 +49,23 @@ CONFIG = {
         "depth": 0.12
     },
     "pedestrian_1": {
-        "x": 30.0,
+        "x": 36.0,
         "start_y": -3.8,
         "target_y": 3.8,
-        "speed": 1.20,
-        "trigger_ego_x": 14.0
+        "speed": 1.35,
+        "trigger_ego_x": 8.0
     },
     "pedestrian_2": {
-        "x": 50.0,
+        "x": 58.0,
         "start_y": 3.8,
         "target_y": -3.8,
-        "speed": 1.20,
-        "trigger_ego_x": 33.0
+        "speed": 1.35,
+        "trigger_ego_x": 36.0
     },
     "auto_rickshaw": {
-        "start_x": 68.0,
+        "start_x": 75.0,
         "y": 1.80,
-        "speed": -3.4,
+        "speed": -2.8,
         "length": 2.6,
         "width": 1.3
     }
@@ -93,49 +93,54 @@ class StandalonePlanner:
 
         # ── 1. Reference Path Planning with Smooth Sigmoid Profiles ──
         if not self.pothole_cleared:
-            if ego_x < 5.0:
+            if ego_x < 5.5:
                 target_y = -1.75
                 self.state = "CRUISE"
-            elif 5.0 <= ego_x <= 18.5:
+            elif 5.5 <= ego_x <= 18.0:
                 self.state = "NUDGE_RIGHT"
-                # Smooth S-curve transition from -1.75m to +0.80m between X=5m and X=13m
-                s = max(0.0, min(1.0, (ego_x - 5.0) / 8.0))
-                smooth_s = s * s * (3.0 - 2.0 * s)   # Hermite smoothstep
-                target_y = -1.75 + smooth_s * (0.80 - (-1.75))
-                target_speed = 4.2
+                # Smooth S-curve transition from -1.75m to +0.60m
+                s = max(0.0, min(1.0, (ego_x - 5.5) / 7.5))
+                smooth_s = s * s * (3.0 - 2.0 * s)
+                target_y = -1.75 + smooth_s * (0.60 - (-1.75))
+                target_speed = 4.0
             else:
                 self.pothole_cleared = True
                 self.state = "RESUME_LANE"
-                target_y = 0.80
+                target_y = 0.60
         else:
-            if ego_x < 24.5:
+            if ego_x < 25.0:
                 self.state = "RESUME_LANE"
-                # Smooth S-curve return from +0.80m to -1.75m between X=18.5m and X=24.5m
-                s = max(0.0, min(1.0, (ego_x - 18.5) / 6.0))
+                # Smooth S-curve return from +0.60m to -1.75m
+                s = max(0.0, min(1.0, (ego_x - 18.0) / 7.0))
                 smooth_s = s * s * (3.0 - 2.0 * s)
-                target_y = 0.80 - smooth_s * (0.80 - (-1.75))
+                target_y = 0.60 - smooth_s * (0.60 - (-1.75))
+                target_speed = 4.2
             else:
                 target_y = -1.75
                 self.state = "CRUISE"
+                target_speed = 4.2
 
-        # ── 2. Pedestrian Yielding Logic (Full Shoulder-to-Shoulder Protection) ──
+        # ── 2. Pedestrian Yielding Logic (Direct Corridor Protection) ──
         for obs in obstacles:
             if "pedestrian" in obs["type"]:
                 dx = obs["pos"][0] - ego_x
-                # If pedestrian is ahead within 16m and within road or shoulder corridor (|y| < 4.2m)
-                if 0.5 < dx < 16.0 and abs(obs["pos"][1]) < 4.2:
+                # Direct lateral clearance to the car's intended path
+                lat_dist = abs(obs["pos"][1] - target_y)
+                if 0.5 < dx < 14.0 and lat_dist < 1.35:
                     ttc = dx / max(ego_v, 0.4)
-                    if ttc < 4.0:
+                    if ttc < 3.2:
                         self.state = "YIELD_PEDESTRIAN"
-                        target_speed = 0.0
+                        target_speed = min(target_speed, 1.8)
+                        if dx < 4.5 and lat_dist < 0.90:
+                            target_speed = 0.0
 
         # ── 3. Oncoming Vehicle Coordination ──
         for obs in obstacles:
             if obs["type"] == "auto_rickshaw":
                 dx = obs["pos"][0] - ego_x
-                if 0.0 < dx < 22.0 and ego_y > -0.6:
+                if 0.0 < dx < 22.0 and ego_y > -0.4:
                     self.state = "YIELD_ONCOMING"
-                    target_speed = min(target_speed, 2.8)
+                    target_speed = min(target_speed, 3.0)
 
         # ── 4. Goal Arrival Check ──
         if ego_x >= CONFIG["ego"]["goal_x"]:
@@ -254,11 +259,11 @@ class IndianRoadSupervisor:
         lateral swerves or yaw rotations.
         """
         if self.viewpoint_node:
-            cam_x = self.ego_x - 3.0   # Slightly behind the action along road X-axis
+            cam_x = max(-7.5, self.ego_x - 7.5)
             cam_y = 0.0               # Strictly centered on the road (not following car laterally)
-            cam_z = 12.5              # Bird's eye elevation overlooking both lanes and obstacles
+            cam_z = 9.5               # Elevated bird's eye view overlooking both lanes and obstacles
             self.viewpoint_node.getField("position").setSFVec3f([cam_x, cam_y, cam_z])
-            self.viewpoint_node.getField("orientation").setSFRotation([0.2991, -0.2991, -0.9062, 1.6692])
+            self.viewpoint_node.getField("orientation").setSFRotation([0.10, 0.36, -0.92, 1.32])
 
     def update_dynamic_obstacles(self):
         if not self.ped1_active and self.ego_x >= CONFIG["pedestrian_1"]["trigger_ego_x"]:
@@ -396,12 +401,17 @@ class IndianRoadSupervisor:
                     break
 
                 if self.ego_x >= CONFIG["ego"]["goal_x"]:
-                    print("\n" + "="*65)
-                    print(f"  [SUCCESS] Goal reached at X={self.ego_x:.1f}m in t={t_sim:.1f}s!")
-                    print("  Smooth steering validated: ±5° for lane tracking, up to ±30° for sharp turn")
-                    print("="*65 + "\n")
-                    success = True
-                    break
+                    if not success:
+                        print("\n" + "="*65)
+                        print(f"  [SUCCESS] Goal reached at X={self.ego_x:.1f}m in t={t_sim:.1f}s!")
+                        print("  [DEMO COMPLETE] 0 Collisions | Smooth Detour | All Obstacles Cleared")
+                        print("="*65 + "\n")
+                        success = True
+                    # Hold smoothly at goal so recording window remains live
+                    self.ego_v = 0.0
+                    self.apply_kinematics(0.0, 0.0, 1.0)
+                    time.sleep(0.02)
+                    continue
 
         except KeyboardInterrupt:
             pass
