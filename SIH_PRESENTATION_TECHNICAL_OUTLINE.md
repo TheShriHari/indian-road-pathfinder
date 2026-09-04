@@ -34,9 +34,147 @@ Operating an autonomous vehicle (AV) in Indian semi-urban and rural Operational 
 
 ---
 
-## 2. System Architecture & Tech Stack
+## 2. System Architecture, File Layout & Inter-File Workflow
 
-### 2.1 Modular End-to-End Data Flow
+### 2.1 Complete Repository File Architecture & Subsystem Mapping
+
+```
+indian-road-pathfinder/
+├── webots/
+│   ├── worlds/
+│   │   ├── indian_rural_road.wbt             # 3D Virtual Environment: 140m ENU asphalt road, unpaved shoulders,
+│   │   │                                     # trees, milestone, pothole crater, 2 pedestrians, oncoming auto.
+│   │   └── .indian_rural_road.wbproj         # Webots project settings, camera perspectives, and viewport flags.
+│   └── controllers/
+│       └── indian_road_supervisor/
+│           └── indian_road_supervisor.py     # Supervisor API Controller: Multi-agent animation, pedestrian flank
+│                                             # guards, ego kinematics, sensor noise pipeline, TCP server (port 20000).
+├── matlab/
+│   ├── webots_simulation_bridge.m           # Master Co-Simulation Client: Orchestrates 20ms tick loop, manages TCP
+│   │                                         # telemetry ingest, coordinates planner, state machine, and control out.
+│   ├── local_occupancy_grid_builder.m       # Costmap Engine: Builds rolling 300x150 local grid (0.2m res) with
+│   │                                         # soft hazard cost inflation (0-255) around potholes and verges.
+│   ├── dynamic_obstacle_predictor.m         # EKF Tracking Engine: Per-agent state estimator with class-specific Q
+│   │                                         # process noise, Joseph-form covariance updates, and 15-tick coasting.
+│   ├── universal_bottleneck_decider.m       # Corridor Squeeze Decider: Probes path normals, computes W_free(s),
+│   │                                         # detects critical pinch (<2.55m), and injects dynamic Virtual Stop Line.
+│   ├── adaptive_path_planner.m              # Motion Planner: 7-steer Kinematic Hybrid A* lattice search on rolling
+│   │                                         # 28m horizon with non-holonomic bicycle model and PCHIP spline smoothing.
+│   ├── behavior_state_machine.m             # Decision Layer: 5-state hysteresis state machine (CRUISE, NUDGE,
+│   │                                         # YIELD_DECEL, YIELD_WAIT, RESUME) regulating target reference speed.
+│   ├── pure_pursuit_controller.m            # Control Execution: Adaptive-lookahead lateral Pure Pursuit tracking
+│   │                                         # with target lateral shift rate limiting and longitudinal P-speed control.
+│   ├── vehicle_kinematics.m                 # Vehicle Physics Model: Non-holonomic bicycle model forward simulation.
+│   ├── evaluate_metrics.m                   # Safety Validator: Computes minimum clearance, lateral error, jerk,
+│   │                                         # time-to-goal, and validates ISO 15622 kinematic compliance.
+│   ├── run_batch_tests.m                    # Batch Automation: Executes automated validation runs across randomized seeds.
+│   ├── generate_scenarios.m                 # Procedural Generator: Creates stochastic Indian ODD obstacle distributions.
+│   └── investigate_root_causes.m            # Forensic Audit: Analyzes failure modes, infeasible pinches, and latency.
+├── webots_sim.py                            # Unified CLI Launcher: Manages Webots binaries, GUI/headless flags, bridge.
+├── run_webots_sim.bat / .ps1                # 1-Click Launchers: Windows Command Prompt & PowerShell automated scripts.
+├── WEBOTS_GUIDE.md                          # Documentation: Complete manual for Webots standalone & MATLAB co-simulation.
+├── SIH_PRESENTATION_TECHNICAL_OUTLINE.md    # Master Blueprint: Technical presentation outline for SIH evaluation.
+└── batch_test_results.csv                   # Empirical Dataset: 1,000-run benchmark records (latencies, clearances, outcomes).
+```
+
+---
+
+### 2.2 Detailed Inter-File Execution Workflow (Every 20ms Control Loop)
+
+The system operates as a closed-loop distributed co-simulation between Cyberbotics Webots (3D physics/sensors) and MATLAB (algorithmic planning/control). Below is the precise sequential runtime contract executed at every $20\,\text{ms}$ simulation tick:
+
+```
+[ Webots: indian_rural_road.wbt ]
+       │  (1) Physics step: ODE collision/dynamics update
+       ▼
+[ Webots Supervisor: indian_road_supervisor.py ]
+       │  (2) Ingest odometry, compute flank guards, condition sensor streams
+       │  (3) Serialize JSON packet: {"ego_state", "obstacles", "road_boundaries", "potholes"}
+       ▼
+   === TCP/IP Socket Stream (Port 20000, UTF-8 \n) ===
+       ▼
+[ MATLAB Master: webots_simulation_bridge.m ]
+       │
+       ├─► (4) Calls: dynamic_obstacle_predictor.m
+       │       Input: observations, dt=0.02s, N_horizon=35
+       │       Output: predicted_trajectories, innov_stats (EKF coasting on dropout)
+       │
+       ├─► (5) Calls: local_occupancy_grid_builder.m
+       │       Input: ego_pose, sensor_detections, map_config (0.2m res)
+       │       Output: local_costmap (300x150, values 0-255), grid_meta
+       │
+       ├─► (6) Calls: universal_bottleneck_decider.m
+       │       Input: ego_state, planned_path, costmap, dynamic_predictions
+       │       Output: virtual_stop_active, stop_pose, bottleneck_info (s_pinch, W_free)
+       │
+       ├─► (7) Calls: adaptive_path_planner.m  (Triggered on timer 200ms or forced replan)
+       │       Input: start_pose, goal_pose (capped to 28m), static_map, dynamic_predictions
+       │       Output: path (80x2 waypoints), costmap, latency_ms, plan_ok
+       │
+       ├─► (8) Calls: behavior_state_machine.m
+       │       Input: current_state, ego_state, predicted_agents, virtual_stop_active
+       │       Output: new_state (CRUISE/NUDGE/YIELD/WAIT/RESUME), v_ref, debug_info
+       │
+       └─► (9) Calls: pure_pursuit_controller.m
+               Input: ego_state, path, v_ref, controller_params
+               Output: control = [delta_rad; accel_mps2], e_y, e_theta
+       │
+       │  (10) Serialize JSON command: {"steer": delta, "throttle": u, "brake": b}
+       ▼
+   === TCP/IP Socket Stream (Port 20000, UTF-8 \n) ===
+       ▼
+[ Webots Supervisor: indian_road_supervisor.py ]
+       │  (11) Apply kinematics: update steering angle, throttle acceleration, or AEB braking
+       ▼
+[ Webots: indian_rural_road.wbt ]  --> Completes 20ms cycle; advances vehicle in 3D world
+```
+
+#### Step-by-Step Subsystem Execution Contract:
+1. **World Physics Update (`indian_rural_road.wbt`):**
+   * Webots advances ODE rigid-body physics by time step $\Delta t = 20\,\text{ms}$ ($50\,\text{Hz}$).
+   * Vehicle wheel contact forces, suspensions, and ground reactions are solved.
+2. **Supervisor Telemetry Extraction & Conditioning (`indian_road_supervisor.py`):**
+   * Reads ego node `translation` $[x, y, z]$ and `rotation` $[0, 0, 1, \theta]$.
+   * Evaluates pedestrian flank protection: if ego body envelope ($|X_{\text{ego}} - X_{\text{ped}}| \le 2.3\,\text{m}$, $|Y_{\text{ego}} - Y_{\text{ped}}| < 1.6\,\text{m}$) overlaps, the pedestrian halts until the rear bumper clears.
+   * Injects sensor noise and perception artifacts: Range gate ($R \le 35.0\,\text{m}$, $|\text{azimuth}| \le 70^\circ$), dropout probability ($p_{\text{drop}} = 0.05$), and Gaussian coordinate noise ($\sigma = 0.5\,\text{m}$).
+   * Serializes payload to JSON and transmits via non-blocking TCP socket stream on port `20000`.
+3. **Master Bridge Ingestion (`webots_simulation_bridge.m`):**
+   * Ingests JSON string via `readline(tcp)` ($< 1.5\,\text{ms}$ latency).
+   * Parses ego odometry $[x, y, \theta, v]^T$, detected road boundaries, pothole locations, and dynamic obstacle observations.
+4. **Dynamic Obstacle Prediction (`dynamic_obstacle_predictor.m`):**
+   * Maintains persistent per-agent EKF filters indexed by unique ID.
+   * Applies class-specific process noise matrix $\mathbf{Q}_c$ (cattle, rickshaw, pedestrian, pushcart).
+   * Executes 15-tick dead-reckoning coasting during sensor dropouts; outputs $N_{\text{horizon}} = 35$ future waypoints ($3.5\,\text{s}$ lead time).
+5. **Rolling Local Costmap Construction (`local_occupancy_grid_builder.m`):**
+   * Constructs an ego-centric $300 \times 150$ grid ($0.2\,\text{m}$ resolution) covering $[-10\,\text{m}, +50\,\text{m}] \times [\pm 15\,\text{m}]$.
+   * Inflates soft safety cushions around potholes and road verges ($C \in [1, 249]$) and sets hard boundaries ($C \ge 250$).
+6. **Spatio-Temporal Corridor Analysis (`universal_bottleneck_decider.m`):**
+   * Marches rays along path station normals $\mathbf{n}(s)$ up to $30\,\text{m}$ ahead.
+   * Evaluates continuous width: $W_{\text{free}}(s) = d_{\text{left}}(s) + d_{\text{right}}(s)$.
+   * If $W_{\text{free}}(s) < 2.55\,\text{m}$, injects a dynamic Virtual Stop Line at $s_{\text{stop}} = \max(0, s_{\text{pinch}} - 3.5\,\text{m})$.
+7. **Kinematic Hybrid A* Path Planning (`adaptive_path_planner.m`):**
+   * Triggered every $200\,\text{ms}$ or immediately when a hazard compromise occurs.
+   * Caps search target to rolling local horizon $L_{\text{goal}} = 28.0\,\text{m}$ along global route vector.
+   * Explores $\mathbb{SE}(2)$ configuration space via 7 kinematic bicycle arcs with non-holonomic constraint $\delta \in [\pm 30^\circ, \pm 20^\circ, \pm 10^\circ, 0^\circ]$.
+   * Applies PCHIP cubic Hermite spline smoothing to the discrete nodes, returning an $80 \times 2$ collision-free path.
+8. **Behavioral Decision State Machine (`behavior_state_machine.m`):**
+   * Evaluates longitudinal distance $d_{\text{lon}}$ and lateral clearance $d_{\text{lat}}$ to predicted agent envelopes.
+   * Arbitrates target velocity: CRUISE ($5.0\,\text{m/s}$), NUDGE ($3.5\,\text{m/s}$), YIELD_DECEL ($1.2\text{--}1.5\,\text{m/s}$), YIELD_WAIT ($0.0\,\text{m/s}$), or RESUME ($2.5\,\text{m/s}$).
+   * Enforces distance-velocity hysteresis, preventing oscillation between adjacent states.
+9. **Motion Control Execution (`pure_pursuit_controller.m`):**
+   * Computes lookahead distance dynamically: $L_d = \max(1.8\,\text{m}, 0.38 \cdot v)$.
+   * Generates steering command $\delta(t) = \text{clip}\left(\arctan\left(\frac{2 L \sin\alpha}{L_d}\right), -30^\circ, +30^\circ\right)$.
+   * Implements steering rate slew limiting ($\Delta\delta \le 25^\circ/\text{s} \cdot \Delta t$) to eliminate wheel snapping.
+   * Longitudinal P-controller calculates throttle $u \in [0, 1]$ or braking $b \in [0, 1]$.
+10. **Actuation Execution & Telemetry Feedback (`indian_road_supervisor.py`):**
+    * Packages JSON command `{"steer": delta, "throttle": u, "brake": b}` and transmits to Webots.
+    * Supervisor applies vehicle kinematics, updating vehicle position and orientation in the Webots 3D simulation.
+11. **Post-Run Forensic Validation (`evaluate_metrics.m` & `investigate_root_causes.m`):**
+    * Computes statistical safety metrics: minimum lateral clearance, maximum jerk, cross-track error $e_y$, EKF innovation residuals, and records outcomes to `batch_test_results.csv`.
+
+---
+
+### 2.3 Modular End-to-End Data Flow Diagram
 
 ```
                      [ CYBERBOTICS WEBOTS 3D SIMULATION SUITE ]
@@ -110,7 +248,9 @@ Ego Vehicle Node          Pothole Crater Solid           Dynamic Pedestrians    
                      [ WEBOTS VEHICLE ACTUATOR EXECUTION ]
 ```
 
-### 2.2 Complete Technology Stack Specifications
+---
+
+### 2.4 Complete Technology Stack Specifications
 * **Core Algorithm Suite:** MATLAB (R2020b+ / MATLAB Online base installation). Written entirely with **zero external proprietary toolboxes** (no Automated Driving Toolbox, no Navigation Toolbox, no ROS Toolbox dependencies required).
 * **3D Simulation & Physical Modeling Platform:** **Cyberbotics Webots (v2023b / R2025a)**
   * *Physics Engine:* Open Dynamics Engine (ODE) with trimesh contact collisions, damped suspensions, and accurate tire friction modeling.
