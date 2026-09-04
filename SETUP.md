@@ -64,7 +64,29 @@ python sumo_sim.py --headless
 
 ---
 
-### Option B: Full Co-Simulation (SUMO GUI + Python + MATLAB)
+### 🌾 Option B: 10 Rural Road Scenario Combinations (2 Pedestrians + 1 Pothole + 1 Oncoming Auto)
+
+Runs the 10 distinct rural road interaction scenarios testing multiple crossing speeds, dynamic yielding, and pothole detours:
+
+```powershell
+# Run all 10 combinations with visual GUI:
+python sumo_rural_batch.py --gui
+
+# Or 1-click batch launcher:
+.\run_rural_10_trials.bat
+
+# Or run headless (fastest automated benchmark):
+python sumo_rural_batch.py --headless
+
+# Or run a single specific trial (e.g. combo 3):
+python sumo_rural_batch.py --gui --trial 3
+```
+
+*(Results will automatically be saved to `sumo_rural_10_trials.csv` and summarized in your console!)*
+
+---
+
+### Option C: Full Co-Simulation (SUMO GUI + Python + MATLAB)
 
 Runs the 3D/2D SUMO world while MATLAB executes the **Hybrid A* Planner**, **EKF Trajectory Predictor**, and **Behavior State Machine**:
 
