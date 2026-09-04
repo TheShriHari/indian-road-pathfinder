@@ -37,16 +37,16 @@ function [new_state, v_ref, debug_info] = behavior_state_machine(current_state, 
 defaults.v_cruise      = 5.0;   % m/s  nominal cruise speed
 defaults.v_nudge       = 3.5;   % m/s  reduced speed during NUDGE
 defaults.v_decel       = 1.5;   % m/s  slow yield approach
-defaults.v_wait        = 0.2;   % m/s  near-stop during YIELD_WAIT (not zero to avoid deadlock)
+defaults.v_wait        = 0.0;   % m/s  full stop during YIELD_WAIT to avoid creeping into in-path obstacles
 defaults.v_resume      = 2.5;   % m/s  initial resume speed
-defaults.d_nudge       = 7.0;   % m  threshold to enter NUDGE
-defaults.d_decel       = 4.5;   % m  threshold to enter YIELD_DECEL
-defaults.d_wait        = 2.5;   % m  threshold to enter YIELD_WAIT
-defaults.d_clear       = 8.0;   % m  agent must exceed this to allow RESUME->CRUISE
-% FIX: was 3.0 m — too wide; caught cattle walking on dirt verge (|y|>2.5 m)
-% outside the 5 m pavement, causing false in-path detection.  1.8 m matches
-% half-lane width (2.5 m) minus one vehicle body width (1.85 m / 2 ≈ 0.9 m).
-defaults.d_lat_path    = 1.8;   % m  max lateral offset to consider agent "in path"
+defaults.d_nudge       = 10.0;  % m  threshold to enter NUDGE
+defaults.d_decel       = 7.0;   % m  threshold to enter YIELD_DECEL
+defaults.d_wait        = 4.5;   % m  threshold to enter YIELD_WAIT (sufficient stopping margin)
+defaults.d_clear       = 10.0;  % m  agent must exceed this to allow RESUME->CRUISE
+% d_lat_path: set to 1.15 m (vehicle half-width 0.925 m + 0.225 m margin).
+% Prevents vehicles in the adjacent opposing lane (|y| > 1.2 m) from triggering
+% false in-path emergency yield stops.
+defaults.d_lat_path    = 1.15;  % m  max lateral offset to consider agent "in path"
 if nargin < 5 || isempty(params)
     params = defaults;
 else
@@ -71,16 +71,26 @@ nearest_lat  = Inf;
 for i = 1:length(predicted_agents)
     wp = predicted_agents(i).waypoints;
     if isempty(wp), continue; end
-    ax = wp(1, 1);  % agent's one-step-ahead predicted x
-    ay = wp(1, 2);  % agent's one-step-ahead predicted y
-    dx = ax - ego_x;
-    dy = ay - ego_y;
-    d  = hypot(dx, dy);
-    if d < min_dist
-        min_dist = d;
-        % Longitudinal/lateral decomposition in ego vehicle's frame
-        nearest_lon =  dx * cos(ego_theta) + dy * sin(ego_theta);
-        nearest_lat = abs(-dx * sin(ego_theta) + dy * cos(ego_theta));
+    % Scan predicted horizon (up to 15 steps = 1.5s) to catch approaching/crossing agents
+    for h = 1:min(15, size(wp, 1))
+        ax = wp(h, 1);
+        ay = wp(h, 2);
+        dx = ax - ego_x;
+        dy = ay - ego_y;
+        d  = hypot(dx, dy);
+        lon =  dx * cos(ego_theta) + dy * sin(ego_theta);
+        lat = abs(-dx * sin(ego_theta) + dy * cos(ego_theta));
+        if lon > 0 && lat < params.d_lat_path
+            if d < min_dist
+                min_dist    = d;
+                nearest_lon = lon;
+                nearest_lat = lat;
+            end
+        elseif d < min_dist && h == 1
+            min_dist    = d;
+            nearest_lon = lon;
+            nearest_lat = lat;
+        end
     end
 end
 
@@ -99,25 +109,24 @@ debug_info.agent_in_path = agent_in_path;
 virtual_stop_active = false;
 stop_line_dist = 4.0;
 
-if isfield(params, 'virtual_stop_active') && params.virtual_stop_active
-    virtual_stop_active = true;
+if isfield(params, 'virtual_stop_active')
+    virtual_stop_active = params.virtual_stop_active;
     if isfield(params, 'stop_line_dist'), stop_line_dist = params.stop_line_dist; end
 else
-    % Evaluate if any predicted agent is directly obstructing passage with low lateral room
+    % Fallback only when no external decider is provided:
+    % Halt only if an agent is directly obstructing the immediate travel lane (lat_d < 0.9m)
     for i = 1:length(predicted_agents)
         wp = predicted_agents(i).waypoints;
         if isempty(wp), continue; end
-        for step_h = 1:min(8, size(wp, 1))
+        for step_h = 1:min(5, size(wp, 1))
             ag_x = wp(step_h, 1);
             ag_y = wp(step_h, 2);
-            % Vector from ego to predicted agent
             dx = ag_x - ego_x;
             dy = ag_y - ego_y;
             lon_d = dx * cos(ego_theta) + dy * sin(ego_theta);
             lat_d = abs(-dx * sin(ego_theta) + dy * cos(ego_theta));
             
-            % Squeeze: agent is close ahead (3m to 12m) and directly blocking central corridor (|lat_d| < 1.4m)
-            if lon_d > 2.5 && lon_d < 12.0 && lat_d < 1.4
+            if lon_d > 2.0 && lon_d < 6.0 && lat_d < 0.9
                 virtual_stop_active = true;
                 stop_line_dist = max(1.5, lon_d - 3.5);
                 break;
@@ -163,14 +172,14 @@ else
         case 'YIELD_DECEL'
             if agent_in_path && min_dist < params.d_wait
                 new_state = 'YIELD_WAIT';
-            elseif (~agent_in_path) || (min_dist >= params.d_clear)
+            elseif ((~agent_in_path) || (min_dist >= params.d_clear)) && (min_dist >= 4.0)
                 new_state = 'RESUME';
             else
                 new_state = 'YIELD_DECEL';
             end
 
         case 'YIELD_WAIT'
-            if (~agent_in_path) || (min_dist >= params.d_decel)
+            if ((~agent_in_path) || (min_dist >= params.d_decel)) && (min_dist >= 4.0)
                 new_state = 'RESUME';
             else
                 new_state = 'YIELD_WAIT';

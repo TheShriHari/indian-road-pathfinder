@@ -289,8 +289,10 @@ def run_simulation(args):
         srv.listen(1)
 
         print("\n" + "=" * 70)
-        print(f"  [BRIDGE READY] Waiting for MATLAB on port {args.matlab_port}...")
-        print(f"  If MATLAB is on another machine, configure BRIDGE_HOST to this PC's IP.")
+        print(f"  [BRIDGE READY] WAITING FOR MATLAB ON PORT {args.matlab_port}...")
+        print(f"  --> If running with MATLAB: Open MATLAB now and run 'carla_simulation_bridge'!")
+        print(f"  --> If you do NOT have MATLAB and want the car to drive autonomously:")
+        print(f"      Press Ctrl+C and run:  python obs_sim.py --autonomous")
         print("=" * 70 + "\n")
 
         conn, addr = srv.accept()

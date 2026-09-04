@@ -71,6 +71,9 @@ for i = 1:num_trials
     seed = i;
     scenario = generate_random_scenario(seed);
 
+    % Reset persistent EKF filter and sensor detection states across trials
+    clear dynamic_obstacle_predictor simulate_sensor_detection;
+
     % Run single scenario in silent mode
     sim_opts.max_steps = 400; % 40.0s hard cap
     sim_opts.verbose   = false;

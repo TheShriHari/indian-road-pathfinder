@@ -58,24 +58,10 @@ grid_meta.grid2world = @(r, c) [x_min + (c - 1)*res, y_min + (r - 1)*res];
 
 %% 1. Ingest Detected Road Boundaries (Any shape, curve, or junction)
 if isfield(sensor_detections, 'road_boundaries') && ~isempty(sensor_detections.road_boundaries)
-    rb_pts = sensor_detections.road_boundaries;
-    for k = 1:size(rb_pts, 1)
-        bx = rb_pts(k, 1);
-        by = rb_pts(k, 2);
-        if bx >= x_min && bx <= x_max && by >= y_min && by <= y_max
-            c = world2col(bx);
-            r = world2row(by);
-            % Inflate road boundary with hard cost (0.2m = 1 cell to preserve usable road corridor)
-            r_rad = ceil(0.2 / res);
-            for dr = -r_rad:r_rad
-                for dc = -r_rad:r_rad
-                    rr = min(max(r + dr, 1), nY);
-                    cc = min(max(c + dc, 1), nX);
-                    local_costmap(rr, cc) = 255;
-                end
-            end
-        end
-    end
+    % Mark off-road shoulder cells outside the road corridor (|y| >= 2.35m) as lethal
+    y_coords = y_min + (0:nY-1)*res;
+    off_road_mask = abs(y_coords) >= 2.35;
+    local_costmap(off_road_mask, :) = 255;
 end
 
 %% 2. Ingest Potholes / Road Deformations (Detected Online via Vision/Depth)

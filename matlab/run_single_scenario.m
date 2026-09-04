@@ -47,6 +47,9 @@ if ~isempty(seed)
     rng(seed);
 end
 
+% Explicitly clear persistent filter and sensor state for fresh scenario
+clear dynamic_obstacle_predictor simulate_sensor_detection;
+
 % Set simulation options & defaults
 dt = 0.1;
 if isfield(sim_opts, 'dt'), dt = sim_opts.dt; end
@@ -175,7 +178,7 @@ collision_details       = struct([]);
 last_replan_step        = -100;
 safe_stop_active        = false;
 stopped_wait_steps      = 0;
-MAX_STOP_WAIT_STEPS     = round(6.0 / dt); % 60 steps = 6.0 seconds of sustained blockage
+MAX_STOP_WAIT_STEPS     = round(4.5 / dt); % 45 steps = 4.5 seconds of sustained blockage
 
 % EKF innovation logging — accumulated over the run for post-hoc statistics
 innov_log        = [];   % Nx1 vector of |innov| norms (measurement updates only)
@@ -278,7 +281,7 @@ while step < max_steps
     if needs_replan
         last_replan_step = step;
         cur_pose   = [ego_state(1), ego_state(2), ego_state(3)];
-        local_goal = compute_local_goal(ego_state(1:2)', path, LOCAL_GOAL_HORIZON, goal_pose);
+        local_goal = compute_local_goal(ego_state(1:2)', path, LOCAL_GOAL_HORIZON, goal_pose, rolling_costmap, grid_meta, map_cfg.grid_res);
         grid_org   = [grid_meta.x_min, grid_meta.y_min];
         [path_new, ~, ~, plan_ok] = adaptive_path_planner( ...
             cur_pose, local_goal, rolling_costmap, predictions, ...
@@ -322,9 +325,9 @@ while step < max_steps
                     for k = 1:length(predictions)
                         wp = predictions(k).waypoints;
                         if isempty(wp), continue; end
-                        for h = 1:min(10, size(wp, 1))
+                        for h = 1:min(6, size(wp, 1))
                             d_a = hypot(path_ahead(:,1) - wp(h,1), path_ahead(:,2) - wp(h,2));
-                            if min(d_a) < 1.25
+                            if min(d_a) < 0.90
                                 path_is_valid = false;
                                 break;
                             end
@@ -508,9 +511,9 @@ while step < max_steps
         break;
     end
 
-    if verbose && mod(step, 10) == 0
-        fprintf('[t=%5.1fs #%3d] Pos:[%5.1f, %5.1f] v=%4.1fm/s | %-11s | min_clr=%.2fm\n', ...
-            t, step, ego_state(1), ego_state(2), ego_state(4), bsm_state, min_clearance);
+    if verbose && (mod(step, 5) == 0 || step == 1)
+        fprintf('[t=%5.1fs #%3d] Pos:[%5.1f, %5.1f] v=%4.1fm/s | %-11s (v_ref=%.1f) | vstop=%d safe_stop=%d | min_clr=%.2fm\n', ...
+            t, step, ego_state(1), ego_state(2), ego_state(4), bsm_state, v_ref, vstop_active, safe_stop_active, min_clearance);
     end
 end
 
@@ -575,7 +578,32 @@ end
 end
 
 %% ── Local Helper Functions ───────────────────────────────────────────────
-function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose)
+function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, costmap, grid_meta, grid_res)
     target_x = min(goal_pose(1), ego_xy(1) + horizon_m);
-    lg = [target_x, goal_pose(2), goal_pose(3)];
+    
+    % On a 2-lane road with oncoming traffic at y > 0, default driving lane is y = -0.95
+    y_cands = [-0.95, -0.6, -1.3, -0.2, 0.2, -1.6, 0.6, 1.0];
+    best_y = -0.95;
+    
+    if nargin >= 7 && ~isempty(costmap) && ~isempty(grid_meta)
+        c_x = min(max(round((target_x - grid_meta.x_min) / grid_res) + 1, 1), grid_meta.nX);
+        min_c = Inf;
+        for yi = 1:length(y_cands)
+            cand_y = y_cands(yi);
+            cy_idx = min(max(round((cand_y - grid_meta.y_min) / grid_res) + 1, 1), grid_meta.nY);
+            % Soft penalty for deviating from nominal lane
+            cand_cost = costmap(cy_idx, c_x) + 25.0 * abs(cand_y - (-0.95));
+            if cand_cost < min_c
+                min_c = cand_cost;
+                best_y = cand_y;
+            end
+        end
+    end
+    
+    % When within 5m of goal_pose, align to final goal_pose y
+    if target_x >= goal_pose(1) - 5.0
+        best_y = goal_pose(2);
+    end
+    
+    lg = [target_x, best_y, goal_pose(3)];
 end

@@ -190,26 +190,22 @@ end
                 end
             end
             
-            % Check dynamic agents' predicted positions at arrival time
-            for a_idx = 1:length(dyn_preds)
-                wp = dyn_preds(a_idx).waypoints;
-                if isempty(wp), continue; end
-                h_idx = min(horizon_step, size(wp, 1));
-                ag_x = wp(h_idx, 1);
-                ag_y = wp(h_idx, 2);
-                
-                % Agent radius buffer (~1.2m)
-                d_ag = hypot(test_x - ag_x, test_y - ag_y);
-                if d_ag <= 1.2
-                    if lat_dist == 0
+            % Check dynamic agents' predicted positions for direct path centerline collisions
+            if lat_dist == 0
+                for a_idx = 1:length(dyn_preds)
+                    wp = dyn_preds(a_idx).waypoints;
+                    if isempty(wp), continue; end
+                    h_idx = min(horizon_step, size(wp, 1));
+                    ag_x = wp(h_idx, 1);
+                    ag_y = wp(h_idx, 2);
+                    
+                    % Direct collision with predicted agent position
+                    d_ag = hypot(test_x - ag_x, test_y - ag_y);
+                    if d_ag <= 1.2
                         is_center_blocked = true;
-                        if isfield(params, 'sim_t') && params.sim_t >= 3.0 && params.sim_t <= 9.5
-                            fprintf('  [UBD_DIAG lat=0 (DYNAMIC) t=%.2fs] +s=%.1fm pt=[%.2f, %.2f] test=[%.2f, %.2f] ag=%d (%s) ag_pos=[%.2f, %.2f] dist=%.2fm (<=1.2m, h=%d)\n', ...
-                                params.sim_t, s_dist, center_pt(1), center_pt(2), test_x, test_y, a_idx, dyn_preds(a_idx).type, ag_x, ag_y, d_ag, h_idx);
-                        end
+                        clearance = 0;
+                        return;
                     end
-                    clearance = lat_dist;
-                    return;
                 end
             end
         end

@@ -63,11 +63,11 @@ if ~isempty(dynamic_predictions)
         obs_type  = dynamic_predictions(i).type;
 
         if strcmpi(obs_type, 'cattle')
-            clearance_r = 1.6;
+            clearance_r = 1.8;
         elseif strcmpi(obs_type, 'auto_rickshaw')
-            clearance_r = 1.5;
+            clearance_r = 1.8;
         else
-            clearance_r = 1.3;
+            clearance_r = 1.5;
         end
 
         clearance_cells = ceil(clearance_r / grid_res);
@@ -84,14 +84,14 @@ if ~isempty(dynamic_predictions)
             for cx = r_min_x:r_max_x
                 for cy = r_min_y:r_max_y
                     dist = hypot((cx - gx) * grid_res, (cy - gy) * grid_res);
-                    if dist <= 1.35 && t <= 8
-                        % Lethal core: collision threshold is 1.0m, so <=1.35m is strictly impassable
+                    if dist <= 0.80 && t <= 1
+                        % Immediate lethal core: true physical penetration
                         costmap(cy, cx) = 255;
                     elseif dist <= clearance_r
-                        % Repulsive buffer around agent
-                        cost_add = (1 - dist/clearance_r) * 180 * (1 / (1 + 0.2*t));
+                        % Repulsive buffer around predicted agent path
+                        cost_add = (1 - dist/clearance_r) * 180 * (1 / (1 + 0.15*t));
                         if costmap(cy, cx) < 250
-                            costmap(cy, cx) = min(240, costmap(cy, cx) + cost_add);
+                            costmap(cy, cx) = min(220, costmap(cy, cx) + cost_add);
                         end
                     end
                 end
@@ -107,9 +107,9 @@ end
 % ============================================================
 
 % --- Search parameters ---
-ASTAR_RES  = 0.5;       % [m] search grid resolution (balanced for 5m rural road)
-N_YAW      = 16;        % heading discretisation: 16 bins x 22.5 deg = 360 deg
-YAW_RES    = 2*pi / N_YAW;  % 22.5 deg per bin (preserves steer angle resolution)
+ASTAR_RES  = 0.35;      % [m] search grid resolution (fine enough to resolve narrow corridors)
+N_YAW      = 32;        % heading discretisation: 32 bins x 11.25 deg (prevents steer-pruning)
+YAW_RES    = 2*pi / N_YAW;  % 11.25 deg per bin (guarantees steer arc separation)
 WB         = 2.7;       % vehicle wheelbase [m]  (same as vehicle_kinematics.m)
 ARC_L      = 1.2;       % arc length per expansion [m]
 ARC_STEP   = 0.3;       % integration step along arc [m]
@@ -120,7 +120,7 @@ HARD_BLOCK = 250;       % costmap value treated as impassable
 COST_WT    = 0.015;     % weight: costmap value -> g-cost contribution
 STEER_WT   = 0.15;      % weight: steer angle penalty (prefer straight driving)
 SC_WT      = 0.10;      % weight: steer-change penalty (prefer smooth turns)
-MAX_ITER   = 3500;      % cap search iterations to avoid slow stalls on impassable roads
+MAX_ITER   = 6000;      % fast queue allows deeper search without timeout
 
 % World bounds — now taken from grid_origin (rolling window)
 x_max = x_min + (cmap_cols - 1) * grid_res;
@@ -213,8 +213,8 @@ while ~isempty(pq) && iter < MAX_ITER
             ny   = ny   + ARC_STEP * sin(nyaw);
             nyaw = nyaw + ARC_STEP * tan(steer) / WB;  % bicycle model yaw rate
 
-            % Bounds check
-            if nx < x_min || nx > x_max || ny < y_min || ny > y_max
+            % Bounds check and physical road pavement boundary (5m corridor: -2.35m to +2.35m)
+            if nx < x_min || nx > x_max || ny < y_min || ny > y_max || abs(ny) > 2.35
                 arc_ok = false; break;
             end
             % Hard obstacle check at each integration point
@@ -262,14 +262,7 @@ while ~isempty(pq) && iter < MAX_ITER
             continue;
         end
 
-        % Eliminate lazy deletion waste by purging any existing pending entry in pq
-        if ~isempty(pq)
-            dup_idx = find(pq(:,2) == nb_row & pq(:,3) == nb_col & pq(:,4) == nb_yaw);
-            if ~isempty(dup_idx)
-                pq(dup_idx, :) = [];
-            end
-        end
-
+        % closed_mat and g_mat already prevent expansion of suboptimal or closed nodes
         h_new = hypot(nx - goal_pose(1), ny - goal_pose(2));
         pq(end+1, :) = [g_new + h_new, nb_row, nb_col, nb_yaw]; %#ok<AGROW>
         total_insertions = total_insertions + 1;
