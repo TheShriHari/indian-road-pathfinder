@@ -45,7 +45,7 @@ min_traversable_width = params.vehicle_width + 2 * params.min_clearance; % ~2.55
 
 virtual_stop_active = false;
 stop_pose = [];
-bottleneck_info = struct('station_s', Inf, 'min_width', Inf, 'reason', 'Clear');
+bottleneck_info = struct('station_s', Inf, 'min_width', Inf, 'reason', 'Clear', 'path_invalid', false);
 
 if isempty(planned_path) || size(planned_path, 1) < 2
     return;
@@ -63,12 +63,23 @@ for k = 2:size(planned_path, 1)
     path_stations(k) = cum_s;
 end
 
-% 2. Evaluate lateral width at regular station intervals
+% Project ego vehicle onto path to find ego station
+d_ego_pts = hypot(planned_path(:,1) - ego_x, planned_path(:,2) - ego_y);
+[~, nearest_idx] = min(d_ego_pts);
+s_ego = path_stations(nearest_idx);
+
+% 2. Evaluate lateral width at regular station intervals strictly ahead of ego
 ds = 1.0; % 1-meter evaluation resolution
-s_eval = 2.0:ds:min(params.scan_horizon, cum_s);
+s_start = s_ego + 1.0;
+s_end   = min(cum_s, s_ego + params.scan_horizon);
+if s_start >= s_end
+    return;
+end
+s_eval = s_start:ds:s_end;
 
 for idx = 1:length(s_eval)
     s = s_eval(idx);
+    dist_ahead = s - s_ego;
     
     % Interpolate path point and tangent direction at station s
     pt = interp1(path_stations, planned_path, s, 'linear');
@@ -80,9 +91,20 @@ for idx = 1:length(s_eval)
     n_right = [ sin(tangent_yaw), -cos(tangent_yaw)];
     
     % Scan laterally to find closest obstacle boundary on Left and Right
-    left_dist  = scan_lateral_clearance(pt, n_left,  costmap, grid_meta, dynamic_predictions, s, ego_state(4));
-    right_dist = scan_lateral_clearance(pt, n_right, costmap, grid_meta, dynamic_predictions, s, ego_state(4));
+    [left_dist,  left_blocked]  = scan_lateral_clearance(pt, n_left,  costmap, grid_meta, dynamic_predictions, dist_ahead, ego_state(4));
+    [right_dist, right_blocked] = scan_lateral_clearance(pt, n_right, costmap, grid_meta, dynamic_predictions, dist_ahead, ego_state(4));
     
+    % ── Path Collision vs Corridor Squeeze ────────────────────────────────────
+    if left_blocked || right_blocked
+        % Path centerline itself sits in lethal obstacle or dynamic agent radius
+        virtual_stop_active = false;
+        bottleneck_info.path_invalid = true;
+        bottleneck_info.station_s = dist_ahead;
+        bottleneck_info.min_width = 0.0;
+        bottleneck_info.reason = sprintf('Path Collision Detected at +%.1fm (needs immediate replan)', dist_ahead);
+        return;
+    end
+
     corridor_width = left_dist + right_dist;
     
     % ── Dynamic Conflict Gate ────────────────────────────────────────────────
@@ -94,7 +116,7 @@ for idx = 1:length(s_eval)
     % Without this gate the vehicle deadlocked on every pothole squeeze.
     has_dynamic_agent_in_corridor = false;
     if corridor_width < min_traversable_width
-        t_arrive = s / max(ego_state(4), 1.0);
+        t_arrive = dist_ahead / max(ego_state(4), 1.0);
         h_check  = max(1, min(20, round(t_arrive / 0.1)));
         for a_chk = 1:length(dynamic_predictions)
             wpc = dynamic_predictions(a_chk).waypoints;
@@ -118,25 +140,27 @@ for idx = 1:length(s_eval)
         virtual_stop_active = true;
         
         % Place stop pose upstream by params.stop_buffer
-        s_stop = max(0.5, s - params.stop_buffer);
+        s_stop = max(s_ego + 0.5, s - params.stop_buffer);
         stop_xy = interp1(path_stations, planned_path, s_stop, 'linear');
         stop_pose = [stop_xy(1), stop_xy(2), tangent_yaw];
         
-        bottleneck_info.station_s = s;
+        bottleneck_info.path_invalid = false;
+        bottleneck_info.station_s = dist_ahead;
         bottleneck_info.min_width = corridor_width;
-        bottleneck_info.reason = sprintf('Corridor Squeeze (Width=%.2fm < %.2fm required at s=%.1fm)', ...
-                                         corridor_width, min_traversable_width, s);
+        bottleneck_info.reason = sprintf('Corridor Squeeze (Width=%.2fm < %.2fm required at +%.1fm)', ...
+                                         corridor_width, min_traversable_width, dist_ahead);
         return;
     end
 end
 
     % --- Nested Function: Scan Lateral Clearance from Centerline ---
-    function clearance = scan_lateral_clearance(center_pt, normal_dir, cmap, g_meta, dyn_preds, s_dist, ego_speed)
+    function [clearance, is_center_blocked] = scan_lateral_clearance(center_pt, normal_dir, cmap, g_meta, dyn_preds, s_dist, ego_speed)
         MAX_LAT_SCAN = 6.0; % Scan up to 6m left/right
         dl = 0.2;           % 20cm search step
         clearance = MAX_LAT_SCAN;
+        is_center_blocked = false;
         
-        % Estimated arrival time at station s
+        % Estimated arrival time at station s ahead of ego
         if ego_speed > 0.5
             t_arrival = s_dist / ego_speed;
         else
@@ -154,6 +178,13 @@ end
                 c = min(max(round((test_x - g_meta.x_min) / g_meta.res) + 1, 1), g_meta.nX);
                 r = min(max(round((test_y - g_meta.y_min) / g_meta.res) + 1, 1), g_meta.nY);
                 if cmap(r, c) >= 200
+                    if lat_dist == 0
+                        is_center_blocked = true;
+                        if isfield(params, 'sim_t') && params.sim_t >= 3.0 && params.sim_t <= 9.5
+                            fprintf('  [UBD_DIAG lat=0 (STATIC) t=%.2fs] +s=%.1fm pt=[%.2f, %.2f] test=[%.2f, %.2f] [r=%d, c=%d] cmap=%d (>=200)\n', ...
+                                params.sim_t, s_dist, center_pt(1), center_pt(2), test_x, test_y, r, c, cmap(r, c));
+                        end
+                    end
                     clearance = lat_dist;
                     return;
                 end
@@ -168,7 +199,15 @@ end
                 ag_y = wp(h_idx, 2);
                 
                 % Agent radius buffer (~1.2m)
-                if hypot(test_x - ag_x, test_y - ag_y) <= 1.2
+                d_ag = hypot(test_x - ag_x, test_y - ag_y);
+                if d_ag <= 1.2
+                    if lat_dist == 0
+                        is_center_blocked = true;
+                        if isfield(params, 'sim_t') && params.sim_t >= 3.0 && params.sim_t <= 9.5
+                            fprintf('  [UBD_DIAG lat=0 (DYNAMIC) t=%.2fs] +s=%.1fm pt=[%.2f, %.2f] test=[%.2f, %.2f] ag=%d (%s) ag_pos=[%.2f, %.2f] dist=%.2fm (<=1.2m, h=%d)\n', ...
+                                params.sim_t, s_dist, center_pt(1), center_pt(2), test_x, test_y, a_idx, dyn_preds(a_idx).type, ag_x, ag_y, d_ag, h_idx);
+                        end
+                    end
                     clearance = lat_dist;
                     return;
                 end

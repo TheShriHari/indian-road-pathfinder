@@ -1,4 +1,4 @@
-function [path, costmap, latency_ms] = adaptive_path_planner(start_pose, goal_pose, static_map, dynamic_predictions, grid_res, grid_origin)
+function [path, costmap, latency_ms, plan_ok] = adaptive_path_planner(start_pose, goal_pose, static_map, dynamic_predictions, grid_res, grid_origin)
 % ADAPTIVE_PATH_PLANNER  Hybrid A* path planning with cubic spline smoothing.
 %   [path, costmap, latency_ms] = adaptive_path_planner(start_pose, goal_pose,
 %                                     static_map, dynamic_predictions, grid_res)
@@ -47,7 +47,11 @@ x_min = grid_origin(1);
 y_min = grid_origin(2);
 
 [cmap_rows, cmap_cols] = size(static_map);
-costmap = double(static_map) * 255;
+if max(static_map(:)) <= 1.0 && any(static_map(:) > 0)
+    costmap = double(static_map) * 255;
+else
+    costmap = double(static_map);
+end
 
 % ============================================================
 % 1. Dynamic Hazard Inflation Costmap  (UNCHANGED from original)
@@ -69,8 +73,8 @@ if ~isempty(dynamic_predictions)
         clearance_cells = ceil(clearance_r / grid_res);
 
         for t = 1:min(10, size(waypoints, 1))
-            gx = round(waypoints(t, 1) / grid_res);
-            gy = round((waypoints(t, 2) + 10) / grid_res);
+            gx = round((waypoints(t, 1) - x_min) / grid_res) + 1;
+            gy = round((waypoints(t, 2) - y_min) / grid_res) + 1;
 
             r_min_x = max(1, gx - clearance_cells);
             r_max_x = min(cmap_cols, gx + clearance_cells);
@@ -79,7 +83,7 @@ if ~isempty(dynamic_predictions)
 
             for cx = r_min_x:r_max_x
                 for cy = r_min_y:r_max_y
-                    dist = hypot((cx-gx)*grid_res, (cy-gy)*grid_res - 10);
+                    dist = hypot((cx - gx) * grid_res, (cy - gy) * grid_res);
                     if dist <= clearance_r
                         cost_add = (1 - dist/clearance_r) * 200 * (1 / (1 + 0.1*t));
                         costmap(cy, cx) = min(255, costmap(cy, cx) + cost_add);
@@ -156,6 +160,8 @@ h0 = hypot(goal_pose(1) - start_pose(1), goal_pose(2) - start_pose(2));
 
 % Priority queue: [f_cost, row, col, yaw_idx]  (unsorted; pop via min scan)
 pq = [h0, s_row, s_col, s_yaw];
+total_insertions = 1;
+stale_skips      = 0;
 
 found        = false;
 found_row    = 0; found_col = 0; found_yaw = 0;
@@ -172,6 +178,7 @@ while ~isempty(pq) && iter < MAX_ITER
     pq(idx, :) = [];
 
     if closed_mat(curr_row, curr_col, curr_yaw)
+        stale_skips = stale_skips + 1;
         continue;  % stale entry in pq (better path was found earlier)
     end
     closed_mat(curr_row, curr_col, curr_yaw) = true;
@@ -245,8 +252,22 @@ while ~isempty(pq) && iter < MAX_ITER
         wyaw_mat(nb_row, nb_col, nb_yaw)  = nyaw;
         steer_mat(nb_row, nb_col, nb_yaw) = steer;
 
+        % Fix 2: Check closed_mat before pushing duplicate onto pq
+        if closed_mat(nb_row, nb_col, nb_yaw)
+            continue;
+        end
+
+        % Eliminate lazy deletion waste by purging any existing pending entry in pq
+        if ~isempty(pq)
+            dup_idx = find(pq(:,2) == nb_row & pq(:,3) == nb_col & pq(:,4) == nb_yaw);
+            if ~isempty(dup_idx)
+                pq(dup_idx, :) = [];
+            end
+        end
+
         h_new = hypot(nx - goal_pose(1), ny - goal_pose(2));
         pq(end+1, :) = [g_new + h_new, nb_row, nb_col, nb_yaw]; %#ok<AGROW>
+        total_insertions = total_insertions + 1;
     end
 end
 
@@ -268,6 +289,88 @@ if found
 else
     % Fallback: straight-line control points (identical to original heuristic path)
     fprintf('[HybridAStar] WARNING: search exhausted %d iterations — using straight-line fallback.\n', iter);
+    
+    % === DIAGNOSTIC INSTRUMENTATION ===
+    distinct_closed = sum(closed_mat(:));
+    straight_dist   = hypot(goal_pose(1) - start_pose(1), goal_pose(2) - start_pose(2));
+    
+    fprintf('=== [HybridAStar DIAGNOSTICS] ===\n');
+    fprintf('  Distinct closed states (sum(closed_mat(:))): %d\n', distinct_closed);
+    fprintf('  Search grid dimensions: nr=%d, nc=%d, N_YAW=%d (total states: %d)\n', nr, nc, N_YAW, nr * nc * N_YAW);
+    fprintf('  Start cell indices: [s_row=%d, s_col=%d, s_yaw=%d]\n', s_row, s_col, s_yaw);
+    fprintf('  Goal cell indices:  [g_row=%d, g_col=%d]\n', g_row, g_col);
+    fprintf('  Start pose (world): [x=%.2f, y=%.2f, yaw=%.3f rad]\n', start_pose(1), start_pose(2), start_pose(3));
+    fprintf('  Goal pose (world):  [x=%.2f, y=%.2f, yaw=%.3f rad]\n', goal_pose(1), goal_pose(2), goal_pose(3));
+    fprintf('  World bounds: x=[%.2f, %.2f], y=[%.2f, %.2f]\n', x_min, x_max, y_min, y_max);
+    fprintf('  Straight-line distance: %.3f m\n', straight_dist);
+    fprintf('  PQ Statistics: total_insertions=%d, stale_skipped=%d, real_expansions=%d, remaining_in_pq=%d\n', ...
+            total_insertions, stale_skips, iter - stale_skips, size(pq, 1));
+    
+    % Check: simulate a single straight-ahead expansion chain (steer=0 repeatedly) from start pose
+    fprintf('  Simulating straight-ahead expansion chain (steer=0):\n');
+    sim_wx   = start_pose(1);
+    sim_wy   = start_pose(2);
+    sim_wyaw = start_pose(3);
+    max_sim_steps = max(10, ceil(straight_dist / ARC_L) + 5);
+    first_block_info = '';
+
+    for step_i = 1:max_sim_steps
+        step_in_bounds = true;
+        step_max_cost  = 0;
+        step_first_out_b  = [];
+        step_first_high_c = [];
+
+        for k = 1:n_arc_steps
+            sim_wx   = sim_wx   + ARC_STEP * cos(sim_wyaw);
+            sim_wy   = sim_wy   + ARC_STEP * sin(sim_wyaw);
+            sim_wyaw = sim_wyaw + ARC_STEP * tan(0) / WB;
+
+            in_b = (sim_wx >= x_min && sim_wx <= x_max && sim_wy >= y_min && sim_wy <= y_max);
+            if ~in_b
+                step_in_bounds = false;
+                if isempty(step_first_out_b)
+                    step_first_out_b = [sim_wx, sim_wy];
+                end
+            end
+
+            c_col = cm_col_f(sim_wx);
+            c_row = cm_row_f(sim_wy);
+            c_val = costmap(c_row, c_col);
+            if c_val > step_max_cost
+                step_max_cost = c_val;
+            end
+            if c_val > HARD_BLOCK && isempty(step_first_high_c)
+                step_first_high_c = [sim_wx, sim_wy, c_val];
+            end
+        end
+        sim_wyaw = atan2(sin(sim_wyaw), cos(sim_wyaw));
+        d_to_g = hypot(sim_wx - goal_pose(1), sim_wy - goal_pose(2));
+        exceeds_hard = (step_max_cost > HARD_BLOCK);
+
+        fprintf('    Step %2d: pos=[%6.2f, %6.2f], yaw=%+5.2f rad | in_bounds=%d (x:[%.1f,%.1f], y:[%.1f,%.1f]) | max_costmap=%5.1f (exceeds HARD_BLOCK(250)=%d) | dist_to_goal=%5.2f m\n', ...
+                step_i, sim_wx, sim_wy, sim_wyaw, step_in_bounds, x_min, x_max, y_min, y_max, step_max_cost, exceeds_hard, d_to_g);
+
+        if ~step_in_bounds && isempty(first_block_info)
+            first_block_info = sprintf('Out of bounds at pos=[%.2f, %.2f] (limits: x=[%.1f, %.1f], y=[%.1f, %.1f])', ...
+                                       step_first_out_b(1), step_first_out_b(2), x_min, x_max, y_min, y_max);
+        end
+        if exceeds_hard && isempty(first_block_info)
+            first_block_info = sprintf('Exceeded HARD_BLOCK (cost=%.1f > %d) at pos=[%.2f, %.2f]', ...
+                                       step_first_high_c(3), HARD_BLOCK, step_first_high_c(1), step_first_high_c(2));
+        end
+
+        if ~step_in_bounds || exceeds_hard || d_to_g <= 1.5 * ASTAR_RES
+            break;
+        end
+    end
+    if ~isempty(first_block_info)
+        fprintf('  [Straight-ahead Chain Blocked]: %s\n', first_block_info);
+    else
+        fprintf('  [Straight-ahead Chain Reached Goal]: dist=%.2f m <= %.2f m without obstacle or boundary block.\n', ...
+                d_to_g, 1.5 * ASTAR_RES);
+    end
+    fprintf('=================================\n');
+
     num_fb = 6;
     t_fb   = linspace(0, 1, num_fb)';
     raw_wp = (1 - t_fb) * [start_pose(1), start_pose(2)] ...
@@ -316,4 +419,5 @@ path(:, 1)  = interp1(t_ctrl, raw_ctrl(:,1), t_samples, 'pchip');
 path(:, 2)  = interp1(t_ctrl, raw_ctrl(:,2), t_samples, 'pchip');
 
 latency_ms = toc * 1000;
+plan_ok    = found;
 end

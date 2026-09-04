@@ -34,7 +34,7 @@
 clear; clc;
 
 fprintf('=========================================================\n');
-fprintf('  CARLA ↔ MATLAB Co-Simulation  (SIH PS-26037)          \n');
+fprintf('  CARLA <-> MATLAB Co-Simulation  (SIH PS-26037)          \n');
 fprintf('=========================================================\n\n');
 
 %% ── Config ───────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ GOAL_POSE     = [70.0, 0.0, 0.0];   % [x, y, theta]
 % the path, capped to LOCAL_GOAL_HORIZON metres ahead of ego. Passing the
 % full GOAL_POSE [80,0,0] forced Hybrid A* to search outside the 50-metre
 % rolling costmap window, exhausting MAX_ITER every cycle.
-LOCAL_GOAL_HORIZON = 18.0;   % metres ahead of ego used as A* target
+LOCAL_GOAL_HORIZON = 28.0;   % metres ahead of ego used as A* target
 GOAL_DIST_TOL = 2.5;    % metres — arrived threshold
 MAX_STEPS     = 2000;   % safety limit
 
@@ -77,6 +77,8 @@ bsm_state   = 'CRUISE';
 path        = zeros(0, 2);          % current planned path (N×2 world coords)
 replan_cnt  = 0;
 REPLAN_EVERY = 8;                   % replan every N ticks OR on threat
+force_replan = false;
+prev_target  = [NaN, NaN];
 
 %% ── Rolling costmap config ───────────────────────────────────────────────
 map_cfg.grid_res  = 0.2;    % 20 cm / cell
@@ -150,7 +152,8 @@ while step < MAX_STEPS
     predictions   = dynamic_obstacle_predictor(raw_obstacles, DT, N_HORIZON);
 
     % ── F. Initial / re-plan with Hybrid A* on rolling costmap ───────────
-    needs_replan = (size(path, 1) < 2) || (mod(step, REPLAN_EVERY) == 0);
+    needs_replan = force_replan || (size(path, 1) < 2) || (mod(step, REPLAN_EVERY) == 0);
+    force_replan = false;
     if ~needs_replan && ~isempty(predictions)
         for k = 1:length(predictions)
             wp = predictions(k).waypoints;
@@ -173,18 +176,31 @@ while step < MAX_STEPS
         % FIX (grid coordinate mismatch): pass rolling window origin so
         % the planner uses correct world→cell mapping for ego_x > 10 m.
         grid_org = [grid_meta.x_min, grid_meta.y_min];
-        [path_new, ~, lat_ms] = adaptive_path_planner( ...
+        [path_new, ~, lat_ms, plan_ok] = adaptive_path_planner( ...
             cur_pose, local_goal, rolling_costmap, predictions, ...
             map_cfg.grid_res, grid_org);
-        if size(path_new, 1) > 2
+        if plan_ok && size(path_new, 1) > 2
             path = path_new;
             replan_cnt = replan_cnt + 1;
+        elseif ~plan_ok
+            if size(path, 1) >= 2 && max(path(:,1)) > cur_pose(1) + 4.0
+                % Retain previous valid path to prevent straight-line fallback from driving off-road
+                fprintf('  [PLANNER] Retaining previous valid path (fallback rejected to prevent off-road drift).\n');
+            else
+                % If existing path has expired, clamp fallback laterally to corridor
+                path_new(:, 2) = min(max(path_new(:, 2), -2.0), 2.0);
+                path = path_new;
+            end
         end
     end
 
     % ── G. Spatial-temporal corridor bottleneck (dynamic, no hardcoded X) ─
+    ubd_params = struct('sim_t', step * DT);
     [vstop_active, ~, bottleneck] = universal_bottleneck_decider( ...
-        ego_state', path, rolling_costmap, grid_meta, predictions, []);
+        ego_state', path, rolling_costmap, grid_meta, predictions, ubd_params);
+    if isfield(bottleneck, 'path_invalid') && bottleneck.path_invalid
+        force_replan = true;
+    end
 
     % FIX (incomplete bsm_params hydration): always initialise bsm_params as
     % an empty struct so BSM's per-field merge fills in ALL defaults.
@@ -204,12 +220,33 @@ while step < MAX_STEPS
 
     % ── I. Pure Pursuit motion control ────────────────────────────────────
     if size(path, 1) >= 2
-        [ctrl_out, ~, ~] = pure_pursuit_controller(ego_state', path, v_ref, []);
+        pp_params.L             = L_WB;
+        pp_params.k_lookahead   = 0.8;
+        pp_params.min_lookahead = 3.5;
+        pp_params.Kp_v          = 1.0;
+        pp_params.max_steer     = MAX_STEER_RAD;
+        pp_params.prev_target   = prev_target;
+        pp_params.dt            = DT;
+        [ctrl_out, ~, ~, target_pt] = pure_pursuit_controller(ego_state', path, v_ref, pp_params);
         steer_rad = ctrl_out(1);
         accel     = ctrl_out(2);
+        prev_target = target_pt;
     else
         steer_rad = 0.0;
         accel     = -2.0;
+        target_pt = [NaN, NaN];
+        prev_target = [NaN, NaN];
+    end
+
+    % Diagnostic 2: Print pure pursuit details at t=12.5-18.0s or high steering
+    sim_t = step * DT;
+    if (sim_t >= 12.5 && sim_t <= 18.0) || abs(steer_rad / MAX_STEER_RAD) >= 0.7
+        alpha_val = mod(atan2(target_pt(2) - ego_state(2), target_pt(1) - ego_state(1)) - ego_state(3) + pi, 2*pi) - pi;
+        Ld_val = max(pp_params.min_lookahead, pp_params.k_lookahead * ego_state(4));
+        fprintf('  [PP_DIAG t=%5.2fs #%3d] ego=[%5.2f, %5.2f, yaw=%+5.2f rad, v=%4.2f] target=[%5.2f, %5.2f] (dx=%+5.2f, dy=%+5.2f) Ld=%4.2fm alpha=%+5.2f rad (%+5.1f deg) steer=%+5.2f replan=%d\n', ...
+            sim_t, step, ego_state(1), ego_state(2), ego_state(3), ego_state(4), ...
+            target_pt(1), target_pt(2), target_pt(1) - ego_state(1), target_pt(2) - ego_state(2), ...
+            Ld_val, alpha_val, alpha_val * 180 / pi, steer_rad / MAX_STEER_RAD, needs_replan);
     end
 
     % Hard stop override when virtual stop line is active
@@ -217,16 +254,25 @@ while step < MAX_STEPS
         accel = -3.5;
     end
 
+    % ── Safety Check: Off-road corridor guard (Fix 3c) ───────────────────
+    if abs(ego_state(2)) > 4.0
+        fprintf('  [SAFETY] Vehicle drifted off-road: y=%.2f\n', ego_state(2));
+        steer_rad = 0.0;
+        accel     = min(accel, -2.5);  % moderate braking recovery
+    end
+
     % ── J. Convert to CARLA VehicleControl (normalised) ───────────────────
-    % FIX (steering sign inversion): ISO 8855 pure pursuit outputs
-    %   positive delta = turn LEFT (positive Y direction).
-    % CARLA VehicleControl.steer: positive = turn RIGHT (UE4 left-handed).
-    % Therefore the sign must be NEGATED on the way out.
-    carla_steer = max(-1.0, min(1.0, -steer_rad / MAX_STEER_RAD));  % note the minus
-    kappa       = abs(tan(steer_rad)) / L_WB;   % curvature [m⁻¹], ≤ 0.213
+    % pure_pursuit_controller outputs steer_rad in standard ISO 8855 (left > 0).
+    % In mock integration, steer_rad directly steers the bicycle model.
+    % In CARLA LIVE mode, steer is negated because UE4 left-handed steer > 0 is right.
+    if strcmp(MODE, 'LIVE')
+        carla_steer = max(-1.0, min(1.0, -steer_rad / MAX_STEER_RAD));
+    else
+        carla_steer = max(-1.0, min(1.0, steer_rad / MAX_STEER_RAD));
+    end
+    kappa = abs(tan(steer_rad)) / L_WB;
 
     if v_ref <= 0.0 && ego_state(4) < 0.1
-        % Stationary hold at virtual stop line
         carla_throttle = 0.0;
         carla_brake    = 1.0;
     elseif accel >= 0
@@ -240,10 +286,8 @@ while step < MAX_STEPS
     % ── K. Send control + integrate mock kinematics ───────────────────────
     bridge_send_control(tcp, MODE, carla_steer, carla_throttle, carla_brake);
 
-    % FIX (mock ghosting): in MOCK mode, integrate the ACTUAL control command
-    % through the bicycle kinematics so braking & steering are honoured.
-    % Previously ego_x was computed as 2.0 + t*3.5 regardless of commands.
     if strcmp(MODE, 'MOCK')
+        % Closed-loop Euler integration of kinematic bicycle
         mock_v     = max(0.0, min(8.0, mock_v + accel * DT));
         mock_x     = mock_x + mock_v * cos(mock_theta) * DT;
         mock_y     = mock_y + mock_v * sin(mock_theta) * DT;
@@ -255,11 +299,11 @@ while step < MAX_STEPS
     if mod(step, 5) == 0
         vstop_str = '';
         if vstop_active
-            vstop_str = sprintf(' [VSTOP @ s=%.1fm — %s]', ...
+            vstop_str = sprintf(' [VSTOP @ s=%.1fm - %s]', ...
                                 bottleneck.station_s, bottleneck.reason);
         end
-        fprintf('[t=%5.1fs #%4d] Pos:[%5.1f,%5.1f] %4.1fm/s | %-11s | ' ...
-                'δ=%+.2f (κ=%.3f) T=%.2f B=%.2f CAM:%s%s\n', ...
+        fprintf(['[t=%5.1fs #%4d] Pos:[%5.1f,%5.1f] %4.1fm/s | %-11s | ' ...
+                 'steer=%+.2f (curv=%.3f) T=%.2f B=%.2f CAM:%s%s\n'], ...
                 t, step, ego_state(1), ego_state(2), ego_state(4), ...
                 bsm_state, carla_steer, kappa, carla_throttle, carla_brake, ...
                 ternary(sensor_pkg.camera.ready, 'OK', '--'), vstop_str);
@@ -386,48 +430,6 @@ end
 
 % ── Local goal helper ─────────────────────────────────────────────────────
 function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose)
-    % Returns a point that is horizon_m metres ahead along planned_path, or
-    % goal_pose if the path is shorter or near goal. Keeps Hybrid A* inside costmap.
-    lg = goal_pose;
-    % Check distance to global goal
-    dist_to_goal = hypot(goal_pose(1) - ego_xy(1), goal_pose(2) - ego_xy(2));
-    if dist_to_goal <= horizon_m || ego_xy(1) >= goal_pose(1) - 1.0
-        lg = goal_pose;
-        return;
-    end
-    
-    if size(planned_path, 1) < 2
-        % No path yet: point directly towards goal_pose capped by horizon_m
-        dx = goal_pose(1) - ego_xy(1);
-        dy = goal_pose(2) - ego_xy(2);
-        d  = hypot(dx, dy);
-        if d <= horizon_m || d < 0.1
-            lg = goal_pose;
-        else
-            lg = [ego_xy(1) + (dx/d)*horizon_m, ego_xy(2) + (dy/d)*horizon_m, goal_pose(3)];
-        end
-        return;
-    end
-    
-    % Cumulative arc length along path
-    diffs  = diff(planned_path);
-    seg_l  = hypot(diffs(:,1), diffs(:,2));
-    cum_s  = [0; cumsum(seg_l)];
-    
-    % Distance from ego to each waypoint
-    d_ego  = hypot(planned_path(:,1) - ego_xy(1), planned_path(:,2) - ego_xy(2));
-    [~, i0] = min(d_ego);
-    target_s = cum_s(i0) + horizon_m;
-    
-    if target_s >= cum_s(end)
-        lg = goal_pose;
-        return;
-    end
-    
-    % Interpolate target point at target_s
-    lg_xy = interp1(cum_s, planned_path, target_s, 'linear');
-    dt_raw = min(target_s + 0.5, cum_s(end));
-    lg_xy2 = interp1(cum_s, planned_path, dt_raw, 'linear');
-    lg_theta = atan2(lg_xy2(2) - lg_xy(2), lg_xy2(1) - lg_xy(1));
-    lg = [lg_xy(1), lg_xy(2), lg_theta];
+    target_x = min(goal_pose(1), ego_xy(1) + horizon_m);
+    lg = [target_x, goal_pose(2), goal_pose(3)];
 end
