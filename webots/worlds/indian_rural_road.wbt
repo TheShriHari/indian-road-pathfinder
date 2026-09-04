@@ -440,7 +440,7 @@ DEF POTHOLE Solid {
   name "pothole"
 }
 DEF PEDESTRIAN_1 Robot {
-  translation 40 -3.8 0.9
+  translation 35 -3.5 0.9
   rotation 0 0 1 1.5708
   children [
     Pose {
@@ -515,7 +515,7 @@ DEF PEDESTRIAN_1 Robot {
   }
 }
 DEF PEDESTRIAN_2 Robot {
-  translation 58 3.8 0.9
+  translation 52 3.5 0.9
   rotation 0 0 1 -1.5708
   children [
     Pose {

@@ -49,18 +49,18 @@ CONFIG = {
         "depth": 0.12
     },
     "pedestrian_1": {
-        "x": 40.0,
-        "start_y": -3.8,
-        "target_y": 3.8,
-        "speed": 1.15,
-        "trigger_ego_x": 10.0
+        "x": 35.0,
+        "start_y": -3.5,
+        "target_y": 3.5,
+        "speed": 0.95,
+        "trigger_ego_x": 25.5
     },
     "pedestrian_2": {
-        "x": 58.0,
-        "start_y": 3.8,
-        "target_y": -3.8,
-        "speed": 1.35,
-        "trigger_ego_x": 24.0
+        "x": 52.0,
+        "start_y": 3.5,
+        "target_y": -3.5,
+        "speed": 0.90,
+        "trigger_ego_x": 42.0
     },
     "auto_rickshaw": {
         "start_x": 70.0,
@@ -120,8 +120,8 @@ class PurePursuitPlanner:
             if "pedestrian" in obs["type"]:
                 dx = obs["pos"][0] - ego_x
                 lat = abs(obs["pos"][1] - ego_y)
-                if 0.5 < dx < 9.0 and lat < 1.15:
-                    target_v = min(target_v, 1.8)
+                if 0.5 < dx < 6.5 and lat < 1.3:
+                    target_v = min(target_v, 2.2)
                     state = "YIELD_PEDESTRIAN"
 
         # Pure Pursuit Lookahead calculation
@@ -203,10 +203,10 @@ class IndianRoadSupervisor:
             self.ego_node.getField("translation").setSFVec3f([0.0, -1.75, 0.42])
             self.ego_node.getField("rotation").setSFRotation([0, 0, 1, 0])
         if self.ped1_node:
-            self.ped1_node.getField("translation").setSFVec3f([40.0, -3.8, 0.9])
+            self.ped1_node.getField("translation").setSFVec3f([35.0, -3.5, 0.9])
             self.ped1_node.getField("rotation").setSFRotation([0, 0, 1, 1.5708])
         if self.ped2_node:
-            self.ped2_node.getField("translation").setSFVec3f([58.0, 3.8, 0.9])
+            self.ped2_node.getField("translation").setSFVec3f([52.0, 3.5, 0.9])
             self.ped2_node.getField("rotation").setSFRotation([0, 0, 1, -1.5708])
         if self.auto_node:
             self.auto_node.getField("translation").setSFVec3f([70.0, 1.80, 0.68])
