@@ -118,13 +118,14 @@ class StandalonePlanner:
                 target_y = -1.75
                 self.state = "CRUISE"
 
-        # ── 2. Pedestrian Yielding Logic ──
+        # ── 2. Pedestrian Yielding Logic (Full Shoulder-to-Shoulder Protection) ──
         for obs in obstacles:
             if "pedestrian" in obs["type"]:
                 dx = obs["pos"][0] - ego_x
-                if 1.0 < dx < 14.0 and abs(obs["pos"][1]) < 3.2:
-                    ttc = dx / max(ego_v, 0.5)
-                    if ttc < 3.5:
+                # If pedestrian is ahead within 16m and within road or shoulder corridor (|y| < 4.2m)
+                if 0.5 < dx < 16.0 and abs(obs["pos"][1]) < 4.2:
+                    ttc = dx / max(ego_v, 0.4)
+                    if ttc < 4.0:
                         self.state = "YIELD_PEDESTRIAN"
                         target_speed = 0.0
 

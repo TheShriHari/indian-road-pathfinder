@@ -80,6 +80,15 @@ def main():
     print(f"  Bridge Mode   : {'ENABLED (port 20000)' if args.bridge else 'STANDALONE AUTONOMOUS'}")
     print("=" * 65 + "\n")
 
+    # Clean up any lingering Webots processes to free port 1234
+    if sys.platform == "win32":
+        try:
+            subprocess.run(["taskkill", "/F", "/IM", "webots.exe", "/IM", "webots-bin.exe", "/IM", "webotsw.exe"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.5)
+        except Exception:
+            pass
+
     # Configure environment
     env = os.environ.copy()
     env["WEBOTS_HOME"] = webots_home
