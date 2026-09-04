@@ -11,11 +11,12 @@ WorldInfo {
   coordinateSystem "ENU"
 }
 
-Viewpoint {
-  orientation 0.14 0.28 -0.94 1.15
-  position -8.0 -1.75 4.5
-  follow "EGO_VEHICLE"
-  followSmoothness 0.05
+DEF VIEWPOINT Viewpoint {
+  orientation 0.08 0.35 -0.93 1.25
+  position -7.0 -1.75 3.8
+  follow "ego_vehicle"
+  followType "Mounted Shot"
+  followSmoothness 0.1
 }
 
 Background {
@@ -171,19 +172,13 @@ DEF TREE_1 Solid {
     Transform {
       translation 0 0 1.2
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 }
-          geometry Cylinder { height 2.4 radius 0.25 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } }
       ]
     }
     Transform {
       translation 0 0 3.0
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.18 0.45 0.15 roughness 0.8 }
-          geometry Sphere { radius 1.6 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.18 0.45 0.15 roughness 0.8 } geometry Sphere { radius 1.6 } }
       ]
     }
   ]
@@ -196,19 +191,13 @@ DEF TREE_2 Solid {
     Transform {
       translation 0 0 1.3
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 }
-          geometry Cylinder { height 2.6 radius 0.28 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.6 radius 0.28 } }
       ]
     }
     Transform {
       translation 0 0 3.2
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.20 0.50 0.18 roughness 0.8 }
-          geometry Sphere { radius 1.8 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.20 0.50 0.18 roughness 0.8 } geometry Sphere { radius 1.8 } }
       ]
     }
   ]
@@ -221,19 +210,13 @@ DEF TREE_3 Solid {
     Transform {
       translation 0 0 1.2
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 }
-          geometry Cylinder { height 2.4 radius 0.25 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } }
       ]
     }
     Transform {
       translation 0 0 3.0
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.16 0.42 0.14 roughness 0.8 }
-          geometry Sphere { radius 1.5 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.16 0.42 0.14 roughness 0.8 } geometry Sphere { radius 1.5 } }
       ]
     }
   ]
@@ -246,19 +229,13 @@ DEF TREE_4 Solid {
     Transform {
       translation 0 0 1.2
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 }
-          geometry Cylinder { height 2.4 radius 0.25 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } }
       ]
     }
     Transform {
       translation 0 0 3.0
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.18 0.46 0.16 roughness 0.8 }
-          geometry Sphere { radius 1.7 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.18 0.46 0.16 roughness 0.8 } geometry Sphere { radius 1.7 } }
       ]
     }
   ]
@@ -271,19 +248,13 @@ DEF TREE_5 Solid {
     Transform {
       translation 0 0 1.3
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 }
-          geometry Cylinder { height 2.6 radius 0.26 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.6 radius 0.26 } }
       ]
     }
     Transform {
       translation 0 0 3.2
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.19 0.48 0.15 roughness 0.8 }
-          geometry Sphere { radius 1.8 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.19 0.48 0.15 roughness 0.8 } geometry Sphere { radius 1.8 } }
       ]
     }
   ]
@@ -296,102 +267,66 @@ DEF TREE_6 Solid {
     Transform {
       translation 0 0 1.2
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 }
-          geometry Cylinder { height 2.4 radius 0.24 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.24 } }
       ]
     }
     Transform {
       translation 0 0 3.0
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.17 0.44 0.15 roughness 0.8 }
-          geometry Sphere { radius 1.6 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.17 0.44 0.15 roughness 0.8 } geometry Sphere { radius 1.6 } }
       ]
     }
   ]
   name "tree_6"
 }
 
-# ── Milestone / Signboard ────────────────────────────────────────────────────
+# ── Milestone / Highway Sign ─────────────────────────────────────────────────
 DEF MILESTONE Solid {
   translation 10 -4.2 0.4
   children [
-    # Base
     Transform {
       translation 0 0 0
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.9 0.9 0.9 roughness 0.4 }
-          geometry Cylinder { height 0.8 radius 0.22 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.9 0.9 0.9 roughness 0.4 } geometry Cylinder { height 0.8 radius 0.22 } }
       ]
     }
-    # Yellow Top (State highway / village standard)
     Transform {
       translation 0 0 0.42
       children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.95 0.75 0.05 roughness 0.4 }
-          geometry Sphere { radius 0.22 }
-        }
+        Shape { appearance PBRAppearance { baseColor 0.95 0.75 0.05 roughness 0.4 } geometry Sphere { radius 0.22 } }
       ]
     }
   ]
   name "milestone"
 }
 
-# ── POTHOLE HAZARD (Recessed road crater in ego travel lane) ─────────────────
+# ── NEW POTHOLE LOCATION (X = 22.0m, Y = -1.35m in ego lane) ─────────────────
 DEF POTHOLE Solid {
-  translation 18.0 -1.2 0.018
+  translation 22.0 -1.35 0.018
   children [
-    # Dark asphalt crack rim
     Transform {
       children [
         Shape {
-          appearance PBRAppearance {
-            baseColor 0.12 0.12 0.13
-            roughness 0.9
-          }
-          geometry Cylinder {
-            height 0.005
-            radius 0.75
-          }
+          appearance PBRAppearance { baseColor 0.12 0.12 0.13 roughness 0.9 }
+          geometry Cylinder { height 0.005 radius 0.75 }
         }
       ]
     }
-    # Deep inner crater (mud/puddle bottom)
     Transform {
       translation 0 0 0.003
       children [
         Shape {
-          appearance PBRAppearance {
-            baseColor 0.06 0.05 0.04
-            roughness 0.2
-            metalness 0.4
-          }
-          geometry Cylinder {
-            height 0.006
-            radius 0.55
-          }
+          appearance PBRAppearance { baseColor 0.06 0.05 0.04 roughness 0.2 metalness 0.4 }
+          geometry Cylinder { height 0.006 radius 0.55 }
         }
       ]
     }
-    # Pothole inner texture irregularity
     Transform {
       translation 0.15 -0.1 0.004
       children [
         Shape {
-          appearance PBRAppearance {
-            baseColor 0.04 0.04 0.04
-            roughness 0.1
-          }
-          geometry Cylinder {
-            height 0.007
-            radius 0.3
-          }
+          appearance PBRAppearance { baseColor 0.04 0.04 0.04 roughness 0.1 }
+          geometry Cylinder { height 0.007 radius 0.3 }
         }
       ]
     }
@@ -399,218 +334,98 @@ DEF POTHOLE Solid {
   name "pothole"
 }
 
-# ── PEDESTRIAN 1 (Crossing from left shoulder to right) ──────────────────────
+# ── NEW PEDESTRIAN 1 LOCATION (X = 35.0m, crossing Left-to-Right) ────────────
 DEF PEDESTRIAN_1 Robot {
-  translation 26.0 3.8 0.9
+  translation 35.0 3.8 0.9
   rotation 0 0 1 -1.5708
   children [
-    # Head
     Transform {
       translation 0 0 0.7
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.76 0.57 0.42 roughness 0.6 }
-          geometry Sphere { radius 0.14 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.76 0.57 0.42 roughness 0.6 } geometry Sphere { radius 0.14 } } ]
     }
-    # Torso (Indian Blue Kurta)
     Transform {
       translation 0 0 0.3
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.15 0.35 0.75 roughness 0.7 }
-          geometry Cylinder { height 0.65 radius 0.22 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.15 0.35 0.75 roughness 0.7 } geometry Cylinder { height 0.65 radius 0.22 } } ]
     }
-    # Legs
     Transform {
       translation 0.09 0 -0.45
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.85 0.85 0.82 roughness 0.8 }
-          geometry Cylinder { height 0.75 radius 0.08 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.85 0.85 0.82 roughness 0.8 } geometry Cylinder { height 0.75 radius 0.08 } } ]
     }
     Transform {
       translation -0.09 0 -0.45
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.85 0.85 0.82 roughness 0.8 }
-          geometry Cylinder { height 0.75 radius 0.08 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.85 0.85 0.82 roughness 0.8 } geometry Cylinder { height 0.75 radius 0.08 } } ]
     }
   ]
   name "pedestrian_1"
-  boundingObject Transform {
-    translation 0 0 0.1
-    children [
-      Cylinder { height 1.7 radius 0.28 }
-    ]
-  }
+  boundingObject Transform { translation 0 0 0.1 children [ Cylinder { height 1.7 radius 0.28 } ] }
 }
 
-# ── PEDESTRIAN 2 (Crossing from right shoulder to left) ─────────────────────
+# ── NEW PEDESTRIAN 2 LOCATION (X = 54.0m, crossing Right-to-Left) ───────────
 DEF PEDESTRIAN_2 Robot {
-  translation 48.0 -3.8 0.9
+  translation 54.0 -3.8 0.9
   rotation 0 0 1 1.5708
   children [
-    # Head
     Transform {
       translation 0 0 0.7
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.74 0.55 0.40 roughness 0.6 }
-          geometry Sphere { radius 0.14 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.74 0.55 0.40 roughness 0.6 } geometry Sphere { radius 0.14 } } ]
     }
-    # Torso (Orange / Saffron Shirt)
     Transform {
       translation 0 0 0.3
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.85 0.42 0.10 roughness 0.7 }
-          geometry Cylinder { height 0.65 radius 0.22 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.85 0.42 0.10 roughness 0.7 } geometry Cylinder { height 0.65 radius 0.22 } } ]
     }
-    # Legs
     Transform {
       translation 0.09 0 -0.45
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.25 0.25 0.28 roughness 0.8 }
-          geometry Cylinder { height 0.75 radius 0.08 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.25 0.25 0.28 roughness 0.8 } geometry Cylinder { height 0.75 radius 0.08 } } ]
     }
     Transform {
       translation -0.09 0 -0.45
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.25 0.25 0.28 roughness 0.8 }
-          geometry Cylinder { height 0.75 radius 0.08 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.25 0.25 0.28 roughness 0.8 } geometry Cylinder { height 0.75 radius 0.08 } } ]
     }
   ]
   name "pedestrian_2"
-  boundingObject Transform {
-    translation 0 0 0.1
-    children [
-      Cylinder { height 1.7 radius 0.28 }
-    ]
-  }
+  boundingObject Transform { translation 0 0 0.1 children [ Cylinder { height 1.7 radius 0.28 } ] }
 }
 
-# ── ONCOMING AUTO-RICKSHAW (Indian 3-Wheeler) ────────────────────────────────
+# ── ONCOMING AUTO-RICKSHAW (X = 70.0m, Y = +1.75m) ──────────────────────────
 DEF AUTO_RICKSHAW Robot {
-  translation 65.0 1.75 0.68
+  translation 70.0 1.75 0.68
   rotation 0 0 1 3.14159
   children [
-    # Main Lower Body (Vibrant Green)
     Transform {
       translation 0 0 0.05
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 0.08 0.54 0.22
-            roughness 0.4
-            metalness 0.2
-          }
-          geometry Box { size 2.5 1.3 0.6 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.08 0.54 0.22 roughness 0.4 metalness 0.2 } geometry Box { size 2.5 1.3 0.6 } } ]
     }
-    # Iconic Yellow Canopy / Roof
     Transform {
       translation -0.15 0 0.6
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 0.96 0.82 0.08
-            roughness 0.5
-            metalness 0.05
-          }
-          geometry Box { size 1.9 1.32 0.52 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.96 0.82 0.08 roughness 0.5 metalness 0.05 } geometry Box { size 1.9 1.32 0.52 } } ]
     }
-    # Front Windshield
     Transform {
       translation 0.85 0 0.5
       rotation 0 1 0 0.2
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 0.15 0.25 0.35
-            roughness 0.1
-            metalness 0.8
-            transparency 0.4
-          }
-          geometry Box { size 0.05 1.15 0.45 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.15 0.25 0.35 roughness 0.1 metalness 0.8 transparency 0.4 } geometry Box { size 0.05 1.15 0.45 } } ]
     }
-    # Front Headlight (Bright yellow-white)
     Transform {
       translation 1.26 0 0.15
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 1.0 1.0 0.8
-            emissiveColor 0.8 0.8 0.4
-            roughness 0.2
-          }
-          geometry Sphere { radius 0.12 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 1.0 1.0 0.8 emissiveColor 0.8 0.8 0.4 roughness 0.2 } geometry Sphere { radius 0.12 } } ]
     }
-    # Front Single Wheel
     Transform {
       translation 1.0 0 -0.36
       rotation 1 0 0 1.5708
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 }
-          geometry Cylinder { height 0.15 radius 0.25 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 } geometry Cylinder { height 0.15 radius 0.25 } } ]
     }
-    # Rear Left Wheel
     Transform {
       translation -0.7 0.62 -0.36
       rotation 1 0 0 1.5708
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 }
-          geometry Cylinder { height 0.18 radius 0.25 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 } geometry Cylinder { height 0.18 radius 0.25 } } ]
     }
-    # Rear Right Wheel
     Transform {
       translation -0.7 -0.62 -0.36
       rotation 1 0 0 1.5708
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 }
-          geometry Cylinder { height 0.18 radius 0.25 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 } geometry Cylinder { height 0.18 radius 0.25 } } ]
     }
   ]
   name "auto_rickshaw"
-  boundingObject Transform {
-    translation 0 0 0.2
-    children [
-      Box { size 2.7 1.35 1.25 }
-    ]
-  }
+  boundingObject Transform { translation 0 0 0.2 children [ Box { size 2.7 1.35 1.25 } ] }
 }
 
 # ── EGO AUTONOMOUS VEHICLE ───────────────────────────────────────────────────
@@ -618,96 +433,34 @@ DEF EGO_VEHICLE Robot {
   translation 0.0 -1.75 0.42
   rotation 0 0 1 0
   children [
-    # Car Lower Body (Sleek Metallic Silver)
     Transform {
       translation 0 0 0.05
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 0.82 0.84 0.88
-            roughness 0.25
-            metalness 0.7
-          }
-          geometry Box { size 4.2 1.8 0.55 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.82 0.84 0.88 roughness 0.25 metalness 0.7 } geometry Box { size 4.2 1.8 0.55 } } ]
     }
-    # Cabin Glass / Roof
     Transform {
       translation -0.2 0 0.55
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 0.12 0.15 0.20
-            roughness 0.1
-            metalness 0.9
-            transparency 0.35
-          }
-          geometry Box { size 2.2 1.5 0.48 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.15 0.20 roughness 0.1 metalness 0.9 transparency 0.35 } geometry Box { size 2.2 1.5 0.48 } } ]
     }
-    # Front Headlights
     Transform {
       translation 2.12 0.65 0.1
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 1.0 1.0 0.95
-            emissiveColor 0.9 0.9 0.8
-          }
-          geometry Sphere { radius 0.1 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 1.0 1.0 0.95 emissiveColor 0.9 0.9 0.8 } geometry Sphere { radius 0.1 } } ]
     }
     Transform {
       translation 2.12 -0.65 0.1
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 1.0 1.0 0.95
-            emissiveColor 0.9 0.9 0.8
-          }
-          geometry Sphere { radius 0.1 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 1.0 1.0 0.95 emissiveColor 0.9 0.9 0.8 } geometry Sphere { radius 0.1 } } ]
     }
-    # Rear Brake Lights
     Transform {
       translation -2.12 0.65 0.1
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 0.9 0.1 0.1
-            emissiveColor 0.8 0.05 0.05
-          }
-          geometry Box { size 0.05 0.25 0.12 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.9 0.1 0.1 emissiveColor 0.8 0.05 0.05 } geometry Box { size 0.05 0.25 0.12 } } ]
     }
     Transform {
       translation -2.12 -0.65 0.1
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 0.9 0.1 0.1
-            emissiveColor 0.8 0.05 0.05
-          }
-          geometry Box { size 0.05 0.25 0.12 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.9 0.1 0.1 emissiveColor 0.8 0.05 0.05 } geometry Box { size 0.05 0.25 0.12 } } ]
     }
-    # Sensor Rig (LiDAR + Camera Pod on roof)
     Transform {
       translation -0.2 0 0.86
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.3 }
-          geometry Cylinder { height 0.14 radius 0.18 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.3 } geometry Cylinder { height 0.14 radius 0.18 } } ]
     }
-    # On-board Camera Sensor
     Camera {
       translation 1.6 0 0.75
       rotation 0 0 1 0
@@ -716,58 +469,29 @@ DEF EGO_VEHICLE Robot {
       width 640
       height 360
     }
-    # Front-Left Wheel
     Transform {
       translation 1.3 0.9 -0.15
       rotation 1 0 0 1.5708
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 }
-          geometry Cylinder { height 0.22 radius 0.32 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 } geometry Cylinder { height 0.22 radius 0.32 } } ]
     }
-    # Front-Right Wheel
     Transform {
       translation 1.3 -0.9 -0.15
       rotation 1 0 0 1.5708
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 }
-          geometry Cylinder { height 0.22 radius 0.32 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 } geometry Cylinder { height 0.22 radius 0.32 } } ]
     }
-    # Rear-Left Wheel
     Transform {
       translation -1.3 0.9 -0.15
       rotation 1 0 0 1.5708
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 }
-          geometry Cylinder { height 0.22 radius 0.32 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 } geometry Cylinder { height 0.22 radius 0.32 } } ]
     }
-    # Rear-Right Wheel
     Transform {
       translation -1.3 -0.9 -0.15
       rotation 1 0 0 1.5708
-      children [
-        Shape {
-          appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 }
-          geometry Cylinder { height 0.22 radius 0.32 }
-        }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 } geometry Cylinder { height 0.22 radius 0.32 } } ]
     }
   ]
   name "ego_vehicle"
-  boundingObject Transform {
-    translation 0 0 0.25
-    children [
-      Box { size 4.4 1.9 1.1 }
-    ]
-  }
+  boundingObject Transform { translation 0 0 0.25 children [ Box { size 4.4 1.9 1.1 } ] }
 }
 
 # ── SUPERVISOR CONTROLLER ───────────────────────────────────────────────────

@@ -3,21 +3,14 @@ indian_road_supervisor.py — Webots 3D Supervisor Controller for Indian Rural R
 =============================================================================
 SIH PS-26037: Adaptive Path Planning for Unstructured Indian Roads
 
-This controller runs inside Webots as the Supervisor:
-  1. Spawns and manages the 3D Indian Rural Road environment:
-       - Ego Vehicle (autonomous car)
-       - Pothole hazard (recessed road crater in ego lane at X=18m, Y=-1.2m)
-       - Pedestrian 1 (crossing left-to-right at X=26m)
-       - Pedestrian 2 (crossing right-to-left at X=48m)
-       - Oncoming Auto-Rickshaw (Indian 3-wheeler approaching at X=65m, Y=+1.75m)
-  2. Animates dynamic agents with realistic Indian road trajectories.
-  3. Supports two execution modes:
-       - STANDALONE AUTONOMOUS: Full onboard adaptive path planner & state machine
-         executes swerves around pothole, yields to crossing pedestrians, yields
-         or negotiates oncoming rickshaw bottleneck.
-       - MATLAB CO-SIMULATION BRIDGE: Opens TCP port 20000 to stream telemetry
-         (ego pose, obstacles, pothole, road bounds) to MATLAB and receive
-         steer/throttle/brake commands.
+Features:
+  1. Follow Camera: Actively locks 3D chase camera to ego vehicle in real time.
+  2. Dynamic Road Hazards:
+       - Pothole: X = 22.0m, Y = -1.35m (recessed crater in ego travel lane)
+       - Pedestrian 1: X = 35.0m (crosses left-to-right from Y = +3.8m to -3.8m)
+       - Pedestrian 2: X = 54.0m (crosses right-to-left from Y = -3.8m to +3.8m)
+       - Oncoming Auto-Rickshaw: X = 70.0m, Y = +1.75m (cruises oncoming in -X direction)
+  3. Standalone autonomous planner + TCP bridge server on port 20000 for MATLAB.
 =============================================================================
 """
 
@@ -33,13 +26,12 @@ from typing import List, Dict, Tuple, Any
 try:
     from controller import Supervisor, Camera
 except ImportError:
-    # Add standard Webots controller search path if running standalone
     webots_home = os.environ.get("WEBOTS_HOME", r"C:\Program Files\Webots")
     sys.path.append(os.path.join(webots_home, "lib", "controller", "python"))
     from controller import Supervisor, Camera
 
 
-# ── Scenario Configuration ───────────────────────────────────────────────────
+# ── Scenario Configuration (Updated Coordinates) ─────────────────────────────
 CONFIG = {
     "road_width": 7.0,
     "road_boundaries": [3.5, -3.5],   # [y_left, y_right]
@@ -54,28 +46,28 @@ CONFIG = {
         "wheelbase": 2.8,
     },
     "pothole": {
-        "center": [18.0, -1.2],
-        "radius": 0.7,
+        "center": [22.0, -1.35],      # Moved to X=22m
+        "radius": 0.75,
         "depth": 0.12
     },
     "pedestrian_1": {
-        "x": 26.0,
+        "x": 35.0,                    # Moved to X=35m
         "start_y": 3.8,
         "target_y": -3.8,
         "speed": 1.15,
-        "trigger_ego_x": 8.0
+        "trigger_ego_x": 17.0
     },
     "pedestrian_2": {
-        "x": 48.0,
+        "x": 54.0,                    # Moved to X=54m
         "start_y": -3.8,
         "target_y": 3.8,
         "speed": 1.25,
-        "trigger_ego_x": 27.0
+        "trigger_ego_x": 34.0
     },
     "auto_rickshaw": {
-        "start_x": 65.0,
+        "start_x": 70.0,              # Starts at X=70m
         "y": 1.75,
-        "speed": -3.6,          # Moving in -X direction
+        "speed": -3.5,                # Moving oncoming in -X direction
         "length": 2.6,
         "width": 1.3
     }
@@ -85,49 +77,37 @@ CONFIG = {
 class StandalonePlanner:
     """
     Onboard Adaptive Path Planner & Behavior State Machine for Standalone Webots.
-    Emulates the full Hybrid A* / EKF / BSM pipeline in pure Python.
+    Calculates swerves past potholes and yields for pedestrians and oncoming traffic.
     """
     def __init__(self):
         self.state = "CRUISE"
         self.pothole_cleared = False
-        self.ped1_yielded = False
-        self.ped2_yielded = False
 
     def plan_step(self, ego_x: float, ego_y: float, ego_yaw: float, ego_v: float,
                   obstacles: List[Dict[str, Any]], pothole: Dict[str, Any]) -> Tuple[float, float, float, str]:
-        """
-        Calculates steer (-1..1), throttle (0..1), brake (0..1), and state name.
-        """
         p_center = pothole["center"]
-        p_rad = pothole["radius"]
-
-        # Default targets
         target_y = -1.75
         target_speed = CONFIG["ego"]["v_cruise"]
         steer = 0.0
         throttle = 0.0
         brake = 0.0
 
+        # 1. Pothole Nudge Logic (X in [10m, 26m])
         dist_to_pothole = p_center[0] - ego_x
-
-        # 1. Pothole Nudge Logic (X in [8m, 22m])
         if -2.0 <= dist_to_pothole <= 14.0:
             if not self.pothole_cleared:
-                self.state = "NUDGE_RIGHT"  # In drive-on-left, swerve rightward toward centerline
-                target_y = -0.15            # Safe corridor avoiding pothole at y=-1.2
+                self.state = "NUDGE_RIGHT"  # Swerve rightward toward road centerline
+                target_y = -0.20            # Safe corridor avoiding pothole at y=-1.35
                 target_speed = 3.8
             if dist_to_pothole < -1.5:
                 self.pothole_cleared = True
                 self.state = "RESUME_LANE"
 
-        # 2. Check Pedestrians
+        # 2. Check Crossing Pedestrians
         for obs in obstacles:
             if "pedestrian" in obs["type"]:
                 dx = obs["pos"][0] - ego_x
-                dy = abs(obs["pos"][1] - ego_y)
-
-                # If pedestrian is ahead within stopping distance and in / entering road
-                if 1.0 < dx < 14.0 and abs(obs["pos"][1]) < 3.0:
+                if 1.0 < dx < 14.0 and abs(obs["pos"][1]) < 3.2:
                     ttc = dx / max(ego_v, 0.5)
                     if ttc < 3.2:
                         self.state = "YIELD_PEDESTRIAN"
@@ -137,18 +117,16 @@ class StandalonePlanner:
         for obs in obstacles:
             if obs["type"] == "auto_rickshaw":
                 dx = obs["pos"][0] - ego_x
-                if 0.0 < dx < 22.0:
-                    # If ego is currently swerving near centerline while auto approaches
-                    if ego_y > -1.0:
-                        self.state = "YIELD_ONCOMING"
-                        target_speed = min(target_speed, 2.5)
+                if 0.0 < dx < 22.0 and ego_y > -0.9:
+                    self.state = "YIELD_ONCOMING"
+                    target_speed = min(target_speed, 2.8)
 
-        # 4. Check Goal Arrival
+        # 4. Goal Arrival Check
         if ego_x >= CONFIG["ego"]["goal_x"]:
             self.state = "ARRIVED"
             target_speed = 0.0
 
-        # ── Longitudinal Control (PI speed tracker) ──
+        # ── Longitudinal Control ──
         speed_err = target_speed - ego_v
         if target_speed <= 0.2:
             throttle = 0.0
@@ -163,43 +141,40 @@ class StandalonePlanner:
             throttle = 0.25
             brake = 0.0
 
-        # ── Lateral Control (Stanley / Pure Pursuit) ──
+        # ── Lateral Control ──
         y_err = target_y - ego_y
-        yaw_err = 0.0 - ego_yaw   # Nominal road heading is 0 rad
-
-        # Cross-track steering law
-        k_p = 0.45
-        k_yaw = 0.60
-        steer_cmd = (y_err * k_p) + (yaw_err * k_yaw)
+        yaw_err = 0.0 - ego_yaw
+        steer_cmd = (y_err * 0.45) + (yaw_err * 0.60)
         steer = max(-0.55, min(0.55, steer_cmd))
 
         return steer, throttle, brake, self.state
 
 
 class IndianRoadSupervisor:
-    """Webots Supervisor handling scene animation, telemetry, and bridge communication."""
+    """Webots Supervisor with Follow Camera and dynamic agent management."""
     def __init__(self):
         self.supervisor = Supervisor()
         self.time_step = int(self.supervisor.getBasicTimeStep())
         self.dt = self.time_step / 1000.0
 
         print("="*65)
-        print("  Webots Indian Rural Road Scene Supervisor Initialized")
+        print("  Webots Indian Rural Road Scene Supervisor (Follow Camera Enabled)")
         print(f"  Time Step: {self.time_step} ms (dt={self.dt:.3f} s)")
         print("="*65)
 
-        # Retrieve scene nodes
+        # Scene nodes
         self.ego_node = self.supervisor.getFromDef("EGO_VEHICLE")
+        self.viewpoint_node = self.supervisor.getFromDef("VIEWPOINT")
         self.ped1_node = self.supervisor.getFromDef("PEDESTRIAN_1")
         self.ped2_node = self.supervisor.getFromDef("PEDESTRIAN_2")
         self.auto_node = self.supervisor.getFromDef("AUTO_RICKSHAW")
         self.pothole_node = self.supervisor.getFromDef("POTHOLE")
 
         if not self.ego_node:
-            print("[ERROR] EGO_VEHICLE node not found in world!")
+            print("[ERROR] EGO_VEHICLE node not found!")
             sys.exit(1)
 
-        # Ego state
+        # Ego vehicle state
         self.ego_x = CONFIG["ego"]["start_x"]
         self.ego_y = CONFIG["ego"]["start_y"]
         self.ego_z = 0.42
@@ -218,16 +193,14 @@ class IndianRoadSupervisor:
         self.auto_x = CONFIG["auto_rickshaw"]["start_x"]
         self.auto_y = CONFIG["auto_rickshaw"]["y"]
 
-        # Planner & TCP Bridge Server setup
+        # Planner & TCP Bridge Server
         self.planner = StandalonePlanner()
         self.server_sock = None
         self.client_sock = None
         self.bridge_mode = False
-
         self._check_bridge_mode()
 
     def _check_bridge_mode(self):
-        """Check if bridge server should be enabled."""
         bridge_env = os.environ.get("WEBOTS_BRIDGE_MODE", "auto").lower()
         if bridge_env in ["1", "true", "yes", "auto", "bridge"]:
             try:
@@ -236,15 +209,23 @@ class IndianRoadSupervisor:
                 self.server_sock.bind(("0.0.0.0", 20000))
                 self.server_sock.listen(1)
                 self.server_sock.setblocking(False)
-                print("[NET] TCP Co-Simulation Bridge listening on 0.0.0.0:20000")
-                print("      (MATLAB or external planner can connect at 127.0.0.1:20000)")
+                print("[NET] TCP Co-Simulation Bridge listening on port 20000")
             except Exception as e:
-                print(f"[NET] Bridge server failed to bind port 20000: {e}")
                 self.server_sock = None
+
+    def update_camera_follow(self):
+        """Actively update the Viewpoint position to follow the car in third-person view."""
+        if self.viewpoint_node:
+            cam_dist = 6.8
+            cam_h = 3.2
+            cam_x = self.ego_x - cam_dist * math.cos(self.ego_yaw)
+            cam_y = self.ego_y - cam_dist * math.sin(self.ego_yaw)
+            cam_z = self.ego_z + cam_h
+            self.viewpoint_node.getField("position").setSFVec3f([cam_x, cam_y, cam_z])
 
     def update_dynamic_obstacles(self):
         """Updates and animates pedestrians and oncoming auto in 3D space."""
-        # 1. Pedestrian 1
+        # 1. Pedestrian 1 (at X = 35.0m)
         if not self.ped1_active and self.ego_x >= CONFIG["pedestrian_1"]["trigger_ego_x"]:
             self.ped1_active = True
             print(f"  [OBS] Pedestrian 1 triggered! Crossing left-to-right at X={self.ped1_x:.1f}m")
@@ -256,7 +237,7 @@ class IndianRoadSupervisor:
             if self.ped1_node:
                 self.ped1_node.getField("translation").setSFVec3f([self.ped1_x, self.ped1_y, 0.9])
 
-        # 2. Pedestrian 2
+        # 2. Pedestrian 2 (at X = 54.0m)
         if not self.ped2_active and self.ego_x >= CONFIG["pedestrian_2"]["trigger_ego_x"]:
             self.ped2_active = True
             print(f"  [OBS] Pedestrian 2 triggered! Crossing right-to-left at X={self.ped2_x:.1f}m")
@@ -268,122 +249,80 @@ class IndianRoadSupervisor:
             if self.ped2_node:
                 self.ped2_node.getField("translation").setSFVec3f([self.ped2_x, self.ped2_y, 0.9])
 
-        # 3. Oncoming Auto-Rickshaw
+        # 3. Oncoming Auto-Rickshaw (from X = 70.0m)
         if self.auto_x > -10.0:
             self.auto_x += CONFIG["auto_rickshaw"]["speed"] * self.dt
             if self.auto_node:
                 self.auto_node.getField("translation").setSFVec3f([self.auto_x, self.auto_y, 0.68])
 
     def get_obstacles_telemetry(self) -> List[Dict[str, Any]]:
-        """Constructs standardized obstacle array for MATLAB / Python planner."""
-        obstacles = []
-        # Pedestrian 1
         v_ped1 = -CONFIG["pedestrian_1"]["speed"] if self.ped1_active else 0.0
-        obstacles.append({
-            "id": 1,
-            "type": "pedestrian",
-            "pos": [round(self.ped1_x, 2), round(self.ped1_y, 2)],
-            "vel": [0.0, round(v_ped1, 2)],
-            "heading": -1.57,
-            "length": 0.5,
-            "width": 0.5
-        })
-
-        # Pedestrian 2
         v_ped2 = CONFIG["pedestrian_2"]["speed"] if self.ped2_active else 0.0
-        obstacles.append({
-            "id": 2,
-            "type": "pedestrian",
-            "pos": [round(self.ped2_x, 2), round(self.ped2_y, 2)],
-            "vel": [0.0, round(v_ped2, 2)],
-            "heading": 1.57,
-            "length": 0.5,
-            "width": 0.5
-        })
-
-        # Oncoming Auto
-        obstacles.append({
-            "id": 3,
-            "type": "auto_rickshaw",
-            "pos": [round(self.auto_x, 2), round(self.auto_y, 2)],
-            "vel": [round(CONFIG["auto_rickshaw"]["speed"], 2), 0.0],
-            "heading": 3.14,
-            "length": CONFIG["auto_rickshaw"]["length"],
-            "width": CONFIG["auto_rickshaw"]["width"]
-        })
-
-        return obstacles
+        return [
+            {"id": 1, "type": "pedestrian", "pos": [round(self.ped1_x, 2), round(self.ped1_y, 2)],
+             "vel": [0.0, round(v_ped1, 2)], "heading": -1.57, "length": 0.5, "width": 0.5},
+            {"id": 2, "type": "pedestrian", "pos": [round(self.ped2_x, 2), round(self.ped2_y, 2)],
+             "vel": [0.0, round(v_ped2, 2)], "heading": 1.57, "length": 0.5, "width": 0.5},
+            {"id": 3, "type": "auto_rickshaw", "pos": [round(self.auto_x, 2), round(self.auto_y, 2)],
+             "vel": [round(CONFIG["auto_rickshaw"]["speed"], 2), 0.0], "heading": 3.14,
+             "length": CONFIG["auto_rickshaw"]["length"], "width": CONFIG["auto_rickshaw"]["width"]}
+        ]
 
     def check_collisions(self) -> Tuple[bool, str]:
-        """Checks distance between ego and all obstacles + pothole."""
-        # 1. Pothole check
         p_cen = CONFIG["pothole"]["center"]
-        d_pothole = math.hypot(self.ego_x - p_cen[0], self.ego_y - p_cen[1])
-        if d_pothole < 0.65:
-            return True, f"POTHOLE IMPACT at ({self.ego_x:.1f}, {self.ego_y:.1f})! Severe chassis drop."
-
-        # 2. Pedestrian 1
-        d_ped1 = math.hypot(self.ego_x - self.ped1_x, self.ego_y - self.ped1_y)
-        if d_ped1 < 1.3:
+        if math.hypot(self.ego_x - p_cen[0], self.ego_y - p_cen[1]) < 0.68:
+            return True, f"POTHOLE IMPACT at ({self.ego_x:.1f}, {self.ego_y:.1f})!"
+        if math.hypot(self.ego_x - self.ped1_x, self.ego_y - self.ped1_y) < 1.3:
             return True, f"COLLISION with Pedestrian 1 at ({self.ego_x:.1f}, {self.ego_y:.1f})!"
-
-        # 3. Pedestrian 2
-        d_ped2 = math.hypot(self.ego_x - self.ped2_x, self.ego_y - self.ped2_y)
-        if d_ped2 < 1.3:
+        if math.hypot(self.ego_x - self.ped2_x, self.ego_y - self.ped2_y) < 1.3:
             return True, f"COLLISION with Pedestrian 2 at ({self.ego_x:.1f}, {self.ego_y:.1f})!"
-
-        # 4. Auto-Rickshaw
-        d_auto_x = abs(self.ego_x - self.auto_x)
-        d_auto_y = abs(self.ego_y - self.auto_y)
-        if d_auto_x < 3.2 and d_auto_y < 1.4:
-            return True, f"HEAD-ON COLLISION with Auto-Rickshaw at ({self.ego_x:.1f}, {self.ego_y:.1f})!"
-
+        if abs(self.ego_x - self.auto_x) < 3.2 and abs(self.ego_y - self.auto_y) < 1.4:
+            return True, f"COLLISION with Auto-Rickshaw at ({self.ego_x:.1f}, {self.ego_y:.1f})!"
         return False, ""
 
     def apply_kinematics(self, steer_rad: float, throttle: float, brake: float):
-        """Kinematic Bicycle Model integration and Webots 3D pose update."""
         accel = (throttle * 3.0) - (brake * 5.2)
         self.ego_v = max(0.0, min(7.5, self.ego_v + accel * self.dt))
         self.ego_x += self.ego_v * math.cos(self.ego_yaw) * self.dt
         self.ego_y += self.ego_v * math.sin(self.ego_yaw) * self.dt
         self.ego_yaw += (self.ego_v / CONFIG["ego"]["wheelbase"]) * math.tan(steer_rad) * self.dt
 
-        # Update Webots node transform
         if self.ego_node:
             self.ego_node.getField("translation").setSFVec3f([self.ego_x, self.ego_y, self.ego_z])
             self.ego_node.getField("rotation").setSFRotation([0, 0, 1, self.ego_yaw])
 
     def run(self):
-        """Main simulation execution loop."""
-        step = 0
-        t_sim = 0.0
-        success = False
+        step, t_sim, success = 0, 0.0, False
 
-        print("\n[SIM] Starting Webots 3D simulation loop...")
-        print("      Observing Rural Road: [Ego] -> [Pothole @ 18m] -> [Ped 1 @ 26m] -> [Ped 2 @ 48m] <- [Auto @ 65m]\n")
+        print("\n[SIM] Starting Webots 3D simulation...")
+        print(f"      Layout: [Ego] -> [Pothole @ {CONFIG['pothole']['center'][0]}m] -> "
+              f"[Ped 1 @ {CONFIG['pedestrian_1']['x']}m] -> [Ped 2 @ {CONFIG['pedestrian_2']['x']}m] "
+              f"<- [Auto @ {CONFIG['auto_rickshaw']['start_x']}m]\n")
 
         try:
             while self.supervisor.step(self.time_step) != -1:
                 step += 1
                 t_sim += self.dt
 
-                # 1. Update dynamic environment
+                # 1. Update camera to follow car
+                self.update_camera_follow()
+
+                # 2. Update dynamic scene obstacles
                 self.update_dynamic_obstacles()
                 obstacles = self.get_obstacles_telemetry()
                 collision, col_reason = self.check_collisions()
 
-                # 2. Check incoming MATLAB bridge connection
+                # 3. Check incoming MATLAB bridge connection
                 if self.server_sock and not self.client_sock:
                     readable, _, _ = select.select([self.server_sock], [], [], 0)
                     if readable:
                         self.client_sock, client_addr = self.server_sock.accept()
                         self.client_sock.setblocking(True)
                         self.bridge_mode = True
-                        print(f"\n[BRIDGE] MATLAB connected from {client_addr}! Switching to MATLAB Control Mode.\n")
+                        print(f"\n[BRIDGE] MATLAB connected from {client_addr}!\n")
 
-                # 3. Control computation
+                # 4. Control computation
                 if self.bridge_mode and self.client_sock:
-                    # Construct and send telemetry package to MATLAB
                     pkg = {
                         "ego_state": [round(self.ego_x, 3), round(self.ego_y, 3), round(self.ego_yaw, 3), round(self.ego_v, 2)],
                         "obstacles": obstacles,
@@ -393,45 +332,30 @@ class IndianRoadSupervisor:
                         "camera": {"ready": True}
                     }
                     try:
-                        payload = (json.dumps(pkg) + "\n").encode('utf-8')
-                        self.client_sock.sendall(payload)
-
+                        self.client_sock.sendall((json.dumps(pkg) + "\n").encode('utf-8'))
                         resp = self.client_sock.recv(4096).decode('utf-8').strip()
                         if not resp:
-                            print("[BRIDGE] MATLAB disconnected.")
-                            self.client_sock.close()
-                            self.client_sock = None
-                            self.bridge_mode = False
-                            steer, throttle, brake = 0.0, 0.0, 1.0
-                            bsm_state = "DISCONNECTED"
-                        else:
-                            ctrl = json.loads(resp)
-                            steer = ctrl.get('steer', 0.0) * 0.55  # Map [-1, 1] to max steer rad
-                            throttle = ctrl.get('throttle', 0.0)
-                            brake = ctrl.get('brake', 0.0)
-                            bsm_state = "MATLAB_HYBRID_A*"
-                    except Exception as e:
-                        print(f"[BRIDGE] Communication error: {e}")
-                        self.client_sock = None
-                        self.bridge_mode = False
-                        steer, throttle, brake = 0.0, 0.0, 1.0
-                        bsm_state = "ERROR"
+                            break
+                        ctrl = json.loads(resp)
+                        steer = ctrl.get('steer', 0.0) * 0.55
+                        throttle, brake = ctrl.get('throttle', 0.0), ctrl.get('brake', 0.0)
+                        bsm_state = "MATLAB_CTL"
+                    except Exception:
+                        break
                 else:
-                    # Standalone autonomous planner
                     steer, throttle, brake, bsm_state = self.planner.plan_step(
                         self.ego_x, self.ego_y, self.ego_yaw, self.ego_v, obstacles, CONFIG["pothole"]
                     )
 
-                # 4. Integrate physical dynamics
+                # 5. Integrate vehicle dynamics
                 self.apply_kinematics(steer, throttle, brake)
 
-                # 5. Telemetry output
+                # 6. Telemetry display
                 if step % 15 == 0 or bsm_state in ["NUDGE_RIGHT", "YIELD_PEDESTRIAN", "YIELD_ONCOMING", "ARRIVED"]:
                     print(f"[t={t_sim:5.1f}s #{step:03d}] Pos:({self.ego_x:5.1f}, {self.ego_y:+4.2f}) "
                           f"V:{self.ego_v:4.1f}m/s | State: {bsm_state:<16} | "
                           f"Steer: {math.degrees(steer):+5.1f}° Thr:{throttle:.2f} Brk:{brake:.2f}")
 
-                # 6. Safety & Termination checks
                 if collision:
                     print(f"\n[!!!] SIMULATION HALTED: {col_reason}\n")
                     break
@@ -439,19 +363,15 @@ class IndianRoadSupervisor:
                 if self.ego_x >= CONFIG["ego"]["goal_x"]:
                     print("\n" + "="*65)
                     print(f"  [SUCCESS] Goal reached at X={self.ego_x:.1f}m in t={t_sim:.1f}s!")
-                    print(f"  Pothole negotiated cleanly | Pedestrians yielded | Auto cleared")
                     print("="*65 + "\n")
                     success = True
                     break
 
         except KeyboardInterrupt:
-            print("\n[SIM] Interrupted by user.")
+            pass
         finally:
-            if self.client_sock:
-                self.client_sock.close()
-            if self.server_sock:
-                self.server_sock.close()
-            print("[SIM] Webots supervisor finished.")
+            if self.client_sock: self.client_sock.close()
+            if self.server_sock: self.server_sock.close()
 
         return success
 
