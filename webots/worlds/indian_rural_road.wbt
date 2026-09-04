@@ -8,33 +8,27 @@ WorldInfo {
   ]
   title "Indian Rural Road"
   basicTimeStep 20
-  coordinateSystem "ENU"
 }
-
 Viewpoint {
-  orientation 0.08 0.35 -0.93 1.25
-  position -7.0 -1.75 3.8
+  orientation -0.5610492824135206 0.814261212399488 0.14900463309907347 0.2756024554429535
+  position -55.068272311335704 -9.585826270262759 12.641614939583418
+  follow "ego_vehicle"
+  followType "Mounted Shot"
 }
-
 Background {
   skyColor [
     0.45 0.68 0.92
   ]
 }
-
 DirectionalLight {
   direction 0.4 0.3 -0.85
   intensity 2.8
   castShadows TRUE
 }
-
 DirectionalLight {
   direction -0.4 -0.3 -0.5
   intensity 0.9
-  castShadows FALSE
 }
-
-# ── Ground Terrain (Rural Grassland) ─────────────────────────────────────────
 DEF GROUND Solid {
   translation 40 0 -0.05
   children [
@@ -42,7 +36,7 @@ DEF GROUND Solid {
       appearance PBRAppearance {
         baseColor 0.32 0.45 0.22
         roughness 0.95
-        metalness 0.0
+        metalness 0
       }
       geometry Box {
         size 160 80 0.1
@@ -54,16 +48,14 @@ DEF GROUND Solid {
     size 160 80 0.1
   }
 }
-
-# ── Left Dirt Shoulder ───────────────────────────────────────────────────────
 DEF SHOULDER_LEFT Solid {
   translation 40 4.75 0.005
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.50 0.40 0.28
+        baseColor 0.5 0.4 0.28
         roughness 0.9
-        metalness 0.0
+        metalness 0
       }
       geometry Box {
         size 140 2.5 0.01
@@ -72,16 +64,14 @@ DEF SHOULDER_LEFT Solid {
   ]
   name "shoulder_left"
 }
-
-# ── Right Dirt Shoulder ──────────────────────────────────────────────────────
 DEF SHOULDER_RIGHT Solid {
   translation 40 -4.75 0.005
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.50 0.40 0.28
+        baseColor 0.5 0.4 0.28
         roughness 0.9
-        metalness 0.0
+        metalness 0
       }
       geometry Box {
         size 140 2.5 0.01
@@ -90,35 +80,31 @@ DEF SHOULDER_RIGHT Solid {
   ]
   name "shoulder_right"
 }
-
-# ── Rural Asphalt Road Surface (7.0m width) ──────────────────────────────────
 DEF ROAD_SURFACE Solid {
   translation 40 0 0.01
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.20 0.20 0.22
+        baseColor 0.2 0.2 0.22
         roughness 0.8
         metalness 0.05
       }
       geometry Box {
-        size 140 7.0 0.01
+        size 140 7 0.01
       }
     }
   ]
   name "road_surface"
   boundingObject Box {
-    size 140 7.0 0.01
+    size 140 7 0.01
   }
 }
-
-# ── Center Road Marking (Faded Dashed Line) ──────────────────────────────────
 DEF CENTER_LINE Solid {
   translation 40 0 0.016
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.85 0.85 0.80
+        baseColor 0.85 0.85 0.8
         roughness 0.6
       }
       geometry Box {
@@ -128,14 +114,12 @@ DEF CENTER_LINE Solid {
   ]
   name "center_line"
 }
-
-# ── Road Edge Markings ───────────────────────────────────────────────────────
 DEF EDGE_LEFT Solid {
   translation 40 3.4 0.016
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.75 0.75 0.70
+        baseColor 0.75 0.75 0.7
         roughness 0.6
       }
       geometry Box {
@@ -145,13 +129,12 @@ DEF EDGE_LEFT Solid {
   ]
   name "edge_left"
 }
-
 DEF EDGE_RIGHT Solid {
   translation 40 -3.4 0.016
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.75 0.75 0.70
+        baseColor 0.75 0.75 0.7
         roughness 0.6
       }
       geometry Box {
@@ -161,124 +144,258 @@ DEF EDGE_RIGHT Solid {
   ]
   name "edge_right"
 }
-
-# ── Roadside Trees & Rural Milieu ────────────────────────────────────────────
 DEF TREE_1 Solid {
   translation 5 6.2 0
   children [
-    Transform {
+    Pose {
       translation 0 0 1.2
-      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.4 0.25 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 2.4
+            radius 0.25
+          }
+        }
+      ]
     }
-    Transform {
-      translation 0 0 3.0
-      children [ Shape { appearance PBRAppearance { baseColor 0.18 0.45 0.15 roughness 0.8 } geometry Sphere { radius 1.6 } } ]
+    Pose {
+      translation 0 0 3
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.18 0.45 0.15
+            roughness 0.8
+          }
+          geometry Sphere {
+            radius 1.6
+          }
+        }
+      ]
     }
   ]
   name "tree_1"
 }
-
 DEF TREE_2 Solid {
   translation 28 6.5 0
   children [
-    Transform {
+    Pose {
       translation 0 0 1.3
-      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.6 radius 0.28 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.4 0.25 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 2.6
+            radius 0.28
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 0 0 3.2
-      children [ Shape { appearance PBRAppearance { baseColor 0.20 0.50 0.18 roughness 0.8 } geometry Sphere { radius 1.8 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.2 0.5 0.18
+            roughness 0.8
+          }
+          geometry Sphere {
+            radius 1.8
+          }
+        }
+      ]
     }
   ]
   name "tree_2"
 }
-
 DEF TREE_3 Solid {
   translation 55 6.3 0
   children [
-    Transform {
+    Pose {
       translation 0 0 1.2
-      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.4 0.25 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 2.4
+            radius 0.25
+          }
+        }
+      ]
     }
-    Transform {
-      translation 0 0 3.0
-      children [ Shape { appearance PBRAppearance { baseColor 0.16 0.42 0.14 roughness 0.8 } geometry Sphere { radius 1.5 } } ]
+    Pose {
+      translation 0 0 3
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.16 0.42 0.14
+            roughness 0.8
+          }
+          geometry Sphere {
+            radius 1.5
+          }
+        }
+      ]
     }
   ]
   name "tree_3"
 }
-
 DEF TREE_4 Solid {
   translation 12 -6.5 0
   children [
-    Transform {
+    Pose {
       translation 0 0 1.2
-      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.4 0.25 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 2.4
+            radius 0.25
+          }
+        }
+      ]
     }
-    Transform {
-      translation 0 0 3.0
-      children [ Shape { appearance PBRAppearance { baseColor 0.18 0.46 0.16 roughness 0.8 } geometry Sphere { radius 1.7 } } ]
+    Pose {
+      translation 0 0 3
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.18 0.46 0.16
+            roughness 0.8
+          }
+          geometry Sphere {
+            radius 1.7
+          }
+        }
+      ]
     }
   ]
   name "tree_4"
 }
-
 DEF TREE_5 Solid {
   translation 40 -6.3 0
   children [
-    Transform {
+    Pose {
       translation 0 0 1.3
-      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.6 radius 0.26 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.4 0.25 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 2.6
+            radius 0.26
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 0 0 3.2
-      children [ Shape { appearance PBRAppearance { baseColor 0.19 0.48 0.15 roughness 0.8 } geometry Sphere { radius 1.8 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.19 0.48 0.15
+            roughness 0.8
+          }
+          geometry Sphere {
+            radius 1.8
+          }
+        }
+      ]
     }
   ]
   name "tree_5"
 }
-
 DEF TREE_6 Solid {
   translation 68 -6.4 0
   children [
-    Transform {
+    Pose {
       translation 0 0 1.2
-      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.24 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.4 0.25 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 2.4
+            radius 0.24
+          }
+        }
+      ]
     }
-    Transform {
-      translation 0 0 3.0
-      children [ Shape { appearance PBRAppearance { baseColor 0.17 0.44 0.15 roughness 0.8 } geometry Sphere { radius 1.6 } } ]
+    Pose {
+      translation 0 0 3
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.17 0.44 0.15
+            roughness 0.8
+          }
+          geometry Sphere {
+            radius 1.6
+          }
+        }
+      ]
     }
   ]
   name "tree_6"
 }
-
-# ── Milestone / Highway Sign ─────────────────────────────────────────────────
 DEF MILESTONE Solid {
   translation 8 -4.2 0.4
   children [
-    Transform {
-      translation 0 0 0
-      children [ Shape { appearance PBRAppearance { baseColor 0.9 0.9 0.9 roughness 0.4 } geometry Cylinder { height 0.8 radius 0.22 } } ]
+    Pose {
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.9 0.9 0.9
+            roughness 0.4
+          }
+          geometry Cylinder {
+            height 0.8
+            radius 0.22
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 0 0 0.42
-      children [ Shape { appearance PBRAppearance { baseColor 0.95 0.75 0.05 roughness 0.4 } geometry Sphere { radius 0.22 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.95 0.75 0.05
+            roughness 0.4
+          }
+          geometry Sphere {
+            radius 0.22
+          }
+        }
+      ]
     }
   ]
   name "milestone"
 }
-
-# ── COMBINATION 3: POTHOLE HAZARD (X = 16.0m, Y = -1.50m) ───────────────────
 DEF POTHOLE Solid {
-  translation 16.0 -1.50 0.018
+  translation 20 -1.65 0.018
   children [
-    # Prominent outer crack rim
-    Transform {
+    Pose {
       children [
         Shape {
           appearance PBRAppearance {
-            baseColor 0.10 0.10 0.11
+            baseColor 0.1 0.1 0.11
             roughness 0.9
           }
           geometry Cylinder {
@@ -288,8 +405,7 @@ DEF POTHOLE Solid {
         }
       ]
     }
-    # Deep recessed crater
-    Transform {
+    Pose {
       translation 0 0 0.003
       children [
         Shape {
@@ -305,8 +421,7 @@ DEF POTHOLE Solid {
         }
       ]
     }
-    # Yellow hazard warning cone on the shoulder near the pothole
-    Transform {
+    Pose {
       translation 0 -1.4 0.25
       children [
         Shape {
@@ -316,7 +431,7 @@ DEF POTHOLE Solid {
           }
           geometry Cone {
             bottomRadius 0.22
-            height 0.50
+            height 0.5
           }
         }
       ]
@@ -324,168 +439,468 @@ DEF POTHOLE Solid {
   ]
   name "pothole"
 }
-
-# ── COMBINATION 4: PEDESTRIAN 1 (X = 36.0m, Crossing Right-to-Left) ──────────
 DEF PEDESTRIAN_1 Robot {
-  translation 36.0 -3.8 0.9
+  translation 40 -3.8 0.9
   rotation 0 0 1 1.5708
   children [
-    Transform {
+    Pose {
       translation 0 0 0.7
-      children [ Shape { appearance PBRAppearance { baseColor 0.76 0.57 0.42 roughness 0.6 } geometry Sphere { radius 0.14 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.76 0.57 0.42
+            roughness 0.6
+          }
+          geometry Sphere {
+            radius 0.14
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 0 0 0.3
-      children [ Shape { appearance PBRAppearance { baseColor 0.15 0.35 0.75 roughness 0.7 } geometry Cylinder { height 0.65 radius 0.22 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.15 0.35 0.75
+            roughness 0.7
+          }
+          geometry Cylinder {
+            height 0.65
+            radius 0.22
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 0.09 0 -0.45
-      children [ Shape { appearance PBRAppearance { baseColor 0.85 0.85 0.82 roughness 0.8 } geometry Cylinder { height 0.75 radius 0.08 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.85 0.85 0.82
+            roughness 0.8
+          }
+          geometry Cylinder {
+            height 0.75
+            radius 0.08
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -0.09 0 -0.45
-      children [ Shape { appearance PBRAppearance { baseColor 0.85 0.85 0.82 roughness 0.8 } geometry Cylinder { height 0.75 radius 0.08 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.85 0.85 0.82
+            roughness 0.8
+          }
+          geometry Cylinder {
+            height 0.75
+            radius 0.08
+          }
+        }
+      ]
     }
   ]
   name "pedestrian_1"
-  boundingObject Transform { translation 0 0 0.1 children [ Cylinder { height 1.7 radius 0.28 } ] }
+  boundingObject Pose {
+    translation 0 0 0.1
+    children [
+      Cylinder {
+        height 1.7
+        radius 0.28
+      }
+    ]
+  }
 }
-
-# ── COMBINATION 4: PEDESTRIAN 2 (X = 58.0m, Crossing Left-to-Right) ──────────
 DEF PEDESTRIAN_2 Robot {
-  translation 58.0 3.8 0.9
+  translation 58 3.8 0.9
   rotation 0 0 1 -1.5708
   children [
-    Transform {
+    Pose {
       translation 0 0 0.7
-      children [ Shape { appearance PBRAppearance { baseColor 0.74 0.55 0.40 roughness 0.6 } geometry Sphere { radius 0.14 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.74 0.55 0.4
+            roughness 0.6
+          }
+          geometry Sphere {
+            radius 0.14
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 0 0 0.3
-      children [ Shape { appearance PBRAppearance { baseColor 0.85 0.42 0.10 roughness 0.7 } geometry Cylinder { height 0.65 radius 0.22 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.85 0.42 0.1
+            roughness 0.7
+          }
+          geometry Cylinder {
+            height 0.65
+            radius 0.22
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 0.09 0 -0.45
-      children [ Shape { appearance PBRAppearance { baseColor 0.25 0.25 0.28 roughness 0.8 } geometry Cylinder { height 0.75 radius 0.08 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.25 0.25 0.28
+            roughness 0.8
+          }
+          geometry Cylinder {
+            height 0.75
+            radius 0.08
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -0.09 0 -0.45
-      children [ Shape { appearance PBRAppearance { baseColor 0.25 0.25 0.28 roughness 0.8 } geometry Cylinder { height 0.75 radius 0.08 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.25 0.25 0.28
+            roughness 0.8
+          }
+          geometry Cylinder {
+            height 0.75
+            radius 0.08
+          }
+        }
+      ]
     }
   ]
   name "pedestrian_2"
-  boundingObject Transform { translation 0 0 0.1 children [ Cylinder { height 1.7 radius 0.28 } ] }
+  boundingObject Pose {
+    translation 0 0 0.1
+    children [
+      Cylinder {
+        height 1.7
+        radius 0.28
+      }
+    ]
+  }
 }
-
-# ── COMBINATION 4: ONCOMING AUTO-RICKSHAW (X = 75.0m, Y = +1.80m) ────────────
 DEF AUTO_RICKSHAW Robot {
-  translation 75.0 1.80 0.68
+  translation 70 1.8 0.68
   rotation 0 0 1 3.14159
   children [
-    Transform {
+    Pose {
       translation 0 0 0.05
-      children [ Shape { appearance PBRAppearance { baseColor 0.08 0.54 0.22 roughness 0.4 metalness 0.2 } geometry Box { size 2.5 1.3 0.6 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.08 0.54 0.22
+            roughness 0.4
+            metalness 0.2
+          }
+          geometry Box {
+            size 2.5 1.3 0.6
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -0.15 0 0.6
-      children [ Shape { appearance PBRAppearance { baseColor 0.96 0.82 0.08 roughness 0.5 metalness 0.05 } geometry Box { size 1.9 1.32 0.52 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.96 0.82 0.08
+            roughness 0.5
+            metalness 0.05
+          }
+          geometry Box {
+            size 1.9 1.32 0.52
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 0.85 0 0.5
       rotation 0 1 0 0.2
-      children [ Shape { appearance PBRAppearance { baseColor 0.15 0.25 0.35 roughness 0.1 metalness 0.8 transparency 0.4 } geometry Box { size 0.05 1.15 0.45 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.15 0.25 0.35
+            transparency 0.4
+            roughness 0.1
+            metalness 0.8
+          }
+          geometry Box {
+            size 0.05 1.15 0.45
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 1.26 0 0.15
-      children [ Shape { appearance PBRAppearance { baseColor 1.0 1.0 0.8 emissiveColor 0.8 0.8 0.4 roughness 0.2 } geometry Sphere { radius 0.12 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 1 1 0.8
+            roughness 0.2
+            emissiveColor 0.8 0.8 0.4
+          }
+          geometry Sphere {
+            radius 0.12
+          }
+        }
+      ]
     }
-    Transform {
-      translation 1.0 0 -0.36
+    Pose {
+      translation 1 0 -0.36
       rotation 1 0 0 1.5708
-      children [ Shape { appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 } geometry Cylinder { height 0.15 radius 0.25 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.1 0.1 0.1
+            roughness 0.8
+          }
+          geometry Cylinder {
+            height 0.15
+            radius 0.25
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -0.7 0.62 -0.36
       rotation 1 0 0 1.5708
-      children [ Shape { appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 } geometry Cylinder { height 0.18 radius 0.25 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.1 0.1 0.1
+            roughness 0.8
+          }
+          geometry Cylinder {
+            height 0.18
+            radius 0.25
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -0.7 -0.62 -0.36
       rotation 1 0 0 1.5708
-      children [ Shape { appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.8 } geometry Cylinder { height 0.18 radius 0.25 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.1 0.1 0.1
+            roughness 0.8
+          }
+          geometry Cylinder {
+            height 0.18
+            radius 0.25
+          }
+        }
+      ]
     }
   ]
   name "auto_rickshaw"
-  boundingObject Transform { translation 0 0 0.2 children [ Box { size 2.7 1.35 1.25 } ] }
+  boundingObject Pose {
+    translation 0 0 0.2
+    children [
+      Box {
+        size 2.7 1.35 1.25
+      }
+    ]
+  }
 }
-
-# ── EGO AUTONOMOUS VEHICLE ───────────────────────────────────────────────────
 DEF EGO_VEHICLE Robot {
-  translation 0.0 -1.75 0.42
+  translation 0 -1.75 0.42
   rotation 0 0 1 0
   children [
-    Transform {
+    Pose {
       translation 0 0 0.05
-      children [ Shape { appearance PBRAppearance { baseColor 0.82 0.84 0.88 roughness 0.25 metalness 0.7 } geometry Box { size 4.2 1.8 0.55 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.82 0.84 0.88
+            roughness 0.25
+            metalness 0.7
+          }
+          geometry Box {
+            size 4.2 1.8 0.55
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -0.2 0 0.55
-      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.15 0.20 roughness 0.1 metalness 0.9 transparency 0.35 } geometry Box { size 2.2 1.5 0.48 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.12 0.15 0.2
+            transparency 0.35
+            roughness 0.1
+            metalness 0.9
+          }
+          geometry Box {
+            size 2.2 1.5 0.48
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 2.12 0.65 0.1
-      children [ Shape { appearance PBRAppearance { baseColor 1.0 1.0 0.95 emissiveColor 0.9 0.9 0.8 } geometry Sphere { radius 0.1 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 1 1 0.95
+            emissiveColor 0.9 0.9 0.8
+          }
+          geometry Sphere {
+            radius 0.1
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 2.12 -0.65 0.1
-      children [ Shape { appearance PBRAppearance { baseColor 1.0 1.0 0.95 emissiveColor 0.9 0.9 0.8 } geometry Sphere { radius 0.1 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 1 1 0.95
+            emissiveColor 0.9 0.9 0.8
+          }
+          geometry Sphere {
+            radius 0.1
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -2.12 0.65 0.1
-      children [ Shape { appearance PBRAppearance { baseColor 0.9 0.1 0.1 emissiveColor 0.8 0.05 0.05 } geometry Box { size 0.05 0.25 0.12 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.9 0.1 0.1
+            emissiveColor 0.8 0.05 0.05
+          }
+          geometry Box {
+            size 0.05 0.25 0.12
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -2.12 -0.65 0.1
-      children [ Shape { appearance PBRAppearance { baseColor 0.9 0.1 0.1 emissiveColor 0.8 0.05 0.05 } geometry Box { size 0.05 0.25 0.12 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.9 0.1 0.1
+            emissiveColor 0.8 0.05 0.05
+          }
+          geometry Box {
+            size 0.05 0.25 0.12
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -0.2 0 0.86
-      children [ Shape { appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 0.3 } geometry Cylinder { height 0.14 radius 0.18 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.1 0.1 0.1
+            roughness 0.3
+          }
+          geometry Cylinder {
+            height 0.14
+            radius 0.18
+          }
+        }
+      ]
     }
     Camera {
       translation 1.6 0 0.75
-      rotation 0 0 1 0
-      name "camera"
       fieldOfView 1.2
       width 640
       height 360
     }
-    Transform {
+    Pose {
       translation 1.3 0.9 -0.15
       rotation 1 0 0 1.5708
-      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 } geometry Cylinder { height 0.22 radius 0.32 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.12 0.12 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 0.22
+            radius 0.32
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation 1.3 -0.9 -0.15
       rotation 1 0 0 1.5708
-      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 } geometry Cylinder { height 0.22 radius 0.32 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.12 0.12 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 0.22
+            radius 0.32
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -1.3 0.9 -0.15
       rotation 1 0 0 1.5708
-      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 } geometry Cylinder { height 0.22 radius 0.32 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.12 0.12 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 0.22
+            radius 0.32
+          }
+        }
+      ]
     }
-    Transform {
+    Pose {
       translation -1.3 -0.9 -0.15
       rotation 1 0 0 1.5708
-      children [ Shape { appearance PBRAppearance { baseColor 0.12 0.12 0.12 roughness 0.9 } geometry Cylinder { height 0.22 radius 0.32 } } ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.12 0.12 0.12
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 0.22
+            radius 0.32
+          }
+        }
+      ]
     }
   ]
   name "ego_vehicle"
-  boundingObject Transform { translation 0 0 0.25 children [ Box { size 4.4 1.9 1.1 } ] }
+  boundingObject Pose {
+    translation 0 0 0.25
+    children [
+      Box {
+        size 4.4 1.9 1.1
+      }
+    ]
+  }
 }
-
-# ── SUPERVISOR CONTROLLER ───────────────────────────────────────────────────
 DEF SCENE_SUPERVISOR Robot {
   name "scene_supervisor"
   controller "indian_road_supervisor"

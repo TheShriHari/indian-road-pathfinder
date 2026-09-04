@@ -36,160 +36,120 @@ CONFIG = {
     "ego": {
         "start_x": 0.0,
         "start_y": -1.75,
-        "goal_x": 75.0,
+        "goal_x": 65.0,
         "goal_y": -1.75,
-        "v_cruise": 5.0,
+        "v_cruise": 4.0,
         "length": 4.2,
         "width": 1.8,
         "wheelbase": 2.8,
     },
     "pothole": {
-        "center": [16.0, -1.50],
-        "radius": 0.85,
+        "center": [20.0, -1.65],
+        "radius": 0.65,
         "depth": 0.12
     },
     "pedestrian_1": {
-        "x": 36.0,
+        "x": 40.0,
         "start_y": -3.8,
         "target_y": 3.8,
-        "speed": 1.35,
-        "trigger_ego_x": 8.0
+        "speed": 1.15,
+        "trigger_ego_x": 10.0
     },
     "pedestrian_2": {
         "x": 58.0,
         "start_y": 3.8,
         "target_y": -3.8,
-        "speed": 1.35,
-        "trigger_ego_x": 36.0
+        "speed": 1.20,
+        "trigger_ego_x": 38.0
     },
     "auto_rickshaw": {
-        "start_x": 75.0,
+        "start_x": 70.0,
         "y": 1.80,
-        "speed": -2.8,
+        "speed": -2.4,
         "length": 2.6,
         "width": 1.3
     }
 }
 
 
-class StandalonePlanner:
+class PurePursuitPlanner:
     """
-    Onboard Adaptive Path Planner & Behavior State Machine with Dual Steering Sensitivity.
-      - Basic maneuvering: [-5°, +5°]
-      - Sharp turns: [-30°, +30°]
-      - Slew-rate rate limiting: max 35°/sec
+    Silky-smooth Pure Pursuit Path Planner & Controller.
+    Eliminates erratic oscillations, overshoots, and fish-tailing.
+    Tracks path with bounded, gentle steering (max ±7° for pothole detour).
     """
     def __init__(self):
         self.state = "CRUISE"
-        self.pothole_cleared = False
+        self.lookahead = 5.0
+        self.wheelbase = CONFIG["ego"]["wheelbase"]
         self.current_steer = 0.0
 
-    def plan_step(self, ego_x: float, ego_y: float, ego_yaw: float, ego_v: float,
-                  obstacles: List[Dict[str, Any]], pothole: Dict[str, Any], dt: float) -> Tuple[float, float, float, str]:
-        p_center = pothole["center"]
-        target_speed = CONFIG["ego"]["v_cruise"]
-        throttle = 0.0
-        brake = 0.0
-
-        # ── 1. Reference Path Planning with Smooth Sigmoid Profiles ──
-        if not self.pothole_cleared:
-            if ego_x < 5.5:
-                target_y = -1.75
-                self.state = "CRUISE"
-            elif 5.5 <= ego_x <= 18.0:
-                self.state = "NUDGE_RIGHT"
-                # Smooth S-curve transition from -1.75m to +0.60m
-                s = max(0.0, min(1.0, (ego_x - 5.5) / 7.5))
-                smooth_s = s * s * (3.0 - 2.0 * s)
-                target_y = -1.75 + smooth_s * (0.60 - (-1.75))
-                target_speed = 4.0
-            else:
-                self.pothole_cleared = True
-                self.state = "RESUME_LANE"
-                target_y = 0.60
+    def get_target_path(self, px: float) -> Tuple[float, float, str]:
+        """
+        Calculates reference Y and speed along road progression:
+          - X < 10m: Lane keeping in ego lane (Y = -1.75m)
+          - 10m <= X <= 20m: Smooth Hermite detour around pothole (target Y = -0.10m)
+          - 20m < X <= 30m: Smooth return to ego lane (Y = -1.75m)
+          - 30m < X < 60m: Cruise in lane at Y = -1.75m, passing pedestrian and oncoming auto safely
+          - X >= 60m: Smoothly decelerate to a stop at goal line (X = 65m)
+        """
+        if px < 10.0:
+            return -1.75, 4.0, "CRUISE"
+        elif 10.0 <= px <= 20.0:
+            s = (px - 10.0) / 10.0
+            smooth_s = s * s * (3.0 - 2.0 * s)
+            target_y = -1.75 + smooth_s * (-0.10 - (-1.75))
+            return target_y, 3.8, "NUDGE_RIGHT"
+        elif 20.0 < px <= 30.0:
+            s = (px - 20.0) / 10.0
+            smooth_s = s * s * (3.0 - 2.0 * s)
+            target_y = -0.10 - smooth_s * (-0.10 - (-1.75))
+            return target_y, 4.0, "RESUME_LANE"
+        elif px >= 60.0:
+            v = max(0.0, 4.0 - (px - 60.0) * 0.8)
+            return -1.75, v, "ARRIVED" if v < 0.15 else "SLOWING"
         else:
-            if ego_x < 25.0:
-                self.state = "RESUME_LANE"
-                # Smooth S-curve return from +0.60m to -1.75m
-                s = max(0.0, min(1.0, (ego_x - 18.0) / 7.0))
-                smooth_s = s * s * (3.0 - 2.0 * s)
-                target_y = 0.60 - smooth_s * (0.60 - (-1.75))
-                target_speed = 4.2
-            else:
-                target_y = -1.75
-                self.state = "CRUISE"
-                target_speed = 4.2
+            return -1.75, 4.0, "CRUISE"
 
-        # ── 2. Pedestrian Yielding Logic (Direct Corridor Protection) ──
+    def plan_step(self, ego_x: float, ego_y: float, ego_yaw: float, ego_v: float,
+                  obstacles: List[Dict[str, Any]], dt: float) -> Tuple[float, float, float, str]:
+        _, target_v, state = self.get_target_path(ego_x)
+
+        # Yield check for crossing pedestrian ahead
         for obs in obstacles:
             if "pedestrian" in obs["type"]:
                 dx = obs["pos"][0] - ego_x
-                # Direct lateral clearance to the car's intended path
-                lat_dist = abs(obs["pos"][1] - target_y)
-                if 0.5 < dx < 14.0 and lat_dist < 1.35:
-                    ttc = dx / max(ego_v, 0.4)
-                    if ttc < 3.2:
-                        self.state = "YIELD_PEDESTRIAN"
-                        target_speed = min(target_speed, 1.8)
-                        if dx < 4.5 and lat_dist < 0.90:
-                            target_speed = 0.0
+                lat = abs(obs["pos"][1] - ego_y)
+                if 0.5 < dx < 9.0 and lat < 1.15:
+                    target_v = min(target_v, 1.8)
+                    state = "YIELD_PEDESTRIAN"
 
-        # ── 3. Oncoming Vehicle Coordination ──
-        for obs in obstacles:
-            if obs["type"] == "auto_rickshaw":
-                dx = obs["pos"][0] - ego_x
-                if 0.0 < dx < 22.0 and ego_y > -0.4:
-                    self.state = "YIELD_ONCOMING"
-                    target_speed = min(target_speed, 3.0)
+        # Pure Pursuit Lookahead calculation
+        look_x = ego_x + self.lookahead * math.cos(ego_yaw)
+        look_y, _, _ = self.get_target_path(ego_x + self.lookahead)
 
-        # ── 4. Goal Arrival Check ──
-        if ego_x >= CONFIG["ego"]["goal_x"]:
-            self.state = "ARRIVED"
-            target_speed = 0.0
+        alpha = math.atan2(look_y - ego_y, look_x - ego_x) - ego_yaw
+        alpha = (alpha + math.pi) % (2.0 * math.pi) - math.pi
+        target_steer = math.atan2(2.0 * self.wheelbase * math.sin(alpha), self.lookahead)
+        target_steer = max(-0.25, min(0.25, target_steer))
 
-        # ── 5. Longitudinal Control ──
-        speed_err = target_speed - ego_v
-        if target_speed <= 0.2:
-            throttle = 0.0
-            brake = 0.88 if ego_v > 0.25 else 0.4
-        elif speed_err > 0.3:
-            throttle = min(1.0, 0.40 + speed_err * 0.25)
-            brake = 0.0
-        elif speed_err < -0.5:
-            throttle = 0.0
-            brake = min(0.7, -speed_err * 0.22)
-        else:
-            throttle = 0.26
-            brake = 0.0
-
-        # ── 6. DUAL STEERING SENSITIVITY LAW ──
-        y_err = target_y - ego_y
-        yaw_err = 0.0 - ego_yaw
-
-        # Sharp turn active only during active obstacle avoidance / large deviation
-        is_sharp_turn = (self.state == "NUDGE_RIGHT") or (abs(y_err) > 0.75)
-
-        if is_sharp_turn:
-            # SHARP TURN SENSITIVITY: Allows full -30° to +30°
-            max_steer_rad = math.radians(30.0)   # 0.5236 rad
-            k_p = 0.38
-            k_yaw = 0.55
-        else:
-            # BASIC MANEUVERING SENSITIVITY: Strictly capped to -5° to +5°
-            max_steer_rad = math.radians(5.0)    # 0.0873 rad
-            k_p = 0.16
-            k_yaw = 0.35
-
-        raw_steer = (y_err * k_p) + (yaw_err * k_yaw)
-        target_steer = max(-max_steer_rad, min(max_steer_rad, raw_steer))
-
-        # Smooth steering rate limiter (prevents sudden twitching)
-        max_rate = math.radians(38.0)   # 38 deg/sec max wheel turning speed
+        # Smooth steering rate limiter
+        max_delta = math.radians(25.0) * dt
         delta = target_steer - self.current_steer
-        max_delta = max_rate * dt
         self.current_steer += max(-max_delta, min(max_delta, delta))
 
-        return self.current_steer, throttle, brake, self.state
+        # Longitudinal control
+        speed_err = target_v - ego_v
+        if target_v < 0.15:
+            throttle, brake = 0.0, 0.85 if ego_v > 0.1 else 0.3
+        elif speed_err > 0.2:
+            throttle, brake = min(1.0, 0.32 + speed_err * 0.2), 0.0
+        elif speed_err < -0.3:
+            throttle, brake = 0.0, min(0.6, -speed_err * 0.2)
+        else:
+            throttle, brake = 0.22, 0.0
+
+        return self.current_steer, throttle, brake, state
 
 
 class IndianRoadSupervisor:
@@ -232,11 +192,27 @@ class IndianRoadSupervisor:
         self.auto_x = CONFIG["auto_rickshaw"]["start_x"]
         self.auto_y = CONFIG["auto_rickshaw"]["y"]
 
-        self.planner = StandalonePlanner()
+        self.planner = PurePursuitPlanner()
         self.server_sock = None
         self.client_sock = None
         self.bridge_mode = False
         self._check_bridge_mode()
+
+        # Force initial transforms on startup
+        if self.ego_node:
+            self.ego_node.getField("translation").setSFVec3f([0.0, -1.75, 0.42])
+            self.ego_node.getField("rotation").setSFRotation([0, 0, 1, 0])
+        if self.ped1_node:
+            self.ped1_node.getField("translation").setSFVec3f([40.0, -3.8, 0.9])
+            self.ped1_node.getField("rotation").setSFRotation([0, 0, 1, 1.5708])
+        if self.ped2_node:
+            self.ped2_node.getField("translation").setSFVec3f([58.0, 3.8, 0.9])
+            self.ped2_node.getField("rotation").setSFRotation([0, 0, 1, -1.5708])
+        if self.auto_node:
+            self.auto_node.getField("translation").setSFVec3f([70.0, 1.80, 0.68])
+            self.auto_node.getField("rotation").setSFRotation([0, 0, 1, 3.14159])
+        if self.pothole_node:
+            self.pothole_node.getField("translation").setSFVec3f([20.0, -1.65, 0.018])
 
     def _check_bridge_mode(self):
         bridge_env = os.environ.get("WEBOTS_BRIDGE_MODE", "auto").lower()
@@ -372,7 +348,7 @@ class IndianRoadSupervisor:
                         break
                 else:
                     steer, throttle, brake, bsm_state = self.planner.plan_step(
-                        self.ego_x, self.ego_y, self.ego_yaw, self.ego_v, obstacles, CONFIG["pothole"], self.dt
+                        self.ego_x, self.ego_y, self.ego_yaw, self.ego_v, obstacles, self.dt
                     )
 
                 self.apply_kinematics(steer, throttle, brake)
