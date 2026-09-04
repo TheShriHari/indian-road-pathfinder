@@ -29,11 +29,21 @@ git checkout simulation
 
 ### Sub-Option 1A: If Your Friend Has MATLAB Installed
 
-#### Step 1: Launch CARLA Simulator
+#### Step 1: Launch CARLA Simulator in Low-Graphics / Low-Effort Mode
+To prevent GPU overload, VRAM exhaustion, and Unreal Engine `D3D device being lost` crashes:
 ```powershell
+# Option A: Use the included Python launcher (auto-detects CarlaUE4)
+python start_carla.py
+
+# Option B: Run the batch or PowerShell script
+.\start_carla_low_effort.bat
+# or: .\start_carla_low_effort.ps1
+
+# Option C: Manual launch with recommended low-effort flags
 cd C:\path\to\CARLA_0.9.X
-.\CarlaUE4.exe -windowed -ResX=1280 -ResY=720 -quality-level=Low
+.\CarlaUE4.exe -dx11 -quality-level=Low -benchmark -fps=20 -windowed -ResX=800 -ResY=600
 ```
+*(Tip: Add `-RenderOffScreen` if you want headless mode with zero window rendering overhead!)*
 
 #### Step 2: Launch the Scene & Bridge Server (Terminal 1)
 In the repository root:
@@ -56,10 +66,10 @@ carla_simulation_bridge
 
 If your friend does not have MATLAB installed, they can run the **standalone autonomous Python navigation controller** directly:
 
-#### Step 1: Launch CARLA Simulator
+#### Step 1: Launch CARLA Simulator in Low-Graphics Mode
 ```powershell
-cd C:\path\to\CARLA_0.9.X
-.\CarlaUE4.exe -windowed -ResX=1280 -ResY=720 -quality-level=Low
+python start_carla.py
+# Or: .\start_carla_low_effort.bat
 ```
 
 #### Step 2: Run Autonomous Python Navigation
@@ -131,3 +141,35 @@ If you want to run **CARLA on your friend's PC** while running **MATLAB on your 
 | `--map` | `None` (current) | Specific CARLA map to load (e.g. `Town01`, `Town04`) |
 | `--vehicle` | `vehicle.tesla.model3` | Ego vehicle blueprint name |
 | `--standalone` | `False` | Spawn scene only without starting the bridge server |
+| `--clean-scene` | `False` | Purge all previous ego vehicles and obstacles before running |
+
+---
+
+## 5. Troubleshooting: Unreal Engine "D3D Device Lost" (0x887A0020)
+
+If you see:
+```
+LowLevelFatalError [File:Unknown] [Line: 198]
+Unreal Engine is exiting due to D3D device being lost. (Error: 0x887A0020 - 'INTERNAL_ERROR')
+```
+
+This error happens when Windows TDR (Timeout Detection and Recovery) resets the GPU driver because CARLA took longer than 2 seconds to render a frame.
+
+### Quick Fix Checklist:
+1. **Always launch CARLA with low-effort settings**:
+   ```powershell
+   python start_carla.py
+   # Or: .\start_carla_low_effort.bat
+   ```
+   This automatically caps framerate to 20 FPS, switches to DX11, lowers graphics quality to `Low`, and resizes the window to `800x600`.
+2. **Increase Windows GPU Timeout (`TdrDelay`)**:
+   - Open `regedit` and go to `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers`.
+   - Create a `DWORD (32-bit)` named `TdrDelay` with value `10` (Decimal).
+   - Create a `DWORD (32-bit)` named `TdrDdiDelay` with value `10` (Decimal).
+   - Restart your PC.
+3. **Run Headless (Zero Window Rendering)**:
+   If you only care about data/telemetry and don't need a spectator window:
+   ```powershell
+   python start_carla.py --headless
+   ```
+

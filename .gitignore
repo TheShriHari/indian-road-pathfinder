@@ -4,3 +4,5 @@ __pycache__/
 *.asv
 .DS_Store
 Thumbs.db
+trial*_trace.txt
+trial*.txt

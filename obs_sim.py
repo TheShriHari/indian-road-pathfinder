@@ -75,6 +75,7 @@ from carla_bridge import (
     get_ego_telemetry,
     get_road_boundaries,
     get_camera_meta,
+    cleanup_carla_actors,
     MockWorld,
     IM_WIDTH, IM_HEIGHT, CAM_FOV, CAM_FX, CAM_FY, CAM_CX, CAM_CY
 )
@@ -106,6 +107,9 @@ def run_simulation(args):
         print(f"[ERROR] Failed to connect to CARLA server: {e}")
         print("        Ensure CarlaUE4.exe is running on the host machine.")
         sys.exit(1)
+
+    # Purge orphaned sensors to free DirectX render targets and avoid D3D device lost crashes
+    cleanup_carla_actors(world, clean_ego=getattr(args, 'clean_scene', False))
 
     # Configure synchronous mode
     orig_settings = world.get_settings()
@@ -194,6 +198,7 @@ def run_simulation(args):
                 sim_time += dt
 
                 rgb_bgr, depth_m = sensors.snapshot()
+                sensors.render_preview()
                 detections = []
                 if rgb_bgr is not None and depth_m is not None:
                     detections = detector.detect(rgb_bgr)
@@ -304,6 +309,7 @@ def run_simulation(args):
             update_spectator(world, ego_vehicle)
 
             rgb_bgr, depth_m = sensors.snapshot()
+            sensors.render_preview()
             detections = []
             if rgb_bgr is not None and depth_m is not None:
                 detections = detector.detect(rgb_bgr)
@@ -432,6 +438,8 @@ if __name__ == '__main__':
                         help='Run scene only without waiting for MATLAB bridge')
     parser.add_argument('--autonomous',  action='store_true',
                         help='Run standalone autonomous Python controller directly in CARLA (No MATLAB required)')
+    parser.add_argument('--clean-scene',  action='store_true',
+                        help='Purge all previous ego vehicles and obstacles before running')
     parser.add_argument('--duration',    type=float, default=60.0,
                         help='Duration in seconds for autonomous run (default: 60s)')
     args = parser.parse_args()

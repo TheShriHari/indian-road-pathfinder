@@ -39,14 +39,13 @@ defaults.v_nudge       = 3.5;   % m/s  reduced speed during NUDGE
 defaults.v_decel       = 1.5;   % m/s  slow yield approach
 defaults.v_wait        = 0.0;   % m/s  full stop during YIELD_WAIT to avoid creeping into in-path obstacles
 defaults.v_resume      = 2.5;   % m/s  initial resume speed
-defaults.d_nudge       = 10.0;  % m  threshold to enter NUDGE
-defaults.d_decel       = 7.0;   % m  threshold to enter YIELD_DECEL
-defaults.d_wait        = 4.5;   % m  threshold to enter YIELD_WAIT (sufficient stopping margin)
+defaults.d_nudge       = 12.0;  % m  threshold to enter NUDGE
+defaults.d_decel       = 8.5;   % m  threshold to enter YIELD_DECEL
+defaults.d_wait        = 6.0;   % m  threshold to enter YIELD_WAIT (provides 2.4m front bumper buffer before braking)
 defaults.d_clear       = 10.0;  % m  agent must exceed this to allow RESUME->CRUISE
-% d_lat_path: set to 1.15 m (vehicle half-width 0.925 m + 0.225 m margin).
-% Prevents vehicles in the adjacent opposing lane (|y| > 1.2 m) from triggering
-% false in-path emergency yield stops.
-defaults.d_lat_path    = 1.15;  % m  max lateral offset to consider agent "in path"
+% d_lat_path: set to 1.30 m (vehicle half-width 0.925 m + 0.375 m margin)
+% for crossing agents and dynamic objects.
+defaults.d_lat_path    = 1.30;  % m  max lateral offset to consider agent "in path"
 if nargin < 5 || isempty(params)
     params = defaults;
 else
@@ -63,43 +62,60 @@ ego_x     = ego_state(1);
 ego_y     = ego_state(2);
 ego_theta = ego_state(3);
 
-% ---- Find nearest predicted agent and compute longitudinal/lateral distance ----
+% ---- Find nearest predicted agent and check if any agent enters ego path ----
 min_dist     = Inf;
 nearest_lon  = Inf;
 nearest_lat  = Inf;
+agent_in_path = false;
 
 for i = 1:length(predicted_agents)
     wp = predicted_agents(i).waypoints;
     if isempty(wp), continue; end
-    % Scan predicted horizon (up to 15 steps = 1.5s) to catch approaching/crossing agents
-    for h = 1:min(15, size(wp, 1))
+    
+    % Current position (h = 1)
+    ax0 = wp(1, 1);
+    ay0 = wp(1, 2);
+    dx0 = ax0 - ego_x;
+    dy0 = ay0 - ego_y;
+    d0  = hypot(dx0, dy0);
+    lon0 =  dx0 * cos(ego_theta) + dy0 * sin(ego_theta);
+    lat0 = abs(-dx0 * sin(ego_theta) + dy0 * cos(ego_theta));
+    if d0 < min_dist
+        min_dist = d0;
+        nearest_lon = lon0;
+        nearest_lat = lat0;
+    end
+    
+    % Scan prediction horizon (up to 20 steps = 2.0s) for corridor intersection
+    for h = 1:min(20, size(wp, 1))
         ax = wp(h, 1);
         ay = wp(h, 2);
         dx = ax - ego_x;
         dy = ay - ego_y;
-        d  = hypot(dx, dy);
         lon =  dx * cos(ego_theta) + dy * sin(ego_theta);
         lat = abs(-dx * sin(ego_theta) + dy * cos(ego_theta));
-        if lon > 0 && lat < params.d_lat_path
-            if d < min_dist
-                min_dist    = d;
+        
+        % If predicted to be ahead and in path corridor
+        if lon > 0 && lon < 30.0 && lat < params.d_lat_path
+            agent_in_path = true;
+            d_pred = hypot(dx, dy);
+            if d_pred < min_dist || (nearest_lat >= params.d_lat_path)
+                min_dist = min(min_dist, d_pred);
                 nearest_lon = lon;
                 nearest_lat = lat;
             end
-        elseif d < min_dist && h == 1
-            min_dist    = d;
-            nearest_lon = lon;
-            nearest_lat = lat;
         end
     end
 end
 
-% Agent is "in path" when it is ahead (lon > 0) and laterally close
-agent_in_path = (nearest_lon > 0) && (nearest_lat < params.d_lat_path);
+% Backward compatibility: if no predicted agent entered corridor, but immediate position is in path
+if ~agent_in_path && nearest_lon > 0 && nearest_lat < params.d_lat_path
+    agent_in_path = true;
+end
 
-debug_info.min_dist     = min_dist;
-debug_info.nearest_lon  = nearest_lon;
-debug_info.nearest_lat  = nearest_lat;
+debug_info.min_dist      = min_dist;
+debug_info.nearest_lon   = nearest_lon;
+debug_info.nearest_lat   = nearest_lat;
 debug_info.agent_in_path = agent_in_path;
 
 % ---- Dynamic Spatial-Temporal Bottleneck Decider ----
@@ -139,6 +155,25 @@ end
 debug_info.virtual_stop_active = virtual_stop_active;
 debug_info.stop_line_dist = stop_line_dist;
 
+% Compute closing speed for approaching/oncoming agents to adapt safety margins
+max_closing_speed = 0.0;
+v_ego_fwd = ego_state(4);
+for i = 1:length(predicted_agents)
+    if isfield(predicted_agents(i), 'velocity') && ~isempty(predicted_agents(i).velocity)
+        vx_ag = predicted_agents(i).velocity(1);
+        if vx_ag < 0
+            v_rel = v_ego_fwd - vx_ag;
+            if v_rel > max_closing_speed
+                max_closing_speed = v_rel;
+            end
+        end
+    end
+end
+
+% Adaptive threshold scaling for oncoming traffic
+d_wait_eff  = params.d_wait  + min(3.5, max(0.0, (max_closing_speed - 3.0) * 0.7));
+d_decel_eff = params.d_decel + min(4.0, max(0.0, (max_closing_speed - 3.0) * 0.9));
+
 % ---- State machine transitions ----
 % Hysteresis: transitions from safer to more cautious states are trigger-immediate;
 % transitions back to less cautious states require distance to exceed the "clear"
@@ -150,9 +185,9 @@ else
     switch current_state
 
         case 'CRUISE'
-            if agent_in_path && min_dist < params.d_wait
+            if agent_in_path && min_dist < d_wait_eff
                 new_state = 'YIELD_WAIT';
-            elseif agent_in_path && min_dist < params.d_decel
+            elseif agent_in_path && min_dist < d_decel_eff
                 new_state = 'YIELD_DECEL';
             elseif agent_in_path && min_dist < params.d_nudge
                 new_state = 'NUDGE';
@@ -161,7 +196,9 @@ else
             end
 
         case 'NUDGE'
-            if agent_in_path && min_dist < params.d_decel
+            if agent_in_path && min_dist < d_wait_eff
+                new_state = 'YIELD_WAIT';
+            elseif agent_in_path && min_dist < d_decel_eff
                 new_state = 'YIELD_DECEL';
             elseif (~agent_in_path) || (min_dist >= params.d_clear)
                 new_state = 'CRUISE';
@@ -170,23 +207,25 @@ else
             end
 
         case 'YIELD_DECEL'
-            if agent_in_path && min_dist < params.d_wait
+            if agent_in_path && min_dist < d_wait_eff
                 new_state = 'YIELD_WAIT';
-            elseif ((~agent_in_path) || (min_dist >= params.d_clear)) && (min_dist >= 4.0)
+            elseif (~agent_in_path && min_dist >= d_decel_eff) || (min_dist >= params.d_clear)
                 new_state = 'RESUME';
             else
                 new_state = 'YIELD_DECEL';
             end
 
         case 'YIELD_WAIT'
-            if ((~agent_in_path) || (min_dist >= params.d_decel)) && (min_dist >= 4.0)
+            if (~agent_in_path && min_dist >= d_wait_eff + 1.5) || (min_dist >= d_decel_eff)
                 new_state = 'RESUME';
             else
                 new_state = 'YIELD_WAIT';
             end
 
         case 'RESUME'
-            if agent_in_path && min_dist < params.d_decel
+            if agent_in_path && min_dist < d_wait_eff
+                new_state = 'YIELD_WAIT';
+            elseif agent_in_path && min_dist < d_decel_eff
                 new_state = 'YIELD_DECEL';
             elseif min_dist >= params.d_clear
                 new_state = 'CRUISE';

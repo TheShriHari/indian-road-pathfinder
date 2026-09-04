@@ -150,7 +150,7 @@ class YoloV8Detector:
         from ultralytics import YOLO  # lazy import — only at instantiation
         self.model = YOLO('yolov8n.pt')
         self.conf  = conf_thresh
-        print(f'[DETECTOR] YOLOv8n loaded (conf≥{conf_thresh:.2f})')
+        print(f'[DETECTOR] YOLOv8n loaded (conf>={conf_thresh:.2f})')
 
     def detect(self, rgb_frame):
         """
@@ -426,9 +426,15 @@ class CarlaSensorSuite:
         with _lock:
             global _latest_rgb
             _latest_rgb = bgr
+
+    def render_preview(self):
+        """Thread-safe camera preview called from the main thread (avoids DirectX/UI deadlocks)."""
         if self.show_cam and CV2_AVAILABLE:
-            cv2.imshow('CARLA RGB Camera', bgr)
-            cv2.waitKey(1)
+            with _lock:
+                frame = _latest_rgb.copy() if _latest_rgb is not None else None
+            if frame is not None:
+                cv2.imshow('CARLA RGB Camera', frame)
+                cv2.waitKey(1)
 
     # ── Depth Camera ────────────────────────────────────────────────────────
     def _spawn_depth_camera(self):
@@ -505,12 +511,20 @@ class CarlaSensorSuite:
     def destroy(self):
         for a in self.actor_list:
             try:
+                if hasattr(a, 'is_listening') and a.is_listening:
+                    a.stop()
+            except Exception:
+                pass
+            try:
                 a.destroy()
             except Exception:
                 pass
         self.actor_list.clear()
         if CV2_AVAILABLE:
-            cv2.destroyAllWindows()
+            try:
+                cv2.destroyAllWindows()
+            except Exception:
+                pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -628,35 +642,101 @@ class MockWorld:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  5. Actor & Sensor Cleanup Helpers
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def cleanup_carla_actors(world, clean_ego=True):
+    """
+    Purges orphaned sensors and actors from previous crashed/interrupted runs.
+    Freeing DirectX render targets prevents D3D device lost crashes.
+    """
+    if not CARLA_AVAILABLE or world is None:
+        return
+    try:
+        actors = world.get_actors()
+        # 1. Stop and destroy all leftover sensors first (frees GPU render targets immediately)
+        for s in actors.filter('sensor.*'):
+            try:
+                if hasattr(s, 'is_listening') and s.is_listening:
+                    s.stop()
+            except Exception:
+                pass
+            try:
+                s.destroy()
+            except Exception:
+                pass
+
+        # 2. Clean up leftover test vehicles / props / walkers
+        if clean_ego:
+            for v in actors.filter('vehicle.*'):
+                role = v.attributes.get('role_name', '')
+                if role in ['hero', 'ego_vehicle', 'static_obstacle_1', 'dynamic_oncoming']:
+                    try:
+                        v.destroy()
+                    except Exception:
+                        pass
+            for p in actors.filter('static.prop.*'):
+                role = p.attributes.get('role_name', '')
+                if role in ['static_obstacle_2']:
+                    try:
+                        p.destroy()
+                    except Exception:
+                        pass
+            for w in actors.filter('walker.*'):
+                role = w.attributes.get('role_name', '')
+                if role in ['dynamic_crossing', 'crossing_agent']:
+                    try:
+                        w.destroy()
+                    except Exception:
+                        pass
+        print('[CLEANUP] Purged leftover sensors and test actors from CARLA.')
+    except Exception as e:
+        print(f'[CLEANUP] Notice during actor purge: {e}')
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  6. Main bridge loop
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def run_bridge(args):
     print('=' * 64)
-    print('  CARLA ↔ MATLAB Vision Bridge  (SIH PS-26037)')
+    print('  CARLA <-> MATLAB Vision Bridge  (SIH PS-26037)')
     print('  Perception: camera-only  |  NO world.get_actors()')
     print('=' * 64)
 
     # ── Connect to CARLA ───────────────────────────────────────────────────
     mock_mode = not CARLA_AVAILABLE
     world_obj = ego_vehicle = sensors = None
+    orig_settings = None
 
     if not mock_mode:
         try:
             client = carla.Client(args.carla_host, args.carla_port)
-            client.set_timeout(10.0)
+            client.set_timeout(15.0)
             world_obj = client.get_world()
             print(f'[CARLA] Connected — map: {world_obj.get_map().name}')
             if args.map:
                 world_obj = client.load_world(args.map)
                 print(f'[CARLA] Loaded map: {args.map}')
+
+            # Clean up orphaned sensors/actors from previous sessions
+            cleanup_carla_actors(world_obj, clean_ego=not getattr(args, 'reuse_ego', False))
+
+            # Store original settings and configure Synchronous Mode
+            # Prevents D3D device lost crashes caused by uncapped rendering and TM sync mismatches
+            orig_settings = world_obj.get_settings()
+            settings = world_obj.get_settings()
+            settings.synchronous_mode = True
+            settings.fixed_delta_seconds = args.fixed_delta
+            world_obj.apply_settings(settings)
+            print(f'[CARLA] Synchronous mode enabled (fixed_delta={settings.fixed_delta_seconds:.3f}s / {1.0/settings.fixed_delta_seconds:.0f} FPS).')
         except Exception as e:
             print(f'[WARN] CARLA connection failed ({e}) → MOCK mode.')
             mock_mode = True
 
     actor_list = []
     if not mock_mode:
-        # Check if an ego vehicle already exists (e.g. from obs_sim.py)
+        # Check if an ego vehicle already exists (e.g. from obs_sim.py or --reuse-ego)
         for actor in world_obj.get_actors().filter('vehicle.*'):
             if actor.attributes.get('role_name') in ['hero', 'ego_vehicle']:
                 ego_vehicle = actor
@@ -686,7 +766,7 @@ def run_bridge(args):
         if not getattr(args, 'no_scene', False):
             from carla_scene import spawn_corridor_obstacles, update_spectator
             print('[SCENE] Spawning Indian road corridor obstacles...')
-            tm = client.get_trafficmanager(8000)
+            tm = client.get_trafficmanager(args.tm_port)
             tm.set_synchronous_mode(True)
             sc_actors = spawn_corridor_obstacles(world_obj, ego_vehicle, tm)
             actor_list.extend(sc_actors)
@@ -734,6 +814,9 @@ def run_bridge(args):
 
             # Grab a synchronized snapshot of both camera frames
             rgb_bgr, depth_m = sensors.snapshot()
+
+            # Render camera preview safely on main thread if requested
+            sensors.render_preview()
 
             # Run neural detector on RGB frame
             detections = []
@@ -844,13 +927,26 @@ def run_bridge(args):
     except (ConnectionResetError, BrokenPipeError):
         print('[BRIDGE] MATLAB disconnected unexpectedly.')
     finally:
-        conn.close()
-        srv.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            srv.close()
+        except Exception:
+            pass
         if sensors:
             sensors.destroy()
         for a in reversed(actor_list):
             try:
                 a.destroy()
+            except Exception:
+                pass
+        # Restore original world settings so CARLA spectator/server runs smoothly
+        if world_obj and orig_settings is not None:
+            try:
+                world_obj.apply_settings(orig_settings)
+                print('[CARLA] Restored original world settings.')
             except Exception:
                 pass
         print('[BRIDGE] Cleaned up. Goodbye.')
@@ -861,18 +957,24 @@ def run_bridge(args):
 # ═══════════════════════════════════════════════════════════════════════════════
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='CARLA ↔ MATLAB Vision Bridge (PS-26037)')
-    parser.add_argument('--carla-host',  default='127.0.0.1')
-    parser.add_argument('--carla-port',  type=int, default=2000)
-    parser.add_argument('--matlab-port', type=int, default=20000)
-    parser.add_argument('--map',         default=None,
+        description='CARLA <-> MATLAB Vision Bridge (PS-26037)')
+    parser.add_argument('--carla-host',   default='127.0.0.1')
+    parser.add_argument('--carla-port',   type=int, default=2000)
+    parser.add_argument('--matlab-port',  type=int, default=20000)
+    parser.add_argument('--tm-port',      type=int, default=8000,
+                        help='Traffic Manager port (default: 8000)')
+    parser.add_argument('--fixed-delta',  type=float, default=0.05,
+                        help='CARLA fixed delta simulation step in seconds (default: 0.05s = 20 Hz)')
+    parser.add_argument('--map',          default=None,
                         help='CARLA map name to load, e.g. Town04')
-    parser.add_argument('--vehicle',     default='vehicle.tesla.model3')
-    parser.add_argument('--show-cam',    action='store_true',
+    parser.add_argument('--vehicle',      default='vehicle.tesla.model3')
+    parser.add_argument('--reuse-ego',    action='store_true',
+                        help='Attempt to reuse an existing hero vehicle instead of spawning a fresh one')
+    parser.add_argument('--show-cam',     action='store_true',
                         help='Display live RGB stream in an OpenCV window')
-    parser.add_argument('--det-conf',    type=float, default=DET_CONF_DEFAULT,
+    parser.add_argument('--det-conf',     type=float, default=DET_CONF_DEFAULT,
                         help=f'Minimum detector confidence (default: {DET_CONF_DEFAULT})')
-    parser.add_argument('--no-scene',    action='store_true',
+    parser.add_argument('--no-scene',     action='store_true',
                         help='Disable automatic Indian road corridor obstacle spawning')
     args = parser.parse_args()
     run_bridge(args)

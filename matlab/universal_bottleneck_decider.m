@@ -116,18 +116,22 @@ for idx = 1:length(s_eval)
     % Without this gate the vehicle deadlocked on every pothole squeeze.
     has_dynamic_agent_in_corridor = false;
     if corridor_width < min_traversable_width
-        t_arrive = dist_ahead / max(ego_state(4), 1.0);
-        h_check  = max(1, min(20, round(t_arrive / 0.1)));
         for a_chk = 1:length(dynamic_predictions)
             wpc = dynamic_predictions(a_chk).waypoints;
             if isempty(wpc), continue; end
-            h_use = min(h_check, size(wpc,1));
-            for hh = 1:h_use
+            for hh = 1:min(25, size(wpc, 1))
                 dx_c = wpc(hh,1) - pt(1);
                 dy_c = wpc(hh,2) - pt(2);
-                if hypot(dx_c, dy_c) < 2.5   % within 2.5 m of squeeze point
+                if hypot(dx_c, dy_c) < 3.5   % within 3.5 m of squeeze point
                     has_dynamic_agent_in_corridor = true;
                     break;
+                end
+            end
+            if ~has_dynamic_agent_in_corridor && isfield(dynamic_predictions(a_chk), 'velocity') && ~isempty(dynamic_predictions(a_chk).velocity)
+                v_ag = dynamic_predictions(a_chk).velocity;
+                if v_ag(1) < -0.5 && wpc(1,1) > pt(1) && (wpc(1,1) - pt(1)) < 25.0
+                    % Oncoming vehicle within 25m of squeeze point ahead
+                    has_dynamic_agent_in_corridor = true;
                 end
             end
             if has_dynamic_agent_in_corridor, break; end
@@ -180,10 +184,6 @@ end
                 if cmap(r, c) >= 200
                     if lat_dist == 0
                         is_center_blocked = true;
-                        if isfield(params, 'sim_t') && params.sim_t >= 3.0 && params.sim_t <= 9.5
-                            fprintf('  [UBD_DIAG lat=0 (STATIC) t=%.2fs] +s=%.1fm pt=[%.2f, %.2f] test=[%.2f, %.2f] [r=%d, c=%d] cmap=%d (>=200)\n', ...
-                                params.sim_t, s_dist, center_pt(1), center_pt(2), test_x, test_y, r, c, cmap(r, c));
-                        end
                     end
                     clearance = lat_dist;
                     return;

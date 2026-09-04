@@ -127,10 +127,14 @@ test_state_machine         % BSM: prints state transitions CRUISE->NUDGE->YIELD_
 
 To run closed-loop pathfinding against a CARLA 3D rural road:
 
-1. **Start CARLA Simulator** (e.g. `CarlaUE4.exe -quality-level=Low`).
+1. **Start CARLA Simulator** in low-graphics / low-effort mode:
+   ```bash
+   python start_carla.py          # Auto-detects CarlaUE4 and runs low-effort mode
+   # Or on Windows: .\start_carla_low_effort.bat
+   ```
 2. **Start the Python Bridge Server** (in project root):
    ```bash
-   python carla_bridge.py --host 127.0.0.1 --port 2000 --bridge-port 20000
+   python carla_bridge.py --carla-host 127.0.0.1 --carla-port 2000 --matlab-port 20000
    ```
 3. **In MATLAB**, open `matlab/carla_simulation_bridge.m`:
    - Set `MODE = 'LIVE_CARLA'` to receive live telemetry and transmit steering/throttle commands.

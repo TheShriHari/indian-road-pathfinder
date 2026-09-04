@@ -15,8 +15,8 @@ function [control, e_y, e_theta, target_pt] = pure_pursuit_controller(state, pat
 
 if nargin < 4 || isempty(params)
     params.L = 2.7;           % Wheelbase (m)
-    params.k_lookahead = 0.5; % Lookahead gain (s)
-    params.min_lookahead = 2.5; % Minimum lookahead distance (m)
+    params.k_lookahead = 0.38; % Lookahead gain (s)
+    params.min_lookahead = 1.8; % Minimum lookahead distance (m)
     params.Kp_v = 1.0;        % Speed P gain
     params.max_steer = pi/6;
 end

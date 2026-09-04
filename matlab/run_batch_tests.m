@@ -121,7 +121,9 @@ for i = 1:num_trials
     end
 
     % Periodic progress logging
-    if mod(i, 100) == 0 || i == num_trials
+    log_freq = 25;
+    if num_trials <= 50, log_freq = 5; end
+    if mod(i, log_freq) == 0 || i == num_trials
         fprintf('[PROGRESS] %4d / %4d complete | SUCCESS: %3d | COLLISION: %3d | SAFE_STOP: %3d | STALLED: %2d | TIMEOUT: %2d | ERROR: %2d (%.1fs)\n', ...
             i, num_trials, success_cnt, collision_cnt, safe_stop_cnt, stalled_cnt, timeout_cnt, error_cnt, toc(t_batch_start));
     end

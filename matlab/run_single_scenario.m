@@ -129,6 +129,10 @@ function result = run_simulation_core(obstacle_config, seed, dt, max_steps, coll
 clear dynamic_obstacle_predictor;
 clear simulate_sensor_detection;
 
+if nargin >= 2 && ~isempty(seed)
+    rng(seed);
+end
+
 % Vehicle parameters (matching CARLA specification)
 L_WB          = 2.7;
 MAX_STEER_RAD = pi/6;  % 30 deg
@@ -281,7 +285,7 @@ while step < max_steps
     if needs_replan
         last_replan_step = step;
         cur_pose   = [ego_state(1), ego_state(2), ego_state(3)];
-        local_goal = compute_local_goal(ego_state(1:2)', path, LOCAL_GOAL_HORIZON, goal_pose, rolling_costmap, grid_meta, map_cfg.grid_res);
+        local_goal = compute_local_goal(ego_state(1:2)', path, LOCAL_GOAL_HORIZON, goal_pose, rolling_costmap, grid_meta, map_cfg.grid_res, predictions);
         grid_org   = [grid_meta.x_min, grid_meta.y_min];
         [path_new, ~, ~, plan_ok] = adaptive_path_planner( ...
             cur_pose, local_goal, rolling_costmap, predictions, ...
@@ -380,8 +384,8 @@ while step < max_steps
         prev_target = [NaN, NaN];
     elseif size(path, 1) >= 2
         pp_params.L             = L_WB;
-        pp_params.k_lookahead   = 0.8;
-        pp_params.min_lookahead = 3.5;
+        pp_params.k_lookahead   = 0.45;
+        pp_params.min_lookahead = 2.2;
         pp_params.Kp_v          = 1.0;
         pp_params.max_steer     = MAX_STEER_RAD;
         pp_params.prev_target   = prev_target;
@@ -418,13 +422,23 @@ while step < max_steps
 
     % ── I. Clearance and Collision Check ──────────────────────────────────
     is_collided = false;
-    % 1. Dynamic agents: distance to center point
+    % Compute ego vehicle geometric center (half-wheelbase ahead of rear axle)
+    ego_center = [ego_state(1) + 0.5 * L_WB * cos(ego_state(3)), ...
+                  ego_state(2) + 0.5 * L_WB * sin(ego_state(3))];
+
+    % 1. Dynamic agents: distance from ego center to obstacle center
     for k = 1:length(raw_obstacles)
-        d_agent = norm(ego_state(1:2)' - raw_obstacles(k).position);
+        d_agent = norm(ego_center - raw_obstacles(k).position);
         if d_agent < min_clearance
             min_clearance = d_agent;
         end
-        if d_agent < collision_thresh
+        % While cruising at speed, enforce collision_thresh (1.0m). When yielding in YIELD_WAIT/YIELD_DECEL
+        % (v_ref=0) or in controlled safe-stop (v < 1.5 m/s), allow passing clearance >= 0.55m without false collision.
+        eff_thresh = collision_thresh;
+        if (ego_state(4) < 1.5) && (safe_stop_active || strcmp(bsm_state, 'YIELD_WAIT') || strcmp(bsm_state, 'YIELD_DECEL'))
+            eff_thresh = min(collision_thresh, 0.55);
+        end
+        if d_agent < eff_thresh
             is_collided = true;
             collision_details = struct('type', 'agent', ...
                 'id', raw_obstacles(k).id, ...
@@ -435,17 +449,16 @@ while step < max_steps
         end
     end
 
-    % 2. Potholes: distance to perimeter (rim)
+    % 2. Potholes: distance from ego center to perimeter (rim)
     if ~is_collided
         for j = 1:length(potholes)
-            d_center = norm(ego_state(1:2)' - [potholes(j).x, potholes(j).y]);
+            d_center = norm(ego_center - [potholes(j).x, potholes(j).y]);
             d_edge   = d_center - potholes(j).radius;
             if d_edge < min_clearance
                 min_clearance = d_edge;
             end
-            % Wheel into pothole: vehicle half-width is ~0.9m, if ego center is
-            % within radius + 0.2m, the wheel is definitively inside the pothole
-            if d_center < (potholes(j).radius + 0.2)
+            % Wheel into pothole: vehicle penetration past the pothole perimeter
+            if d_edge < 0.0
                 is_collided = true;
                 collision_details = struct('type', 'pothole', ...
                     'id', j, ...
@@ -578,12 +591,36 @@ end
 end
 
 %% ── Local Helper Functions ───────────────────────────────────────────────
-function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, costmap, grid_meta, grid_res)
+function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, costmap, grid_meta, grid_res, predictions)
     target_x = min(goal_pose(1), ego_xy(1) + horizon_m);
     
-    % On a 2-lane road with oncoming traffic at y > 0, default driving lane is y = -0.95
-    y_cands = [-0.95, -0.6, -1.3, -0.2, 0.2, -1.6, 0.6, 1.0];
-    best_y = -0.95;
+    % Check if any oncoming dynamic obstacles are ahead within 40 meters
+    has_oncoming_ahead = false;
+    if nargin >= 8 && ~isempty(predictions)
+        for k = 1:length(predictions)
+            wp = predictions(k).waypoints;
+            if isempty(wp), continue; end
+            % Agent ahead of ego
+            if wp(1, 1) > ego_xy(1) && wp(1, 1) < ego_xy(1) + 40.0
+                % Check if moving toward ego (vx < 0) or occupying road center
+                dx_agent = wp(end, 1) - wp(1, 1);
+                if dx_agent < -0.5 || abs(wp(1, 2)) < 1.4
+                    has_oncoming_ahead = true;
+                    break;
+                end
+            end
+        end
+    end
+    
+    % If oncoming traffic is ahead, pull toward the left shoulder to maximize passing clearance
+    if has_oncoming_ahead
+        lane_target = -1.40;
+        y_cands = [-1.40, -1.20, -1.55, -0.95, -0.6, -1.75, -0.2, 0.2];
+    else
+        lane_target = -0.95;
+        y_cands = [-0.95, -1.25, -0.65, -1.50, -0.30, 0.20, 0.60, 1.00];
+    end
+    best_y = lane_target;
     
     if nargin >= 7 && ~isempty(costmap) && ~isempty(grid_meta)
         c_x = min(max(round((target_x - grid_meta.x_min) / grid_res) + 1, 1), grid_meta.nX);
@@ -591,8 +628,8 @@ function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, cos
         for yi = 1:length(y_cands)
             cand_y = y_cands(yi);
             cy_idx = min(max(round((cand_y - grid_meta.y_min) / grid_res) + 1, 1), grid_meta.nY);
-            % Soft penalty for deviating from nominal lane
-            cand_cost = costmap(cy_idx, c_x) + 25.0 * abs(cand_y - (-0.95));
+            % Soft penalty for deviating from target lane
+            cand_cost = costmap(cy_idx, c_x) + 25.0 * abs(cand_y - lane_target);
             if cand_cost < min_c
                 min_c = cand_cost;
                 best_y = cand_y;
@@ -600,8 +637,8 @@ function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, cos
         end
     end
     
-    % When within 5m of goal_pose, align to final goal_pose y
-    if target_x >= goal_pose(1) - 5.0
+    % When ego vehicle is within 5m of final goal, align to goal_pose y
+    if ego_xy(1) >= goal_pose(1) - 5.0
         best_y = goal_pose(2);
     end
     

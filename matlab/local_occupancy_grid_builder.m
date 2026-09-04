@@ -68,9 +68,9 @@ end
 if isfield(sensor_detections, 'potholes') && ~isempty(sensor_detections.potholes)
     for k = 1:length(sensor_detections.potholes)
         p = sensor_detections.potholes(k);
-        % Collision threshold is radius + 0.20m. Set lethal radius to radius + 0.28m
-        % with repulsive buffer out to radius + 0.50m to absorb pure pursuit tracking error.
-        inflate_circle_cost(p.x, p.y, p.radius, 0.50, 255, 0.28);
+        % Set lethal radius to radius + 0.52m with repulsive buffer out to radius + 0.75m
+        % to safely absorb pure pursuit tracking corner-cutting.
+        inflate_circle_cost(p.x, p.y, p.radius, 0.75, 255, 0.52);
     end
 end
 

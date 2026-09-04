@@ -118,9 +118,9 @@ MAX_STEER  = pi/6;      % max steering angle: 30 deg  (same as vehicle_kinematic
 STEER_OPTS = [-MAX_STEER, -MAX_STEER*2/3, -MAX_STEER/3, 0, MAX_STEER/3, MAX_STEER*2/3, MAX_STEER];
 HARD_BLOCK = 250;       % costmap value treated as impassable
 COST_WT    = 0.015;     % weight: costmap value -> g-cost contribution
-STEER_WT   = 0.15;      % weight: steer angle penalty (prefer straight driving)
-SC_WT      = 0.10;      % weight: steer-change penalty (prefer smooth turns)
-MAX_ITER   = 6000;      % fast queue allows deeper search without timeout
+STEER_WT   = 0.08;      % weight: steer angle penalty (prefer smooth corridor tracking)
+SC_WT      = 0.08;      % weight: steer-change penalty (prefer smooth turns)
+MAX_ITER   = 6000;      % fast queue: 10-25ms per search, avoids search stalls
 
 % World bounds — now taken from grid_origin (rolling window)
 x_max = x_min + (cmap_cols - 1) * grid_res;
@@ -161,7 +161,7 @@ wyaw_mat(s_row, s_col, s_yaw) = start_pose(3);
 
 g_col = w2col(goal_pose(1));
 g_row = w2row(goal_pose(2));
-h0 = hypot(goal_pose(1) - start_pose(1), goal_pose(2) - start_pose(2));
+h0 = hypot(goal_pose(1) - start_pose(1), goal_pose(2) - start_pose(2)) + 1.2 * abs(start_pose(2) - goal_pose(2));
 
 % Priority queue: [f_cost, row, col, yaw_idx]  (unsorted; pop via min scan)
 pq = [h0, s_row, s_col, s_yaw];
@@ -213,8 +213,8 @@ while ~isempty(pq) && iter < MAX_ITER
             ny   = ny   + ARC_STEP * sin(nyaw);
             nyaw = nyaw + ARC_STEP * tan(steer) / WB;  % bicycle model yaw rate
 
-            % Bounds check and physical road pavement boundary (5m corridor: -2.35m to +2.35m)
-            if nx < x_min || nx > x_max || ny < y_min || ny > y_max || abs(ny) > 2.35
+            % Bounds check within grid
+            if nx < x_min || nx > x_max || ny < y_min || ny > y_max
                 arc_ok = false; break;
             end
             % Hard obstacle check at each integration point
@@ -263,7 +263,7 @@ while ~isempty(pq) && iter < MAX_ITER
         end
 
         % closed_mat and g_mat already prevent expansion of suboptimal or closed nodes
-        h_new = hypot(nx - goal_pose(1), ny - goal_pose(2));
+        h_new = hypot(nx - goal_pose(1), ny - goal_pose(2)) + 1.2 * abs(ny - goal_pose(2));
         pq(end+1, :) = [g_new + h_new, nb_row, nb_col, nb_yaw]; %#ok<AGROW>
         total_insertions = total_insertions + 1;
     end
@@ -380,41 +380,19 @@ end
 %    Original deformable-control-point + pchip logic preserved;
 %    now receives the A*-searched path instead of a straight line.
 % ============================================================
-% Resample raw_wp to num_ctrl evenly-spaced control points
-num_ctrl  = max(6, size(raw_wp, 1));
-t_ctrl    = linspace(0, 1, num_ctrl)';
-t_raw     = linspace(0, 1, size(raw_wp, 1))';
-
-if size(raw_wp, 1) >= 2
-    ctrl_x = interp1(t_raw, raw_wp(:,1), t_ctrl, 'linear', 'extrap');
-    ctrl_y = interp1(t_raw, raw_wp(:,2), t_ctrl, 'linear', 'extrap');
-else
-    ctrl_x = linspace(start_pose(1), goal_pose(1), num_ctrl)';
-    ctrl_y = linspace(start_pose(2), goal_pose(2), num_ctrl)';
-end
-raw_ctrl = [ctrl_x, ctrl_y];
-
-% Push interior control points along potential field gradient (UNCHANGED logic;
-% FIX: use grid_origin-relative cell index instead of hardcoded y+10 offset)
-for k = 2:(num_ctrl-1)
-    pt = raw_ctrl(k, :);
-    gx = round((pt(1) - x_min)/grid_res) + 1;
-    gy = round((pt(2) - y_min)/grid_res) + 1;
-
-    if gx >= 3 && gx <= cmap_cols-2 && gy >= 3 && gy <= cmap_rows-2
-        grad_x = costmap(gy, gx+2) - costmap(gy, gx-2);
-        grad_y = costmap(gy+2, gx) - costmap(gy-2, gx);
-        raw_ctrl(k, 1) = raw_ctrl(k, 1) - 0.12 * grad_x * grid_res;
-        raw_ctrl(k, 2) = raw_ctrl(k, 2) - 0.12 * grad_y * grid_res;
-    end
-end
-
-% Cubic Catmull-Rom / pchip spline interpolation (UNCHANGED)
 num_samples = 80;
-t_samples   = linspace(0, 1, num_samples)';
-path        = zeros(num_samples, 2);
-path(:, 1)  = interp1(t_ctrl, raw_ctrl(:,1), t_samples, 'pchip');
-path(:, 2)  = interp1(t_ctrl, raw_ctrl(:,2), t_samples, 'pchip');
+if size(raw_wp, 1) >= 2
+    t_raw     = linspace(0, 1, size(raw_wp, 1))';
+    t_samples = linspace(0, 1, num_samples)';
+    path      = zeros(num_samples, 2);
+    path(:, 1) = interp1(t_raw, raw_wp(:,1), t_samples, 'pchip');
+    path(:, 2) = interp1(t_raw, raw_wp(:,2), t_samples, 'pchip');
+    % Clamp to road corridor boundaries to strictly prevent any spline overshoot
+    path(:, 2) = max(-2.2, min(2.2, path(:, 2)));
+else
+    path = [linspace(start_pose(1), goal_pose(1), num_samples)', ...
+            linspace(start_pose(2), goal_pose(2), num_samples)'];
+end
 
 latency_ms = toc * 1000;
 plan_ok    = found;
