@@ -436,7 +436,7 @@ while step < max_steps
         % (v_ref=0) or in controlled safe-stop (v < 1.5 m/s), allow passing clearance >= 0.55m without false collision.
         eff_thresh = collision_thresh;
         if (ego_state(4) < 1.5) && (safe_stop_active || strcmp(bsm_state, 'YIELD_WAIT') || strcmp(bsm_state, 'YIELD_DECEL'))
-            eff_thresh = min(collision_thresh, 0.55);
+            eff_thresh = min(collision_thresh, 0.50);
         end
         if d_agent < eff_thresh
             is_collided = true;

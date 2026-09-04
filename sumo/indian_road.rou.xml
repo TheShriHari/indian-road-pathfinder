@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <!-- Vehicle types representing Indian road traffic participants -->
+    <vType id="ego_car" length="4.6" width="2.0" maxSpeed="15.0" color="0,180,255" vClass="passenger" accel="3.0" decel="5.0"/>
+    <vType id="auto_rickshaw" length="3.0" width="1.4" maxSpeed="8.0" color="255,210,0" vClass="passenger" accel="1.5" decel="3.5"/>
+    <vType id="obstacle_static" length="4.5" width="2.0" maxSpeed="0.0001" color="200,60,60" vClass="passenger"/>
+    <vType id="pedestrian_marker" length="0.6" width="0.6" maxSpeed="2.0" color="255,80,0" vClass="pedestrian"/>
+
+    <!-- Corridor routes -->
+    <route id="route_east" edges="road_east"/>
+    <route id="route_west" edges="road_west"/>
+
+    <!-- Predefined vehicle placements (can also be dynamically controlled via TraCI) -->
+    <!-- 1. Ego Vehicle starting at x=2.0m on eastbound lane -->
+    <vehicle id="ego" type="ego_car" route="route_east" depart="0.0" departPos="2.0" departSpeed="0.0"/>
+
+    <!-- 2. Left roadblock / parked car at x=20.0m on eastbound lane -->
+    <vehicle id="roadblock_left" type="obstacle_static" route="route_east" depart="0.0" departPos="20.0" departSpeed="0.0"/>
+
+    <!-- 3. Oncoming auto-rickshaw traveling westbound from x=55.0m (departPos on reverse edge) -->
+    <vehicle id="oncoming_rickshaw" type="auto_rickshaw" route="route_west" depart="0.0" departPos="45.0" departSpeed="3.5"/>
+</routes>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<viewsettings>
+    <scheme name="Indian Road Simulation">
+        <viewport zoom="600" x="40" y="0"/>
+        <delay value="50"/>
+        <vehicles vehicleName_show="true" vehicleValue_show="false" vehicleScale="1.2"/>
+        <pois poiName_show="true"/>
+        <polygons polyName_show="true"/>
+    </scheme>
+</viewsettings>

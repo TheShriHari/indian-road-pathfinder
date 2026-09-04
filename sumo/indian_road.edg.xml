@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edges xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/edges_file.xsd">
+    <!-- Two-way undivided rural Indian road corridor: 7.0m total width (3.5m per lane) -->
+    <edge id="road_east" from="start" to="end" numLanes="1" speed="15.0" width="3.5"/>
+    <edge id="road_west" from="end" to="start" numLanes="1" speed="15.0" width="3.5"/>
+</edges>

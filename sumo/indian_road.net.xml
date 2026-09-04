@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<net version="1.20" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
+    <location netOffset="0.00,0.00" convBoundary="0.00,-3.50,100.00,3.50" origBoundary="0.00,-3.50,100.00,3.50" projParameter="!"/>
+    <edge id="road_east" from="start" to="end" priority="1">
+        <lane id="road_east_0" index="0" speed="15.00" length="100.00" width="3.50" shape="0.00,-1.75 100.00,-1.75"/>
+    </edge>
+    <edge id="road_west" from="end" to="start" priority="1">
+        <lane id="road_west_0" index="0" speed="15.00" length="100.00" width="3.50" shape="100.00,1.75 0.00,1.75"/>
+    </edge>
+    <junction id="start" type="priority" x="0.00" y="0.00" incLanes="road_west_0" intLanes="" shape="0.00,3.50 0.00,-3.50"/>
+    <junction id="end" type="priority" x="100.00" y="0.00" incLanes="road_east_0" intLanes="" shape="100.00,-3.50 100.00,3.50"/>
+</net>
