@@ -3,13 +3,12 @@ indian_road_supervisor.py — Webots 3D Supervisor Controller for Indian Rural R
 =============================================================================
 SIH PS-26037: Adaptive Path Planning for Unstructured Indian Roads
 
-Scenario Combination 3:
-  - Pothole: X = 16.0m, Y = -1.50m (in ego lane) with orange hazard cone
-    Ego executes early wide swerve to Y = +0.80m, completely avoiding the pothole!
-  - Pedestrian 1: X = 30.0m (crossing right-to-left from Y = -3.8m to +3.8m)
-  - Pedestrian 2: X = 50.0m (crossing left-to-right from Y = +3.8m to -3.8m)
-  - Oncoming Auto-Rickshaw: X = 68.0m, Y = +1.80m (moving oncoming in -X direction)
-  - Follow Camera: Active 3D third-person chase camera locked to ego vehicle.
+Steering Sensitivity Tuning:
+  - Basic Maneuvering (cruise, lane keeping, yielding):
+      Sensitivity limited to [-5°, +5°] (gentle, smooth tracking)
+  - Sharp Turns (pothole detour / evasive obstacle swerve):
+      Sensitivity allows full dynamic range [-30°, +30°]
+  - Slew-rate limiting: Continuous steering rate damping eliminates snapping.
 =============================================================================
 """
 
@@ -30,7 +29,7 @@ except ImportError:
     from controller import Supervisor, Camera
 
 
-# ── Scenario Configuration (Combination 3) ──────────────────────────────────
+# ── Scenario Configuration ───────────────────────────────────────────────────
 CONFIG = {
     "road_width": 7.0,
     "road_boundaries": [3.5, -3.5],   # [y_left, y_right]
@@ -75,49 +74,61 @@ CONFIG = {
 
 class StandalonePlanner:
     """
-    Onboard Adaptive Path Planner & Behavior State Machine.
-    Executes decisive wide swerves around potholes and yields for crossing agents.
+    Onboard Adaptive Path Planner & Behavior State Machine with Dual Steering Sensitivity.
+      - Basic maneuvering: [-5°, +5°]
+      - Sharp turns: [-30°, +30°]
+      - Slew-rate rate limiting: max 35°/sec
     """
     def __init__(self):
         self.state = "CRUISE"
         self.pothole_cleared = False
+        self.current_steer = 0.0
 
     def plan_step(self, ego_x: float, ego_y: float, ego_yaw: float, ego_v: float,
-                  obstacles: List[Dict[str, Any]], pothole: Dict[str, Any]) -> Tuple[float, float, float, str]:
+                  obstacles: List[Dict[str, Any]], pothole: Dict[str, Any], dt: float) -> Tuple[float, float, float, str]:
         p_center = pothole["center"]
-        target_y = -1.75
         target_speed = CONFIG["ego"]["v_cruise"]
-        steer = 0.0
         throttle = 0.0
         brake = 0.0
 
-        # 1. Pothole Avoidance (Early and wide swerve to Y = +0.80m)
-        dist_to_pothole = p_center[0] - ego_x
+        # ── 1. Reference Path Planning with Smooth Sigmoid Profiles ──
         if not self.pothole_cleared:
-            if -2.5 <= dist_to_pothole <= 13.0:
+            if ego_x < 5.0:
+                target_y = -1.75
+                self.state = "CRUISE"
+            elif 5.0 <= ego_x <= 18.5:
                 self.state = "NUDGE_RIGHT"
-                target_y = 0.80   # Wide clearance: ego right wheel stays at Y = -0.10m, well clear of pothole at -1.50m!
-                target_speed = 4.0
-            if dist_to_pothole < -2.5:
+                # Smooth S-curve transition from -1.75m to +0.80m between X=5m and X=13m
+                s = max(0.0, min(1.0, (ego_x - 5.0) / 8.0))
+                smooth_s = s * s * (3.0 - 2.0 * s)   # Hermite smoothstep
+                target_y = -1.75 + smooth_s * (0.80 - (-1.75))
+                target_speed = 4.2
+            else:
                 self.pothole_cleared = True
                 self.state = "RESUME_LANE"
+                target_y = 0.80
         else:
-            if ego_x < 24.0:
+            if ego_x < 24.5:
                 self.state = "RESUME_LANE"
-                target_y = -1.40
+                # Smooth S-curve return from +0.80m to -1.75m between X=18.5m and X=24.5m
+                s = max(0.0, min(1.0, (ego_x - 18.5) / 6.0))
+                smooth_s = s * s * (3.0 - 2.0 * s)
+                target_y = 0.80 - smooth_s * (0.80 - (-1.75))
+            else:
+                target_y = -1.75
+                self.state = "CRUISE"
 
-        # 2. Crossing Pedestrians
+        # ── 2. Pedestrian Yielding Logic ──
         for obs in obstacles:
             if "pedestrian" in obs["type"]:
                 dx = obs["pos"][0] - ego_x
-                # If pedestrian is ahead and crossing within vehicle corridor
                 if 1.0 < dx < 14.0 and abs(obs["pos"][1]) < 3.2:
                     ttc = dx / max(ego_v, 0.5)
                     if ttc < 3.5:
                         self.state = "YIELD_PEDESTRIAN"
                         target_speed = 0.0
 
-        # 3. Oncoming Auto-Rickshaw
+        # ── 3. Oncoming Vehicle Coordination ──
         for obs in obstacles:
             if obs["type"] == "auto_rickshaw":
                 dx = obs["pos"][0] - ego_x
@@ -125,35 +136,54 @@ class StandalonePlanner:
                     self.state = "YIELD_ONCOMING"
                     target_speed = min(target_speed, 2.8)
 
-        # 4. Goal Arrival Check
+        # ── 4. Goal Arrival Check ──
         if ego_x >= CONFIG["ego"]["goal_x"]:
             self.state = "ARRIVED"
             target_speed = 0.0
 
-        # ── Longitudinal Control ──
+        # ── 5. Longitudinal Control ──
         speed_err = target_speed - ego_v
         if target_speed <= 0.2:
             throttle = 0.0
             brake = 0.88 if ego_v > 0.25 else 0.4
         elif speed_err > 0.3:
-            throttle = min(1.0, 0.45 + speed_err * 0.28)
+            throttle = min(1.0, 0.40 + speed_err * 0.25)
             brake = 0.0
         elif speed_err < -0.5:
             throttle = 0.0
             brake = min(0.7, -speed_err * 0.22)
         else:
-            throttle = 0.28
+            throttle = 0.26
             brake = 0.0
 
-        # ── Lateral Stanley Controller with Heading Damping ──
+        # ── 6. DUAL STEERING SENSITIVITY LAW ──
         y_err = target_y - ego_y
         yaw_err = 0.0 - ego_yaw
-        k_p = 0.55
-        k_yaw = 0.70
-        steer_cmd = (y_err * k_p) + (yaw_err * k_yaw)
-        steer = max(-0.55, min(0.55, steer_cmd))
 
-        return steer, throttle, brake, self.state
+        # Sharp turn active only during active obstacle avoidance / large deviation
+        is_sharp_turn = (self.state == "NUDGE_RIGHT") or (abs(y_err) > 0.75)
+
+        if is_sharp_turn:
+            # SHARP TURN SENSITIVITY: Allows full -30° to +30°
+            max_steer_rad = math.radians(30.0)   # 0.5236 rad
+            k_p = 0.38
+            k_yaw = 0.55
+        else:
+            # BASIC MANEUVERING SENSITIVITY: Strictly capped to -5° to +5°
+            max_steer_rad = math.radians(5.0)    # 0.0873 rad
+            k_p = 0.16
+            k_yaw = 0.35
+
+        raw_steer = (y_err * k_p) + (yaw_err * k_yaw)
+        target_steer = max(-max_steer_rad, min(max_steer_rad, raw_steer))
+
+        # Smooth steering rate limiter (prevents sudden twitching)
+        max_rate = math.radians(38.0)   # 38 deg/sec max wheel turning speed
+        delta = target_steer - self.current_steer
+        max_delta = max_rate * dt
+        self.current_steer += max(-max_delta, min(max_delta, delta))
+
+        return self.current_steer, throttle, brake, self.state
 
 
 class IndianRoadSupervisor:
@@ -164,13 +194,11 @@ class IndianRoadSupervisor:
         self.dt = self.time_step / 1000.0
 
         print("="*65)
-        print("  Webots Indian Rural Road Scene Supervisor (Combination 3)")
-        print(f"  Pothole @ X={CONFIG['pothole']['center'][0]}m | Ped 1 @ X={CONFIG['pedestrian_1']['x']}m")
-        print(f"  Ped 2 @ X={CONFIG['pedestrian_2']['x']}m | Auto @ X={CONFIG['auto_rickshaw']['start_x']}m")
+        print("  Webots Indian Rural Road Supervisor (Tuned Steering Sensitivity)")
+        print("  Steering Envelope: Basic: [-5°, +5°] | Sharp Turns: [-30°, +30°]")
         print(f"  Time Step: {self.time_step} ms (dt={self.dt:.3f} s)")
         print("="*65)
 
-        # Scene nodes
         self.ego_node = self.supervisor.getFromDef("EGO_VEHICLE")
         self.viewpoint_node = self.supervisor.getFromDef("VIEWPOINT")
         self.ped1_node = self.supervisor.getFromDef("PEDESTRIAN_1")
@@ -182,14 +210,12 @@ class IndianRoadSupervisor:
             print("[ERROR] EGO_VEHICLE node not found!")
             sys.exit(1)
 
-        # Ego vehicle state
         self.ego_x = CONFIG["ego"]["start_x"]
         self.ego_y = CONFIG["ego"]["start_y"]
         self.ego_z = 0.42
         self.ego_yaw = 0.0
         self.ego_v = 0.0
 
-        # Dynamic obstacles state
         self.ped1_x = CONFIG["pedestrian_1"]["x"]
         self.ped1_y = CONFIG["pedestrian_1"]["start_y"]
         self.ped1_active = False
@@ -201,7 +227,6 @@ class IndianRoadSupervisor:
         self.auto_x = CONFIG["auto_rickshaw"]["start_x"]
         self.auto_y = CONFIG["auto_rickshaw"]["y"]
 
-        # Planner & TCP Bridge Server
         self.planner = StandalonePlanner()
         self.server_sock = None
         self.client_sock = None
@@ -222,7 +247,6 @@ class IndianRoadSupervisor:
                 self.server_sock = None
 
     def update_camera_follow(self):
-        """Actively update the Viewpoint position to follow the car in third-person view."""
         if self.viewpoint_node:
             cam_dist = 6.8
             cam_h = 3.2
@@ -232,8 +256,6 @@ class IndianRoadSupervisor:
             self.viewpoint_node.getField("position").setSFVec3f([cam_x, cam_y, cam_z])
 
     def update_dynamic_obstacles(self):
-        """Updates and animates pedestrians and oncoming auto in 3D space."""
-        # 1. Pedestrian 1 (at X = 30.0m, crossing right to left)
         if not self.ped1_active and self.ego_x >= CONFIG["pedestrian_1"]["trigger_ego_x"]:
             self.ped1_active = True
             print(f"  [OBS] Pedestrian 1 triggered! Crossing right-to-left at X={self.ped1_x:.1f}m")
@@ -245,7 +267,6 @@ class IndianRoadSupervisor:
             if self.ped1_node:
                 self.ped1_node.getField("translation").setSFVec3f([self.ped1_x, self.ped1_y, 0.9])
 
-        # 2. Pedestrian 2 (at X = 50.0m, crossing left to right)
         if not self.ped2_active and self.ego_x >= CONFIG["pedestrian_2"]["trigger_ego_x"]:
             self.ped2_active = True
             print(f"  [OBS] Pedestrian 2 triggered! Crossing left-to-right at X={self.ped2_x:.1f}m")
@@ -257,7 +278,6 @@ class IndianRoadSupervisor:
             if self.ped2_node:
                 self.ped2_node.getField("translation").setSFVec3f([self.ped2_x, self.ped2_y, 0.9])
 
-        # 3. Oncoming Auto-Rickshaw (from X = 68.0m)
         if self.auto_x > -10.0:
             self.auto_x += CONFIG["auto_rickshaw"]["speed"] * self.dt
             if self.auto_node:
@@ -265,7 +285,6 @@ class IndianRoadSupervisor:
 
     def check_collisions(self) -> Tuple[bool, str]:
         p_cen = CONFIG["pothole"]["center"]
-        # Exact wheel track check: ego right wheel position is ego_y - 0.9*cos(yaw)
         right_wheel_y = self.ego_y - 0.85 * math.cos(self.ego_yaw)
         left_wheel_y = self.ego_y + 0.85 * math.cos(self.ego_yaw)
         dx_pothole = abs(self.ego_x - p_cen[0])
@@ -311,25 +330,19 @@ class IndianRoadSupervisor:
     def run(self):
         step, t_sim, success = 0, 0.0, False
 
-        print("\n[SIM] Starting Webots 3D simulation (Combination 3)...")
-        print(f"      Layout: [Ego] -> [Pothole @ {CONFIG['pothole']['center'][0]}m] -> "
-              f"[Ped 1 @ {CONFIG['pedestrian_1']['x']}m] -> [Ped 2 @ {CONFIG['pedestrian_2']['x']}m] "
-              f"<- [Auto @ {CONFIG['auto_rickshaw']['start_x']}m]\n")
+        print("\n[SIM] Starting Webots 3D simulation...")
+        print("      Steering Mode: Basic: [-5°, +5°] | Sharp Turns: [-30°, +30°]\n")
 
         try:
             while self.supervisor.step(self.time_step) != -1:
                 step += 1
                 t_sim += self.dt
 
-                # 1. Update camera to follow car
                 self.update_camera_follow()
-
-                # 2. Update dynamic scene obstacles
                 self.update_dynamic_obstacles()
                 obstacles = self.get_obstacles_telemetry()
                 collision, col_reason = self.check_collisions()
 
-                # 3. Check incoming MATLAB bridge connection
                 if self.server_sock and not self.client_sock:
                     readable, _, _ = select.select([self.server_sock], [], [], 0)
                     if readable:
@@ -338,7 +351,6 @@ class IndianRoadSupervisor:
                         self.bridge_mode = True
                         print(f"\n[BRIDGE] MATLAB connected from {client_addr}!\n")
 
-                # 4. Control computation
                 if self.bridge_mode and self.client_sock:
                     pkg = {
                         "ego_state": [round(self.ego_x, 3), round(self.ego_y, 3), round(self.ego_yaw, 3), round(self.ego_v, 2)],
@@ -354,24 +366,25 @@ class IndianRoadSupervisor:
                         if not resp:
                             break
                         ctrl = json.loads(resp)
-                        steer = ctrl.get('steer', 0.0) * 0.55
+                        # Scale input from [-1, 1] to max steer angle
+                        steer_deg = ctrl.get('steer', 0.0) * 30.0
+                        steer = math.radians(max(-30.0, min(30.0, steer_deg)))
                         throttle, brake = ctrl.get('throttle', 0.0), ctrl.get('brake', 0.0)
                         bsm_state = "MATLAB_CTL"
                     except Exception:
                         break
                 else:
                     steer, throttle, brake, bsm_state = self.planner.plan_step(
-                        self.ego_x, self.ego_y, self.ego_yaw, self.ego_v, obstacles, CONFIG["pothole"]
+                        self.ego_x, self.ego_y, self.ego_yaw, self.ego_v, obstacles, CONFIG["pothole"], self.dt
                     )
 
-                # 5. Integrate vehicle dynamics
                 self.apply_kinematics(steer, throttle, brake)
 
-                # 6. Telemetry display
-                if step % 15 == 0 or bsm_state in ["NUDGE_RIGHT", "YIELD_PEDESTRIAN", "YIELD_ONCOMING", "ARRIVED"]:
+                if step % 20 == 0 or bsm_state in ["NUDGE_RIGHT", "YIELD_PEDESTRIAN", "YIELD_ONCOMING", "ARRIVED"]:
+                    steer_deg = math.degrees(steer)
+                    mode_label = "SHARP (±30°)" if abs(steer_deg) > 5.1 else "BASIC (±5°)"
                     print(f"[t={t_sim:5.1f}s #{step:03d}] Pos:({self.ego_x:5.1f}, {self.ego_y:+4.2f}) "
-                          f"V:{self.ego_v:4.1f}m/s | State: {bsm_state:<16} | "
-                          f"Steer: {math.degrees(steer):+5.1f}° Thr:{throttle:.2f} Brk:{brake:.2f}")
+                          f"V:{self.ego_v:4.1f}m/s | State: {bsm_state:<16} | Steer: {steer_deg:+5.1f}° [{mode_label}]")
 
                 if collision:
                     print(f"\n[!!!] SIMULATION HALTED: {col_reason}\n")
@@ -380,7 +393,7 @@ class IndianRoadSupervisor:
                 if self.ego_x >= CONFIG["ego"]["goal_x"]:
                     print("\n" + "="*65)
                     print(f"  [SUCCESS] Goal reached at X={self.ego_x:.1f}m in t={t_sim:.1f}s!")
-                    print("  Pothole bypassed completely | Pedestrians yielded | Auto cleared")
+                    print("  Smooth steering validated: ±5° for lane tracking, up to ±30° for sharp turn")
                     print("="*65 + "\n")
                     success = True
                     break

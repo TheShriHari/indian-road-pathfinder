@@ -179,8 +179,18 @@ while step < MAX_STEPS
     cur_pose_4d = [ego_state(1); ego_state(2); ego_state(3); ego_state(4)];
     [delta_cmd, a_cmd] = pure_pursuit_controller(cur_pose_4d, path, v_ref, L_WB);
 
-    steer_norm = delta_cmd / MAX_STEER_RAD;
-    steer_norm = max(-1.0, min(1.0, steer_norm));
+    % Dual steering sensitivity:
+    % - Basic maneuvering (cruise, lane-following, yielding): limit to [-5°, +5°]
+    % - Sharp turns (active nudge / swerve / evasive): allow full [-30°, +30°]
+    is_sharp_turn = strcmp(bsm_state, 'NUDGE') || strcmp(bsm_state, 'EVASIVE') || ...
+                    (size(path, 1) >= 2 && abs(path(1,2) - ego_state(2)) > 0.8);
+    if is_sharp_turn
+        steer_limit_rad = deg2rad(30.0);
+    else
+        steer_limit_rad = deg2rad(5.0);
+    end
+    delta_clamped = max(-steer_limit_rad, min(steer_limit_rad, delta_cmd));
+    steer_norm    = delta_clamped / deg2rad(30.0);   % Normalized [-1, 1] relative to 30 deg
 
     if a_cmd >= 0
         throttle = min(1.0, a_cmd / 3.0);
@@ -196,9 +206,9 @@ while step < MAX_STEPS
     send_control(tcp, ctrl);
 
     if mod(step, 25) == 0
-        fprintf('[t=%5.2fs] X=%5.1f Y=%+4.2f V=%4.1f | BSM=%-14s | steer=%+5.1f deg thr=%.2f brk=%.2f\n', ...
-            t, ego_state(1), ego_state(2), ego_state(4), bsm_state, ...
-            rad2deg(delta_cmd), throttle, brake);
+        steer_deg = rad2deg(delta_clamped);
+        fprintf('[t=%5.2fs] X=%5.1f Y=%+4.2f V=%4.1f | BSM=%-14s | steer=%+5.1f deg (limit: ±%.0f°)\n', ...
+            t, ego_state(1), ego_state(2), ego_state(4), bsm_state, steer_deg, rad2deg(steer_limit_rad));
     end
 end
 
