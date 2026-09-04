@@ -12,11 +12,8 @@ WorldInfo {
 }
 
 DEF VIEWPOINT Viewpoint {
-  orientation 0.08 0.35 -0.93 1.25
-  position -7.0 -1.75 3.8
-  follow "ego_vehicle"
-  followType "Mounted Shot"
-  followSmoothness 0.1
+  orientation 0.2991 -0.2991 -0.9062 1.6692
+  position -3.0 0.0 12.5
 }
 
 Background {

@@ -18,11 +18,12 @@ import argparse
 import time
 
 def find_webots_executable():
-    """Locates webots.exe on the system."""
+    """Locates webotsw.exe or webots.exe on the system."""
     # 1. Check environment variable
     webots_home = os.environ.get("WEBOTS_HOME")
     if webots_home:
         candidates = [
+            os.path.join(webots_home, "msys64", "mingw64", "bin", "webotsw.exe"),
             os.path.join(webots_home, "msys64", "mingw64", "bin", "webots.exe"),
             os.path.join(webots_home, "bin", "webots.exe"),
             os.path.join(webots_home, "webots.exe"),
@@ -38,9 +39,10 @@ def find_webots_executable():
         r"D:\Program Files\Webots",
     ]
     for sp in std_paths:
-        c = os.path.join(sp, "msys64", "mingw64", "bin", "webots.exe")
-        if os.path.isfile(c):
-            return c, sp
+        for b in ["webotsw.exe", "webots.exe"]:
+            c = os.path.join(sp, "msys64", "mingw64", "bin", b)
+            if os.path.isfile(c):
+                return c, sp
 
     return None, None
 
@@ -49,7 +51,7 @@ def main():
     parser.add_argument("--world", type=str, default=None, help="Path to .wbt world file")
     parser.add_argument("--mode", type=str, default="realtime", choices=["pause", "realtime", "fast"],
                         help="Startup simulation mode (default: realtime)")
-    parser.add_argument("--batch", action="store_true", default=True, help="Prevent blocking dialog popups")
+    parser.add_argument("--batch", action="store_true", default=False, help="Prevent blocking dialog popups (headless batch mode)")
     parser.add_argument("--no-rendering", action="store_true", help="Disable 3D rendering for headless speed")
     parser.add_argument("--bridge", action="store_true", help="Signal supervisor to accept MATLAB TCP connection")
     parser.add_argument("--port", type=int, default=20000, help="MATLAB TCP bridge port")

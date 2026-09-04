@@ -248,13 +248,17 @@ class IndianRoadSupervisor:
                 self.server_sock = None
 
     def update_camera_follow(self):
+        """
+        Bird's Eye View: elevated high above the road surface, moving steadily along
+        the centerline of the road (Y=0.0) following road progression, NOT the car's
+        lateral swerves or yaw rotations.
+        """
         if self.viewpoint_node:
-            cam_dist = 6.8
-            cam_h = 3.2
-            cam_x = self.ego_x - cam_dist * math.cos(self.ego_yaw)
-            cam_y = self.ego_y - cam_dist * math.sin(self.ego_yaw)
-            cam_z = self.ego_z + cam_h
+            cam_x = self.ego_x - 3.0   # Slightly behind the action along road X-axis
+            cam_y = 0.0               # Strictly centered on the road (not following car laterally)
+            cam_z = 12.5              # Bird's eye elevation overlooking both lanes and obstacles
             self.viewpoint_node.getField("position").setSFVec3f([cam_x, cam_y, cam_z])
+            self.viewpoint_node.getField("orientation").setSFRotation([0.2991, -0.2991, -0.9062, 1.6692])
 
     def update_dynamic_obstacles(self):
         if not self.ped1_active and self.ego_x >= CONFIG["pedestrian_1"]["trigger_ego_x"]:
