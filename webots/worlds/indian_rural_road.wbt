@@ -4,7 +4,7 @@ WorldInfo {
   info [
     "Indian Rural Road Simulation - SIH PS-26037"
     "Adaptive Path Planning for Unstructured Indian Roads"
-    "Features: Pothole hazard, 2 crossing pedestrians, oncoming auto-rickshaw"
+    "Combination 3: Pothole @ 16m, Pedestrian 1 @ 30m, Pedestrian 2 @ 50m, Auto @ 68m"
   ]
   title "Indian Rural Road"
   basicTimeStep 20
@@ -171,15 +171,11 @@ DEF TREE_1 Solid {
   children [
     Transform {
       translation 0 0 1.2
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } } ]
     }
     Transform {
       translation 0 0 3.0
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.18 0.45 0.15 roughness 0.8 } geometry Sphere { radius 1.6 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.18 0.45 0.15 roughness 0.8 } geometry Sphere { radius 1.6 } } ]
     }
   ]
   name "tree_1"
@@ -190,15 +186,11 @@ DEF TREE_2 Solid {
   children [
     Transform {
       translation 0 0 1.3
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.6 radius 0.28 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.6 radius 0.28 } } ]
     }
     Transform {
       translation 0 0 3.2
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.20 0.50 0.18 roughness 0.8 } geometry Sphere { radius 1.8 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.20 0.50 0.18 roughness 0.8 } geometry Sphere { radius 1.8 } } ]
     }
   ]
   name "tree_2"
@@ -209,34 +201,26 @@ DEF TREE_3 Solid {
   children [
     Transform {
       translation 0 0 1.2
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } } ]
     }
     Transform {
       translation 0 0 3.0
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.16 0.42 0.14 roughness 0.8 } geometry Sphere { radius 1.5 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.16 0.42 0.14 roughness 0.8 } geometry Sphere { radius 1.5 } } ]
     }
   ]
   name "tree_3"
 }
 
 DEF TREE_4 Solid {
-  translation 15 -6.5 0
+  translation 12 -6.5 0
   children [
     Transform {
       translation 0 0 1.2
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.25 } } ]
     }
     Transform {
       translation 0 0 3.0
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.18 0.46 0.16 roughness 0.8 } geometry Sphere { radius 1.7 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.18 0.46 0.16 roughness 0.8 } geometry Sphere { radius 1.7 } } ]
     }
   ]
   name "tree_4"
@@ -247,34 +231,26 @@ DEF TREE_5 Solid {
   children [
     Transform {
       translation 0 0 1.3
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.6 radius 0.26 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.6 radius 0.26 } } ]
     }
     Transform {
       translation 0 0 3.2
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.19 0.48 0.15 roughness 0.8 } geometry Sphere { radius 1.8 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.19 0.48 0.15 roughness 0.8 } geometry Sphere { radius 1.8 } } ]
     }
   ]
   name "tree_5"
 }
 
 DEF TREE_6 Solid {
-  translation 70 -6.4 0
+  translation 68 -6.4 0
   children [
     Transform {
       translation 0 0 1.2
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.24 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.4 0.25 0.12 roughness 0.9 } geometry Cylinder { height 2.4 radius 0.24 } } ]
     }
     Transform {
       translation 0 0 3.0
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.17 0.44 0.15 roughness 0.8 } geometry Sphere { radius 1.6 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.17 0.44 0.15 roughness 0.8 } geometry Sphere { radius 1.6 } } ]
     }
   ]
   name "tree_6"
@@ -282,51 +258,69 @@ DEF TREE_6 Solid {
 
 # ── Milestone / Highway Sign ─────────────────────────────────────────────────
 DEF MILESTONE Solid {
-  translation 10 -4.2 0.4
+  translation 8 -4.2 0.4
   children [
     Transform {
       translation 0 0 0
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.9 0.9 0.9 roughness 0.4 } geometry Cylinder { height 0.8 radius 0.22 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.9 0.9 0.9 roughness 0.4 } geometry Cylinder { height 0.8 radius 0.22 } } ]
     }
     Transform {
       translation 0 0 0.42
-      children [
-        Shape { appearance PBRAppearance { baseColor 0.95 0.75 0.05 roughness 0.4 } geometry Sphere { radius 0.22 } }
-      ]
+      children [ Shape { appearance PBRAppearance { baseColor 0.95 0.75 0.05 roughness 0.4 } geometry Sphere { radius 0.22 } } ]
     }
   ]
   name "milestone"
 }
 
-# ── NEW POTHOLE LOCATION (X = 22.0m, Y = -1.35m in ego lane) ─────────────────
+# ── COMBINATION 3: POTHOLE HAZARD (X = 16.0m, Y = -1.50m) ───────────────────
 DEF POTHOLE Solid {
-  translation 22.0 -1.35 0.018
+  translation 16.0 -1.50 0.018
   children [
+    # Prominent outer crack rim
     Transform {
       children [
         Shape {
-          appearance PBRAppearance { baseColor 0.12 0.12 0.13 roughness 0.9 }
-          geometry Cylinder { height 0.005 radius 0.75 }
+          appearance PBRAppearance {
+            baseColor 0.10 0.10 0.11
+            roughness 0.9
+          }
+          geometry Cylinder {
+            height 0.005
+            radius 0.85
+          }
         }
       ]
     }
+    # Deep recessed crater
     Transform {
       translation 0 0 0.003
       children [
         Shape {
-          appearance PBRAppearance { baseColor 0.06 0.05 0.04 roughness 0.2 metalness 0.4 }
-          geometry Cylinder { height 0.006 radius 0.55 }
+          appearance PBRAppearance {
+            baseColor 0.04 0.03 0.02
+            roughness 0.15
+            metalness 0.5
+          }
+          geometry Cylinder {
+            height 0.006
+            radius 0.65
+          }
         }
       ]
     }
+    # Yellow hazard warning cone on the shoulder near the pothole
     Transform {
-      translation 0.15 -0.1 0.004
+      translation 0 -1.4 0.25
       children [
         Shape {
-          appearance PBRAppearance { baseColor 0.04 0.04 0.04 roughness 0.1 }
-          geometry Cylinder { height 0.007 radius 0.3 }
+          appearance PBRAppearance {
+            baseColor 0.95 0.45 0.05
+            roughness 0.4
+          }
+          geometry Cone {
+            bottomRadius 0.22
+            height 0.50
+          }
         }
       ]
     }
@@ -334,10 +328,10 @@ DEF POTHOLE Solid {
   name "pothole"
 }
 
-# ── NEW PEDESTRIAN 1 LOCATION (X = 35.0m, crossing Left-to-Right) ────────────
+# ── COMBINATION 3: PEDESTRIAN 1 (X = 30.0m, Crossing Right-to-Left) ──────────
 DEF PEDESTRIAN_1 Robot {
-  translation 35.0 3.8 0.9
-  rotation 0 0 1 -1.5708
+  translation 30.0 -3.8 0.9
+  rotation 0 0 1 1.5708
   children [
     Transform {
       translation 0 0 0.7
@@ -360,10 +354,10 @@ DEF PEDESTRIAN_1 Robot {
   boundingObject Transform { translation 0 0 0.1 children [ Cylinder { height 1.7 radius 0.28 } ] }
 }
 
-# ── NEW PEDESTRIAN 2 LOCATION (X = 54.0m, crossing Right-to-Left) ───────────
+# ── COMBINATION 3: PEDESTRIAN 2 (X = 50.0m, Crossing Left-to-Right) ──────────
 DEF PEDESTRIAN_2 Robot {
-  translation 54.0 -3.8 0.9
-  rotation 0 0 1 1.5708
+  translation 50.0 3.8 0.9
+  rotation 0 0 1 -1.5708
   children [
     Transform {
       translation 0 0 0.7
@@ -386,9 +380,9 @@ DEF PEDESTRIAN_2 Robot {
   boundingObject Transform { translation 0 0 0.1 children [ Cylinder { height 1.7 radius 0.28 } ] }
 }
 
-# ── ONCOMING AUTO-RICKSHAW (X = 70.0m, Y = +1.75m) ──────────────────────────
+# ── COMBINATION 3: ONCOMING AUTO-RICKSHAW (X = 68.0m, Y = +1.80m) ────────────
 DEF AUTO_RICKSHAW Robot {
-  translation 70.0 1.75 0.68
+  translation 68.0 1.80 0.68
   rotation 0 0 1 3.14159
   children [
     Transform {
