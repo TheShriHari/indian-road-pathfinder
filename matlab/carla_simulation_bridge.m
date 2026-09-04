@@ -43,7 +43,7 @@ BRIDGE_HOST  = '127.0.0.1';
 BRIDGE_PORT  = 20000;
 
 DT            = 0.1;    % CARLA synchronous step size (seconds)
-N_HORIZON     = 20;     % EKF prediction steps forwarded to planner & BSM
+N_HORIZON     = 35;     % EKF prediction steps forwarded to planner & BSM (3.5s lead time)
 GOAL_POSE     = [70.0, 0.0, 0.0];   % [x, y, theta]
 % FIX (goal-horizon overflow): the planner target is a rolling LOCAL_GOAL on
 % the path, capped to LOCAL_GOAL_HORIZON metres ahead of ego. Passing the
@@ -71,20 +71,43 @@ if strcmp(MODE, 'LIVE')
     end
 end
 
+if strcmp(MODE, 'MOCK')
+    fprintf('[SIM] Running closed-loop simulation in MOCK mode via run_single_scenario...\n\n');
+    mock_opts.verbose = true;
+    mock_opts.max_steps = MAX_STEPS;
+    mock_opts.dt = DT;
+    mock_opts.goal_dist_tol = GOAL_DIST_TOL;
+    res = run_single_scenario([], 42, mock_opts);
+    % Print sensor layer summary for MOCK mode
+    if isfield(res, 'total_dropouts')
+        fprintf('[MOCK] Sensor layer summary: %d dropouts, %d misclassifications\n', ...
+            res.total_dropouts, res.total_misclasses);
+        if ~isnan(res.innov_mean)
+            fprintf('[MOCK] EKF innovation: mean=%.4fm  max=%.4fm\n', res.innov_mean, res.innov_max);
+        end
+    end
+    return;
+end
+
 %% ── Persistent algorithm state ───────────────────────────────────────────
 clear dynamic_obstacle_predictor;   % reset EKF state map
+clear simulate_sensor_detection;    % reset latency buffer
 bsm_state   = 'CRUISE';
 path        = zeros(0, 2);          % current planned path (N×2 world coords)
 replan_cnt  = 0;
 REPLAN_EVERY = 8;                   % replan every N ticks OR on threat
 force_replan = false;
 prev_target  = [NaN, NaN];
+safe_stop_active = false;
 
 %% ── Rolling costmap config ───────────────────────────────────────────────
 map_cfg.grid_res  = 0.2;    % 20 cm / cell
 map_cfg.range_fwd = 50.0;
 map_cfg.range_bwd = 10.0;
 map_cfg.range_lat = 15.0;
+
+%% ── Sensor simulation config ─────────────────────────────────────────
+sensor_cfg = make_sensor_cfg();    % default realistic perception params
 
 %% ── Main simulation loop ─────────────────────────────────────────────────
 fprintf('[SIM] Starting closed-loop co-simulation (MODE=%s) ...\n\n', MODE);
@@ -121,6 +144,7 @@ while step < MAX_STEPS
         bsm_state = 'CRUISE';
         path      = zeros(0,2);
         clear dynamic_obstacle_predictor;
+        clear simulate_sensor_detection;    % reset latency buffer on collision reset
         step = 0;
         continue;
     end
@@ -149,7 +173,11 @@ while step < MAX_STEPS
 
     % ── E. EKF — predict each dynamic obstacle N steps ahead ─────────────
     raw_obstacles = pkg_obstacles(sensor_pkg);
-    predictions   = dynamic_obstacle_predictor(raw_obstacles, DT, N_HORIZON);
+    % Insert realistic sensor simulation layer between ground-truth and EKF.
+    % The EKF now receives noisy, range-limited, dropout-prone detections
+    % instead of oracle ground truth — giving it real filtering work to do.
+    detected_obs = simulate_sensor_detection(raw_obstacles, ego_state, sensor_cfg);
+    predictions  = dynamic_obstacle_predictor(detected_obs, DT, N_HORIZON);
 
     % ── F. Initial / re-plan with Hybrid A* on rolling costmap ───────────
     needs_replan = force_replan || (size(path, 1) < 2) || (mod(step, REPLAN_EVERY) == 0);
@@ -183,13 +211,28 @@ while step < MAX_STEPS
             path = path_new;
             replan_cnt = replan_cnt + 1;
         elseif ~plan_ok
+            path_is_valid = false;
             if size(path, 1) >= 2 && max(path(:,1)) > cur_pose(1) + 4.0
-                % Retain previous valid path to prevent straight-line fallback from driving off-road
+                ahead_mask = (path(:,1) >= cur_pose(1));
+                path_ahead = path(ahead_mask, :);
+                path_is_valid = true;
+                if isfield(sensor_det, 'potholes')
+                    for j = 1:length(sensor_det.potholes)
+                        d_p = hypot(path_ahead(:,1) - sensor_det.potholes(j).x, path_ahead(:,2) - sensor_det.potholes(j).y) - sensor_det.potholes(j).radius;
+                        if min(d_p) < 0.2
+                            path_is_valid = false;
+                            break;
+                        end
+                    end
+                end
+            end
+            if path_is_valid
                 fprintf('  [PLANNER] Retaining previous valid path (fallback rejected to prevent off-road drift).\n');
+                safe_stop_active = false;
             else
-                % If existing path has expired, clamp fallback laterally to corridor
-                path_new(:, 2) = min(max(path_new(:, 2), -2.0), 2.0);
-                path = path_new;
+                fprintf('  [SAFETY] No collision-free path exists ahead. Engaging controlled SAFE STOP.\n');
+                safe_stop_active = true;
+                path = zeros(0, 2);
             end
         end
     end
@@ -249,8 +292,12 @@ while step < MAX_STEPS
             Ld_val, alpha_val, alpha_val * 180 / pi, steer_rad / MAX_STEER_RAD, needs_replan);
     end
 
-    % Hard stop override when virtual stop line is active
-    if v_ref <= 0.0
+    % Safe stop override if no valid collision-free path exists
+    if safe_stop_active
+        v_ref     = 0.0;
+        accel     = -2.5;
+        steer_rad = 0.0;
+    elseif v_ref <= 0.0
         accel = -3.5;
     end
 
@@ -432,4 +479,19 @@ end
 function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose)
     target_x = min(goal_pose(1), ego_xy(1) + horizon_m);
     lg = [target_x, goal_pose(2), goal_pose(3)];
+end
+
+% ── Sensor config factory ───────────────────────────────────────────────
+function cfg = make_sensor_cfg()
+    % Returns default sensor simulation parameters.
+    % Call this once before the main loop; pass result to simulate_sensor_detection.
+    cfg.max_detection_range = 35.0;   % m  — obstacles beyond this are invisible
+    cfg.field_of_view_deg   = 140.0;  % total cone width (±70° from heading)
+    cfg.base_dropout_prob   = 0.05;   % 5% base missed-detection probability
+    cfg.std_pos_base        = 0.3;    % position noise std at 0 m (m)
+    cfg.std_pos_max         = 0.5;    % position noise std at max_detection_range (m)
+    cfg.std_vel             = 0.2;    % velocity noise std (m/s)
+    cfg.misclass_prob       = 0.03;   % 3% chance of wrong type label
+    cfg.latency_ticks       = 2;      % 2-tick (200 ms) processing/transmission delay
+    cfg.verbose             = true;   % print dropout/misclass events to console
 end

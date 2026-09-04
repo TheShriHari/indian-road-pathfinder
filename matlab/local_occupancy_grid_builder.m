@@ -65,8 +65,8 @@ if isfield(sensor_detections, 'road_boundaries') && ~isempty(sensor_detections.r
         if bx >= x_min && bx <= x_max && by >= y_min && by <= y_max
             c = world2col(bx);
             r = world2row(by);
-            % Inflate road boundary with hard cost
-            r_rad = ceil(0.5 / res);
+            % Inflate road boundary with hard cost (0.2m = 1 cell to preserve usable road corridor)
+            r_rad = ceil(0.2 / res);
             for dr = -r_rad:r_rad
                 for dc = -r_rad:r_rad
                     rr = min(max(r + dr, 1), nY);
@@ -82,7 +82,9 @@ end
 if isfield(sensor_detections, 'potholes') && ~isempty(sensor_detections.potholes)
     for k = 1:length(sensor_detections.potholes)
         p = sensor_detections.potholes(k);
-        inflate_circle_cost(p.x, p.y, p.radius, 0.4, 255);
+        % Collision threshold is radius + 0.20m. Set lethal radius to radius + 0.28m
+        % with repulsive buffer out to radius + 0.50m to absorb pure pursuit tracking error.
+        inflate_circle_cost(p.x, p.y, p.radius, 0.50, 255, 0.28);
     end
 end
 
@@ -92,7 +94,7 @@ if isfield(sensor_detections, 'static_boxes') && ~isempty(sensor_detections.stat
         box = sensor_detections.static_boxes(k);
         rad = 1.0;
         if isfield(box, 'radius'), rad = box.radius; end
-        inflate_circle_cost(box.x, box.y, rad, 0.6, 255);
+        inflate_circle_cost(box.x, box.y, rad, 0.6, 255, 0.25);
     end
 end
 
@@ -111,22 +113,24 @@ if isfield(sensor_detections, 'static_points') && ~isempty(sensor_detections.sta
 end
 
     % --- Nested Helper: Inflate Obstacle with Gradient Clearance ---
-    function inflate_circle_cost(cx, cy, radius, safety_margin, peak_cost)
-        tot_r = radius + safety_margin;
-        col_c = world2col(cx);
-        row_c = world2row(cy);
-        r_cells = ceil(tot_r / res);
+    function inflate_circle_cost(cx, cy, radius, safety_margin, peak_cost, lethal_margin)
+        if nargin < 6, lethal_margin = 0.0; end
+        lethal_r = radius + lethal_margin;
+        tot_r    = max(lethal_r + 0.1, radius + safety_margin);
+        col_c    = world2col(cx);
+        row_c    = world2row(cy);
+        r_cells  = ceil(tot_r / res);
         
         for cc = max(1, col_c - r_cells):min(nX, col_c + r_cells)
             for rr = max(1, row_c - r_cells):min(nY, row_c + r_cells)
                 wx = x_min + (cc - 1) * res;
                 wy = y_min + (rr - 1) * res;
                 d = hypot(wx - cx, wy - cy);
-                if d <= radius
-                    local_costmap(rr, cc) = peak_cost; % Lethal obstacle interior
+                if d <= lethal_r
+                    local_costmap(rr, cc) = peak_cost; % Lethal obstacle interior + collision margin
                 elseif d <= tot_r
                     % Soft repulsive buffer zone
-                    buf_cost = peak_cost * (1.0 - (d - radius) / safety_margin);
+                    buf_cost = peak_cost * (1.0 - (d - lethal_r) / (tot_r - lethal_r));
                     local_costmap(rr, cc) = max(local_costmap(rr, cc), buf_cost);
                 end
             end

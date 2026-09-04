@@ -63,11 +63,11 @@ if ~isempty(dynamic_predictions)
         obs_type  = dynamic_predictions(i).type;
 
         if strcmpi(obs_type, 'cattle')
-            clearance_r = 2.2;
+            clearance_r = 1.6;
         elseif strcmpi(obs_type, 'auto_rickshaw')
-            clearance_r = 1.8;
+            clearance_r = 1.5;
         else
-            clearance_r = 1.4;
+            clearance_r = 1.3;
         end
 
         clearance_cells = ceil(clearance_r / grid_res);
@@ -84,9 +84,15 @@ if ~isempty(dynamic_predictions)
             for cx = r_min_x:r_max_x
                 for cy = r_min_y:r_max_y
                     dist = hypot((cx - gx) * grid_res, (cy - gy) * grid_res);
-                    if dist <= clearance_r
-                        cost_add = (1 - dist/clearance_r) * 200 * (1 / (1 + 0.1*t));
-                        costmap(cy, cx) = min(255, costmap(cy, cx) + cost_add);
+                    if dist <= 1.35 && t <= 8
+                        % Lethal core: collision threshold is 1.0m, so <=1.35m is strictly impassable
+                        costmap(cy, cx) = 255;
+                    elseif dist <= clearance_r
+                        % Repulsive buffer around agent
+                        cost_add = (1 - dist/clearance_r) * 180 * (1 / (1 + 0.2*t));
+                        if costmap(cy, cx) < 250
+                            costmap(cy, cx) = min(240, costmap(cy, cx) + cost_add);
+                        end
                     end
                 end
             end
@@ -101,21 +107,20 @@ end
 % ============================================================
 
 % --- Search parameters ---
-ASTAR_RES  = 1.0;       % [m] search grid resolution (coarser than 0.2m costmap)
-N_YAW      = 12;        % heading discretisation: 12 bins x 30 deg = 360 deg
-YAW_RES    = 2*pi / N_YAW;  % 30 deg per bin
+ASTAR_RES  = 0.4;       % [m] fine search grid resolution for narrow corridor navigation
+N_YAW      = 24;        % heading discretisation: 24 bins x 15 deg = 360 deg
+YAW_RES    = 2*pi / N_YAW;  % 15 deg per bin (prevents small steer turns being pruned)
 WB         = 2.7;       % vehicle wheelbase [m]  (same as vehicle_kinematics.m)
-ARC_L      = 1.5;       % arc length per expansion [m]
-ARC_STEP   = 0.5;       % integration step along arc [m]
+ARC_L      = 1.2;       % arc length per expansion [m]
+ARC_STEP   = 0.3;       % integration step along arc [m]
 MAX_STEER  = pi/6;      % max steering angle: 30 deg  (same as vehicle_kinematics.m)
-% 5 steering options: ±30°, ±15°, 0°  (ref: N_STEER in hybrid_a_star.py is 20;
-% we use 5 to keep MATLAB search tractable without Reeds-Shepp)
-STEER_OPTS = [-MAX_STEER, -MAX_STEER/2, 0, MAX_STEER/2, MAX_STEER];
+% 7 steering options: ±30°, ±20°, ±10°, 0° for fine corridor navigation
+STEER_OPTS = [-MAX_STEER, -MAX_STEER*2/3, -MAX_STEER/3, 0, MAX_STEER/3, MAX_STEER*2/3, MAX_STEER];
 HARD_BLOCK = 250;       % costmap value treated as impassable
 COST_WT    = 0.015;     % weight: costmap value -> g-cost contribution
-STEER_WT   = 0.25;      % weight: steer angle penalty (prefer straight driving)
-SC_WT      = 0.15;      % weight: steer-change penalty (prefer smooth turns)
-MAX_ITER   = 40000;     % max iterations before giving up and falling back
+STEER_WT   = 0.15;      % weight: steer angle penalty (prefer straight driving)
+SC_WT      = 0.10;      % weight: steer-change penalty (prefer smooth turns)
+MAX_ITER   = 60000;     % max iterations before giving up and falling back
 
 % World bounds — now taken from grid_origin (rolling window)
 x_max = x_min + (cmap_cols - 1) * grid_res;
