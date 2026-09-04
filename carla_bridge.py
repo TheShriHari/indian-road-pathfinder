@@ -656,18 +656,41 @@ def run_bridge(args):
 
     actor_list = []
     if not mock_mode:
-        bp_lib  = world_obj.get_blueprint_library()
-        ego_bp  = bp_lib.filter(args.vehicle)[0]
-        ego_bp.set_attribute('role_name', 'hero')
-        spawn_pt = world_obj.get_map().get_spawn_points()[0]
-        ego_vehicle = world_obj.spawn_actor(ego_bp, spawn_pt)
-        actor_list.append(ego_vehicle)
-        print(f'[CARLA] Ego spawned: {ego_vehicle.type_id}')
+        # Check if an ego vehicle already exists (e.g. from obs_sim.py)
+        for actor in world_obj.get_actors().filter('vehicle.*'):
+            if actor.attributes.get('role_name') in ['hero', 'ego_vehicle']:
+                ego_vehicle = actor
+                print(f'[CARLA] Reusing existing ego vehicle: id={ego_vehicle.id} ({ego_vehicle.type_id})')
+                break
 
-        # Physics settle
+        if ego_vehicle is None:
+            from carla_scene import find_suitable_spawn_point
+            bp_lib  = world_obj.get_blueprint_library()
+            ego_bp  = bp_lib.filter(args.vehicle)[0]
+            ego_bp.set_attribute('role_name', 'hero')
+            spawn_pt = find_suitable_spawn_point(world_obj, min_forward_dist=80.0)
+            if spawn_pt is None:
+                spawn_pt = world_obj.get_map().get_spawn_points()[0]
+            ego_vehicle = world_obj.try_spawn_actor(ego_bp, spawn_pt)
+            if ego_vehicle is None:
+                ego_vehicle = world_obj.spawn_actor(ego_bp, world_obj.get_map().get_spawn_points()[0])
+            actor_list.append(ego_vehicle)
+            print(f'[CARLA] Ego spawned: {ego_vehicle.type_id} at {ego_vehicle.get_location()}')
+
+        # Settle physics
         for _ in range(10):
             world_obj.tick()
-        time.sleep(1.0)
+        time.sleep(0.5)
+
+        # Spawn corridor obstacles if requested and none exist
+        if not getattr(args, 'no_scene', False):
+            from carla_scene import spawn_corridor_obstacles, update_spectator
+            print('[SCENE] Spawning Indian road corridor obstacles...')
+            tm = client.get_trafficmanager(8000)
+            tm.set_synchronous_mode(True)
+            sc_actors = spawn_corridor_obstacles(world_obj, ego_vehicle, tm)
+            actor_list.extend(sc_actors)
+            update_spectator(world_obj, ego_vehicle)
 
         # Sensor rig
         sensors = CarlaSensorSuite(world_obj, ego_vehicle, show_cam=args.show_cam)
@@ -675,6 +698,7 @@ def run_bridge(args):
         # Wait for BOTH cameras to produce their first frame
         print('[CARLA] Waiting for camera pair sync...')
         for _ in range(400):
+            world_obj.tick()
             with _lock:
                 ready = (_latest_rgb is not None) and (_latest_depth is not None)
             if ready:
@@ -702,6 +726,11 @@ def run_bridge(args):
             }
         else:
             world_obj.tick()   # advance CARLA one step
+            try:
+                from carla_scene import update_spectator
+                update_spectator(world_obj, ego_vehicle)
+            except Exception:
+                pass
 
             # Grab a synchronized snapshot of both camera frames
             rgb_bgr, depth_m = sensors.snapshot()
@@ -843,5 +872,7 @@ if __name__ == '__main__':
                         help='Display live RGB stream in an OpenCV window')
     parser.add_argument('--det-conf',    type=float, default=DET_CONF_DEFAULT,
                         help=f'Minimum detector confidence (default: {DET_CONF_DEFAULT})')
+    parser.add_argument('--no-scene',    action='store_true',
+                        help='Disable automatic Indian road corridor obstacle spawning')
     args = parser.parse_args()
     run_bridge(args)

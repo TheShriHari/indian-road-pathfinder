@@ -1,186 +1,339 @@
 """
-CARLA simulation: 1 ego vehicle + 2 dynamic obstacles + 2 static obstacles.
+obs_sim.py  —  CARLA Indian Road Scene Generator & Autonomous Bridge Runner
+=============================================================================
+SIH PS-26037: Adaptive Path Planning for Unstructured Indian Roads
 
-Tested against:
-    - Server (API) version: 0.9.15
-    - Client (pip package)  version: 0.9.16
+This script runs on the machine hosting CARLA (e.g. your friend's PC).
+It performs the following end-to-end tasks:
+  1. Connects to CARLA Simulator (default port 2000)
+  2. Sets up the Indian Road Scene:
+       - Spawns Ego Vehicle (role_name='hero') on a straight corridor
+       - Static Obstacle 1: Parked car / roadblock on left lane (+18m)
+       - Static Obstacle 2: Construction hazard / debris on right lane (+38m)
+       - Dynamic Obstacle 1: Oncoming auto-rickshaw / vehicle (+55m)
+       - Dynamic Obstacle 2: Crossing pedestrian / cattle surrogate (+28m)
+  3. Mounts the Camera Sensor Rig on Ego (RGB + Metric Depth + Collision)
+  4. Positions the CARLA Spectator in a 3D chase camera view behind the car
+  5. Starts the TCP Bridge Server on 0.0.0.0:20000 to communicate with MATLAB
+  6. Steps CARLA world synchronously with MATLAB path planning commands
 
-Notes on version mismatch:
-    CARLA prints a warning like:
-        "WARNING: Client and server versions mismatch"
-    This is expected and usually harmless across one minor version gap.
-    If you actually hit AttributeError / API-shape errors, install a
-    matching client instead:
-        pip install carla==0.9.15
-
-Obstacle design:
-    Dynamic obstacles  -> real vehicles driven by the CARLA Traffic Manager
-                           (autopilot=True), so they move around the map.
-    Static obstacles    -> vehicles spawned normally, then autopilot is
-                           left off and physics simulation is disabled so
-                           they behave as fixed, non-moving obstacles
-                           (like parked cars / roadblocks).
+Usage:
+  python obs_sim.py [--carla-host 127.0.0.1] [--carla-port 2000]
+                    [--matlab-port 20000] [--map Town01]
+                    [--vehicle vehicle.tesla.model3] [--show-cam]
+                    [--standalone]
+=============================================================================
 """
 
-import random
+import sys
 import time
-import carla
+import json
+import socket
+import argparse
+import threading
+import numpy as np
+
+# Discover CARLA egg if present in carla/dist
+import glob, os
+try:
+    sys.path.append(glob.glob(os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        '../carla/dist/carla-*%d.%d-%s.egg' % (
+            sys.version_info.major,
+            sys.version_info.minor,
+            'win-amd64' if os.name == 'nt' else 'linux-x86_64')))[0])
+except IndexError:
+    pass
+
+try:
+    import carla
+    CARLA_AVAILABLE = True
+except ImportError:
+    carla = None
+    CARLA_AVAILABLE = False
+    print('[WARN] CARLA Python package not found. Running in MOCK fallback mode.')
+
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    cv2 = None
+    CV2_AVAILABLE = False
+
+from carla_scene import (
+    find_suitable_spawn_point,
+    spawn_corridor_obstacles,
+    update_spectator,
+    set_indian_road_weather
+)
+
+# Import bridge components from carla_bridge
+from carla_bridge import (
+    CarlaSensorSuite,
+    PerceptionFuser,
+    build_detector,
+    get_ego_telemetry,
+    get_road_boundaries,
+    get_camera_meta,
+    MockWorld,
+    IM_WIDTH, IM_HEIGHT, CAM_FOV, CAM_FX, CAM_FY, CAM_CX, CAM_CY
+)
 
 
-# --------------------------------------------------------------------------- #
-# Configuration
-# --------------------------------------------------------------------------- #
-HOST = "127.0.0.1"
-PORT = 2000
-TIMEOUT_S = 10.0
+def run_simulation(args):
+    print("=" * 70)
+    print("  CARLA INDIAN ROAD SCENE SIMULATOR  (SIH PS-26037)")
+    print("=" * 70)
 
-TM_PORT = 8000          # Traffic Manager port
-SYNC_MODE = True         # Run world in synchronous mode (recommended)
-FIXED_DELTA_SECONDS = 0.05
+    if not CARLA_AVAILABLE:
+        print("[ERROR] carla module is required to run CARLA simulation.")
+        print("        If you are testing offline without CARLA, use carla_bridge.py")
+        sys.exit(1)
 
-SIM_DURATION_S = 30      # How long to run the loop before cleanup
+    print(f"[CONNECT] Connecting to CARLA at {args.carla_host}:{args.carla_port}...")
+    try:
+        client = carla.Client(args.carla_host, args.carla_port)
+        client.set_timeout(15.0)
+        world = client.get_world()
+        curr_map = world.get_map().name
+        print(f"[CONNECT] Connected to CARLA Server (Map: {curr_map})")
 
+        if args.map and args.map.lower() not in curr_map.lower():
+            print(f"[MAP] Loading requested map: {args.map}...")
+            world = client.load_world(args.map)
+            print(f"[MAP] Map loaded: {args.map}")
+    except Exception as e:
+        print(f"[ERROR] Failed to connect to CARLA server: {e}")
+        print("        Ensure CarlaUE4.exe is running on the host machine.")
+        sys.exit(1)
 
-def connect_to_carla():
-    """Connect to the CARLA server and return (client, world)."""
-    client = carla.Client(HOST, PORT)
-    client.set_timeout(TIMEOUT_S)
-
-    print(f"Client API version: {client.get_client_version()}")
-    print(f"Server API version: {client.get_server_version()}")
-
-    world = client.get_world()
-    return client, world
-
-
-def configure_sync_mode(client, world, enable=True):
-    """Enable/disable synchronous mode for deterministic stepping."""
+    # Configure synchronous mode
+    orig_settings = world.get_settings()
     settings = world.get_settings()
-    settings.synchronous_mode = enable
-    settings.fixed_delta_seconds = FIXED_DELTA_SECONDS if enable else None
+    settings.synchronous_mode = True
+    settings.fixed_delta_seconds = 0.1  # 10 Hz matching MATLAB planning cycle
     world.apply_settings(settings)
 
-    traffic_manager = client.get_trafficmanager(TM_PORT)
-    traffic_manager.set_synchronous_mode(enable)
-    return traffic_manager
+    traffic_manager = client.get_trafficmanager(args.tm_port)
+    traffic_manager.set_synchronous_mode(True)
 
-
-def spawn_vehicle(world, blueprint_library, spawn_point, role_name="obstacle"):
-    """Spawn a single 4-wheeled vehicle at a given spawn point."""
-    vehicle_bps = blueprint_library.filter("vehicle.*")
-    # Restrict to 4-wheel vehicles to avoid motorbikes/bicycles for obstacles
-    vehicle_bps = [bp for bp in vehicle_bps if int(bp.get_attribute("number_of_wheels")) == 4]
-    bp = random.choice(vehicle_bps)
-    bp.set_attribute("role_name", role_name)
-    if bp.has_attribute("color"):
-        color = random.choice(bp.get_attribute("color").recommended_values)
-        bp.set_attribute("color", color)
-
-    vehicle = world.try_spawn_actor(bp, spawn_point)
-    return vehicle
-
-
-def make_dynamic_obstacle(world, traffic_manager, blueprint_library, spawn_point, index):
-    """Spawn a vehicle and hand control to the Traffic Manager (moving obstacle)."""
-    vehicle = spawn_vehicle(world, blueprint_library, spawn_point, role_name=f"dynamic_obstacle_{index}")
-    if vehicle is None:
-        print(f"[dynamic obstacle {index}] Failed to spawn at {spawn_point.location}")
-        return None
-
-    vehicle.set_autopilot(True, traffic_manager.get_port())
-
-    # Optional: tweak per-vehicle TM behavior
-    traffic_manager.vehicle_percentage_speed_difference(vehicle, random.uniform(-10, 20))
-    traffic_manager.distance_to_leading_vehicle(vehicle, 3.0)
-    traffic_manager.auto_lane_change(vehicle, True)
-
-    print(f"[dynamic obstacle {index}] Spawned id={vehicle.id} at {spawn_point.location}")
-    return vehicle
-
-
-def make_static_obstacle(world, blueprint_library, spawn_point, index):
-    """Spawn a vehicle and freeze it in place (fixed obstacle)."""
-    vehicle = spawn_vehicle(world, blueprint_library, spawn_point, role_name=f"static_obstacle_{index}")
-    if vehicle is None:
-        print(f"[static obstacle {index}] Failed to spawn at {spawn_point.location}")
-        return None
-
-    vehicle.set_autopilot(False)
-    vehicle.set_simulate_physics(False)   # locks the actor in place, ignores forces
-    vehicle.apply_control(carla.VehicleControl(hand_brake=True))
-
-    print(f"[static obstacle {index}] Spawned id={vehicle.id} at {spawn_point.location}")
-    return vehicle
-
-
-def main():
-    client, world = connect_to_carla()
-    traffic_manager = configure_sync_mode(client, world, enable=SYNC_MODE)
-
-    blueprint_library = world.get_blueprint_library()
-    spawn_points = world.get_map().get_spawn_points()
-    if len(spawn_points) < 5:
-        raise RuntimeError("Map does not have enough spawn points for ego + 4 obstacles.")
-
-    random.shuffle(spawn_points)
-    ego_sp = spawn_points[0]
-    dynamic_sps = spawn_points[1:3]
-    static_sps = spawn_points[3:5]
+    set_indian_road_weather(world)
 
     actor_list = []
 
     try:
-        # --- Ego vehicle (optional, useful for testing obstacle avoidance) ---
-        ego_bp = blueprint_library.filter("vehicle.tesla.model3")[0]
-        ego_bp.set_attribute("role_name", "ego_vehicle")
-        ego_vehicle = world.try_spawn_actor(ego_bp, ego_sp)
+        # Check if an ego vehicle already exists
+        ego_vehicle = None
+        for actor in world.get_actors().filter('vehicle.*'):
+            if actor.attributes.get('role_name') in ['hero', 'ego_vehicle']:
+                ego_vehicle = actor
+                print(f"[EGO] Found existing ego vehicle: id={ego_vehicle.id} ({ego_vehicle.type_id})")
+                break
+
+        # Spawn ego vehicle if not present
         if ego_vehicle is None:
-            raise RuntimeError("Failed to spawn ego vehicle.")
-        ego_vehicle.set_autopilot(True, traffic_manager.get_port())
-        actor_list.append(ego_vehicle)
-        print(f"[ego] Spawned id={ego_vehicle.id} at {ego_sp.location}")
+            bp_lib = world.get_blueprint_library()
+            ego_bp = bp_lib.filter(args.vehicle)[0]
+            ego_bp.set_attribute('role_name', 'hero')
 
-        # --- Two dynamic obstacles ---
-        for i, sp in enumerate(dynamic_sps, start=1):
-            v = make_dynamic_obstacle(world, traffic_manager, blueprint_library, sp, i)
-            if v:
-                actor_list.append(v)
+            spawn_pt = find_suitable_spawn_point(world, min_forward_dist=80.0)
+            ego_vehicle = world.try_spawn_actor(ego_bp, spawn_pt)
+            if ego_vehicle is None:
+                # Retry with standard spawn point 0
+                spawn_pt = world.get_map().get_spawn_points()[0]
+                ego_vehicle = world.spawn_actor(ego_bp, spawn_pt)
 
-        # --- Two static obstacles ---
-        for i, sp in enumerate(static_sps, start=1):
-            v = make_static_obstacle(world, blueprint_library, sp, i)
-            if v:
-                actor_list.append(v)
+            actor_list.append(ego_vehicle)
+            print(f"[EGO] Spawned ego vehicle: {ego_vehicle.type_id} at {ego_vehicle.get_location()}")
 
-        # --- Spectator follows the ego vehicle from above ---
-        spectator = world.get_spectator()
+        # Settle physics
+        for _ in range(10):
+            world.tick()
+        time.sleep(0.5)
 
-        # --- Main simulation loop ---
-        start_time = time.time()
-        while time.time() - start_time < SIM_DURATION_S:
-            if SYNC_MODE:
+        # Spawn Indian Road Obstacles along corridor
+        print("[SCENE] Generating Indian Road corridor obstacles...")
+        obstacles = spawn_corridor_obstacles(world, ego_vehicle, traffic_manager)
+        actor_list.extend(obstacles)
+
+        # Update spectator view
+        update_spectator(world, ego_vehicle)
+
+        # Mount camera sensor suite on ego vehicle
+        print("[SENSORS] Mounting synchronized RGB + Depth camera rig...")
+        sensors = CarlaSensorSuite(world, ego_vehicle, show_cam=args.show_cam)
+
+        # Build neural perception detector
+        print(f"[PERCEPTION] Initializing object detector (confidence >= {args.det_conf})...")
+        detector = build_detector(args.det_conf)
+        fuser = PerceptionFuser(IM_WIDTH, IM_HEIGHT, CAM_FX, CAM_FY, CAM_CX, CAM_CY)
+
+        # Wait for camera sync
+        print("[SENSORS] Waiting for camera streams to produce frames...")
+        for _ in range(300):
+            world.tick()
+            rgb, depth = sensors.snapshot()
+            if rgb is not None and depth is not None:
+                break
+            time.sleep(0.05)
+        print("[SENSORS] Camera stream synchronized successfully.")
+
+        if args.standalone:
+            print("\n[SCENE] Running in STANDALONE mode (idle simulation).")
+            print("        Press Ctrl+C to terminate and clean up actors.\n")
+            while True:
                 world.tick()
-            else:
-                world.wait_for_tick()
+                update_spectator(world, ego_vehicle)
+                time.sleep(0.1)
 
-            transform = ego_vehicle.get_transform()
-            spectator.set_transform(
-                carla.Transform(
-                    transform.location + carla.Location(z=30),
-                    carla.Rotation(pitch=-90),
-                )
-            )
+        # ---------------------------------------------------------------------
+        # TCP Bridge Server for MATLAB
+        # ---------------------------------------------------------------------
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Bind to 0.0.0.0 so MATLAB on another PC across LAN/WiFi can connect!
+        srv.bind(('0.0.0.0', args.matlab_port))
+        srv.listen(1)
 
+        print("\n" + "=" * 70)
+        print(f"  [BRIDGE READY] Waiting for MATLAB on port {args.matlab_port}...")
+        print(f"  If MATLAB is on another machine, configure BRIDGE_HOST to this PC's IP.")
+        print("=" * 70 + "\n")
+
+        conn, addr = srv.accept()
+        conn.setblocking(True)
+        print(f"[BRIDGE] MATLAB connected successfully from {addr}!\n")
+
+        def generate_state_packet():
+            world.tick()
+            update_spectator(world, ego_vehicle)
+
+            rgb_bgr, depth_m = sensors.snapshot()
+            detections = []
+            if rgb_bgr is not None and depth_m is not None:
+                detections = detector.detect(rgb_bgr)
+
+            projected_obs = []
+            if depth_m is not None:
+                projected_obs = fuser.project(detections, depth_m)
+
+            with sensors._lock if hasattr(sensors, '_lock') else threading.Lock():
+                collision = sensors.get_collision_state() if hasattr(sensors, 'get_collision_state') else False
+
+            return {
+                "ego": get_ego_telemetry(ego_vehicle),
+                "obstacles": projected_obs,
+                "road_boundaries": get_road_boundaries(world, ego_vehicle),
+                "collision": collision,
+                "camera": get_camera_meta(rgb_bgr)
+            }
+
+        buf = ''
+        step_count = 0
+        while True:
+            chunk = conn.recv(4096).decode('utf-8', errors='replace')
+            if not chunk:
+                print("[BRIDGE] MATLAB disconnected.")
+                break
+            buf += chunk
+
+            while '\n' in buf:
+                line, buf = buf.split('\n', 1)
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    msg = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                # Handle STEP (combined single-trip command)
+                if msg.get('request') == 'STEP':
+                    steer = max(-1.0, min(1.0, float(msg.get('steer', 0.0))))
+                    throttle = max(0.0, min(1.0, float(msg.get('throttle', 0.0))))
+                    brake = max(0.0, min(1.0, float(msg.get('brake', 0.0))))
+
+                    ctrl = carla.VehicleControl()
+                    ctrl.steer = steer
+                    ctrl.throttle = throttle
+                    ctrl.brake = brake
+                    ctrl.hand_brake = False
+                    ego_vehicle.apply_control(ctrl)
+
+                    packet = generate_state_packet()
+                    conn.sendall((json.dumps(packet) + '\n').encode('utf-8'))
+                    step_count += 1
+                    if step_count % 10 == 0:
+                        print(f"[CO-SIM step={step_count:4d}] Steer={steer:+.2f} Throttle={throttle:.2f} Brake={brake:.2f} | Ego: [{packet['ego']['x']:.1f}, {packet['ego']['y']:.1f}] v={packet['ego']['v']:.1f}m/s")
+
+                # Handle GET_STATE
+                elif msg.get('request') == 'GET_STATE':
+                    packet = generate_state_packet()
+                    conn.sendall((json.dumps(packet) + '\n').encode('utf-8'))
+
+                # Handle CONTROL
+                elif 'steer' in msg:
+                    steer = max(-1.0, min(1.0, float(msg.get('steer', 0.0))))
+                    throttle = max(0.0, min(1.0, float(msg.get('throttle', 0.0))))
+                    brake = max(0.0, min(1.0, float(msg.get('brake', 0.0))))
+
+                    ctrl = carla.VehicleControl()
+                    ctrl.steer = steer
+                    ctrl.throttle = throttle
+                    ctrl.brake = brake
+                    ctrl.hand_brake = False
+                    ego_vehicle.apply_control(ctrl)
+
+                    conn.sendall((json.dumps({"ack": "ok"}) + '\n').encode('utf-8'))
+
+                # Handle RESET
+                elif msg.get('request') == 'RESET':
+                    if sensors:
+                        sensors.reset_collision()
+                    conn.sendall((json.dumps({"ack": "reset_ok"}) + '\n').encode('utf-8'))
+
+    except KeyboardInterrupt:
+        print("\n[SIMULATION] Interrupted by user.")
     finally:
-        print("Cleaning up actors...")
-        for actor in actor_list:
-            if actor is not None and actor.is_alive:
-                actor.destroy()
+        print("\n[CLEANUP] Restoring world settings and destroying spawned actors...")
+        try:
+            world.apply_settings(orig_settings)
+        except Exception:
+            pass
 
-        # Restore world to asynchronous mode so it doesn't hang other clients
-        configure_sync_mode(client, world, enable=False)
-        print("Done.")
+        if 'sensors' in locals() and sensors:
+            sensors.destroy()
+
+        for a in reversed(actor_list):
+            try:
+                if a is not None and a.is_alive:
+                    a.destroy()
+            except Exception:
+                pass
+        print("[CLEANUP] Done. Simulation finished safely.")
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='CARLA Indian Road Scene & Simulation Bridge (SIH PS-26037)')
+    parser.add_argument('--carla-host',  default='127.0.0.1',
+                        help='CARLA server IP (default: 127.0.0.1)')
+    parser.add_argument('--carla-port',  type=int, default=2000,
+                        help='CARLA server port (default: 2000)')
+    parser.add_argument('--matlab-port', type=int, default=20000,
+                        help='TCP port for MATLAB co-simulation (default: 20000)')
+    parser.add_argument('--tm-port',     type=int, default=8000,
+                        help='CARLA Traffic Manager port (default: 8000)')
+    parser.add_argument('--map',         default=None,
+                        help='Map name to load (e.g. Town01, Town04)')
+    parser.add_argument('--vehicle',     default='vehicle.tesla.model3',
+                        help='Ego vehicle blueprint name')
+    parser.add_argument('--show-cam',    action='store_true',
+                        help='Show live forward camera stream in OpenCV window')
+    parser.add_argument('--det-conf',    type=float, default=0.40,
+                        help='Object detector confidence threshold')
+    parser.add_argument('--standalone',  action='store_true',
+                        help='Run scene only without waiting for MATLAB bridge')
+    args = parser.parse_args()
+    run_simulation(args)

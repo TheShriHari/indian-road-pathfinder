@@ -38,7 +38,14 @@ fprintf('  CARLA <-> MATLAB Co-Simulation  (SIH PS-26037)          \n');
 fprintf('=========================================================\n\n');
 
 %% ── Config ───────────────────────────────────────────────────────────────
-MODE         = 'LIVE';       % 'LIVE' | 'MOCK'
+MODE         = 'LIVE';       % 'LIVE' (connect to CARLA bridge) | 'MOCK' (offline)
+
+% -------------------------------------------------------------------------
+% NETWORK CONFIGURATION:
+% - If CARLA is running on THIS computer: keep '127.0.0.1'
+% - If CARLA is running on your FRIEND'S computer: replace with friend's
+%   IPv4 address (e.g. '192.168.1.50') found via 'ipconfig' on friend's PC.
+% -------------------------------------------------------------------------
 BRIDGE_HOST  = '127.0.0.1';
 BRIDGE_PORT  = 20000;
 
@@ -173,10 +180,14 @@ while step < MAX_STEPS
 
     % ── E. EKF — predict each dynamic obstacle N steps ahead ─────────────
     raw_obstacles = pkg_obstacles(sensor_pkg);
-    % Insert realistic sensor simulation layer between ground-truth and EKF.
-    % The EKF now receives noisy, range-limited, dropout-prone detections
-    % instead of oracle ground truth — giving it real filtering work to do.
-    detected_obs = simulate_sensor_detection(raw_obstacles, ego_state, sensor_cfg);
+    if strcmp(MODE, 'LIVE')
+        % In LIVE mode with CARLA, observations come directly from the real camera
+        % perception pipeline (YOLOv8 + metric depth back-projection).
+        detected_obs = raw_obstacles;
+    else
+        % In MOCK mode, pass through synthetic sensor simulation layer
+        detected_obs = simulate_sensor_detection(raw_obstacles, ego_state, sensor_cfg);
+    end
     predictions  = dynamic_obstacle_predictor(detected_obs, DT, N_HORIZON);
 
     % ── F. Initial / re-plan with Hybrid A* on rolling costmap ───────────
