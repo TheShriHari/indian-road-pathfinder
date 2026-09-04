@@ -56,11 +56,11 @@ CONFIG = {
         "trigger_ego_x": 20.5
     },
     "pedestrian_2": {
-        "x": 52.0,
-        "start_y": 3.5,
-        "target_y": -3.5,
-        "speed": 1.05,
-        "trigger_ego_x": 36.0
+        "x": 58.0,
+        "start_y": 3.8,
+        "target_y": -3.8,
+        "speed": 0.85,
+        "trigger_ego_x": 48.0
     },
     "auto_rickshaw": {
         "start_x": 70.0,
@@ -217,7 +217,7 @@ class IndianRoadSupervisor:
             self.ped1_node.getField("translation").setSFVec3f([35.0, -3.5, 0.9])
             self.ped1_node.getField("rotation").setSFRotation([0, 0, 1, 1.5708])
         if self.ped2_node:
-            self.ped2_node.getField("translation").setSFVec3f([52.0, 3.5, 0.9])
+            self.ped2_node.getField("translation").setSFVec3f([58.0, 3.8, 0.9])
             self.ped2_node.getField("rotation").setSFRotation([0, 0, 1, -1.5708])
         if self.auto_node:
             self.auto_node.getField("translation").setSFVec3f([70.0, 1.80, 0.68])
