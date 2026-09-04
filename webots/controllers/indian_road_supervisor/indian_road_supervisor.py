@@ -59,8 +59,8 @@ CONFIG = {
         "x": 52.0,
         "start_y": 3.5,
         "target_y": -3.5,
-        "speed": 1.15,
-        "trigger_ego_x": 37.0
+        "speed": 1.05,
+        "trigger_ego_x": 36.0
     },
     "auto_rickshaw": {
         "start_x": 70.0,
@@ -119,9 +119,16 @@ class PurePursuitPlanner:
         for obs in obstacles:
             if "pedestrian" in obs["type"]:
                 dx = obs["pos"][0] - ego_x
-                lat = abs(obs["pos"][1] - ego_y)
-                if 0.2 < dx < 7.5 and lat < 1.35:
-                    if dx < 3.2:
+                dy = obs["pos"][1] - ego_y
+                lat = abs(dy)
+                v_lat = obs.get("vel", [0, 0])[1]
+
+                # Check if pedestrian is in lane or actively stepping into vehicle corridor
+                approaching = (dy > 0 and v_lat < -0.05) or (dy < 0 and v_lat > 0.05)
+                hazard_corridor = lat < 1.4 or (approaching and lat < 2.5)
+
+                if 0.2 < dx < 7.5 and hazard_corridor:
+                    if dx < 3.2 and lat < 1.4:
                         target_v = 0.0
                         state = "STOP_PEDESTRIAN"
                     else:
@@ -238,18 +245,26 @@ class IndianRoadSupervisor:
             self.ped1_active = True
             print(f"  [OBS] Pedestrian 1 triggered! Crossing right-to-left at X={self.ped1_x:.1f}m")
 
-        if self.ped1_active:
+        if not self.ped2_active and self.ego_x >= CONFIG["pedestrian_2"]["trigger_ego_x"]:
+            self.ped2_active = True
+            print(f"  [OBS] Pedestrian 2 triggered! Crossing left-to-right at X={self.ped2_x:.1f}m")
+
+        # Flank protection: pedestrian pauses if vehicle body is adjacent
+        car_front_x = self.ego_x + 2.3
+        car_rear_x = self.ego_x - 2.3
+
+        # Pedestrian 1 movement
+        ped1_flank = (car_rear_x <= self.ped1_x <= car_front_x) and (abs(self.ped1_y - self.ego_y) < 1.6)
+        if self.ped1_active and not ped1_flank:
             target_y = CONFIG["pedestrian_1"]["target_y"]
             if self.ped1_y < target_y:
                 self.ped1_y += CONFIG["pedestrian_1"]["speed"] * self.dt
             if self.ped1_node:
                 self.ped1_node.getField("translation").setSFVec3f([self.ped1_x, self.ped1_y, 0.9])
 
-        if not self.ped2_active and self.ego_x >= CONFIG["pedestrian_2"]["trigger_ego_x"]:
-            self.ped2_active = True
-            print(f"  [OBS] Pedestrian 2 triggered! Crossing left-to-right at X={self.ped2_x:.1f}m")
-
-        if self.ped2_active:
+        # Pedestrian 2 movement
+        ped2_flank = (car_rear_x <= self.ped2_x <= car_front_x) and (abs(self.ped2_y - self.ego_y) < 1.6)
+        if self.ped2_active and not ped2_flank:
             target_y = CONFIG["pedestrian_2"]["target_y"]
             if self.ped2_y > target_y:
                 self.ped2_y -= CONFIG["pedestrian_2"]["speed"] * self.dt
