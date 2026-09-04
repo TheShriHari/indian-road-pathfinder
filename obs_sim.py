@@ -178,6 +178,99 @@ def run_simulation(args):
             time.sleep(0.05)
         print("[SENSORS] Camera stream synchronized successfully.")
 
+        if args.autonomous:
+            print("\n" + "=" * 70)
+            print("  RUNNING AUTONOMOUS PYTHON CONTROLLER (NO MATLAB REQUIRED)")
+            print("  Vehicle uses Pure Pursuit, Camera Perception, and Obstacle Nudge/Yield.")
+            print("=" * 70 + "\n")
+
+            carla_map = world.get_map()
+            sim_time = 0.0
+            dt = 0.1
+
+            while sim_time < args.duration:
+                world.tick()
+                update_spectator(world, ego_vehicle)
+                sim_time += dt
+
+                rgb_bgr, depth_m = sensors.snapshot()
+                detections = []
+                if rgb_bgr is not None and depth_m is not None:
+                    detections = detector.detect(rgb_bgr)
+
+                projected_obs = []
+                if depth_m is not None:
+                    projected_obs = fuser.project(detections, depth_m)
+
+                # Ego state
+                tf = ego_vehicle.get_transform()
+                vel = ego_vehicle.get_velocity()
+                speed = math.sqrt(vel.x**2 + vel.y**2)
+                curr_wp = carla_map.get_waypoint(tf.location, project_to_road=True, lane_type=carla.LaneType.Driving)
+
+                # Target waypoint ahead along road
+                target_lookahead = max(5.0, min(14.0, speed * 1.5 + 4.5))
+                nxt_list = curr_wp.next(target_lookahead) if curr_wp else []
+                target_wp = nxt_list[0] if nxt_list else curr_wp
+
+                # Check obstacles in corridor ahead (X in [1.5, 25.0], |Y| < 2.2m)
+                target_lat_offset = 0.0
+                target_speed = 4.2  # ~15 km/h
+                brake_val = 0.0
+                state_str = "CRUISE"
+
+                for obs in projected_obs:
+                    ox, oy = obs['position']
+                    if 1.5 < ox < 25.0 and abs(oy) < 2.2:
+                        if obs['type'] in ['auto_rickshaw', 'pedestrian', 'cattle'] and ox < 12.0:
+                            state_str = "YIELD_WAIT"
+                            target_speed = 0.0
+                            brake_val = 0.7
+                            break
+                        elif oy <= 0.0:
+                            state_str = "NUDGE_RIGHT"
+                            target_lat_offset = 0.95
+                            target_speed = 3.0
+                        else:
+                            state_str = "NUDGE_LEFT"
+                            target_lat_offset = -0.95
+                            target_speed = 3.0
+
+                # Pure pursuit lateral steering to target with offset
+                right_v = target_wp.transform.get_right_vector() if target_wp else carla.Vector3D(0, 0, 0)
+                goal_loc = (target_wp.transform.location + right_v * target_lat_offset) if target_wp else tf.location
+
+                yaw_rad = math.radians(tf.rotation.yaw)
+                dx = goal_loc.x - tf.location.x
+                dy = goal_loc.y - tf.location.y
+                local_x = dx * math.cos(yaw_rad) + dy * math.sin(yaw_rad)
+                local_y = -dx * math.sin(yaw_rad) + dy * math.cos(yaw_rad)
+
+                L = 2.7
+                Ld2 = local_x**2 + local_y**2
+                steer_rad = math.atan2(2.0 * L * local_y, Ld2) if Ld2 > 0.1 else 0.0
+                steer_norm = max(-1.0, min(1.0, steer_rad / (math.pi / 6.0)))
+
+                # Speed control
+                if target_speed <= 0.1:
+                    throttle_val = 0.0
+                    brake_val = max(0.5, brake_val)
+                elif speed < target_speed:
+                    throttle_val = min(0.6, 0.35 + 0.3 * (target_speed - speed))
+                    brake_val = 0.0
+                else:
+                    throttle_val = 0.0
+                    brake_val = 0.2
+
+                ctrl = carla.VehicleControl(steer=steer_norm, throttle=throttle_val, brake=brake_val, hand_brake=False)
+                ego_vehicle.apply_control(ctrl)
+
+                if int(sim_time / dt) % 10 == 0:
+                    print(f"[AUTO t={sim_time:4.1f}s] Speed={speed:4.1f}m/s | State={state_str:<12s} | Steer={steer_norm:+.2f} Thr={throttle_val:.2f} Brk={brake_val:.2f} | Obs={len(projected_obs)}")
+
+            print("\n[AUTO] Autonomous run completed successfully.")
+            return
+
         if args.standalone:
             print("\n[SCENE] Running in STANDALONE mode (idle simulation).")
             print("        Press Ctrl+C to terminate and clean up actors.\n")
@@ -335,5 +428,9 @@ if __name__ == '__main__':
                         help='Object detector confidence threshold')
     parser.add_argument('--standalone',  action='store_true',
                         help='Run scene only without waiting for MATLAB bridge')
+    parser.add_argument('--autonomous',  action='store_true',
+                        help='Run standalone autonomous Python controller directly in CARLA (No MATLAB required)')
+    parser.add_argument('--duration',    type=float, default=60.0,
+                        help='Duration in seconds for autonomous run (default: 60s)')
     args = parser.parse_args()
     run_simulation(args)

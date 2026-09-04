@@ -107,9 +107,9 @@ end
 % ============================================================
 
 % --- Search parameters ---
-ASTAR_RES  = 0.4;       % [m] fine search grid resolution for narrow corridor navigation
-N_YAW      = 24;        % heading discretisation: 24 bins x 15 deg = 360 deg
-YAW_RES    = 2*pi / N_YAW;  % 15 deg per bin (prevents small steer turns being pruned)
+ASTAR_RES  = 0.5;       % [m] search grid resolution (balanced for 5m rural road)
+N_YAW      = 16;        % heading discretisation: 16 bins x 22.5 deg = 360 deg
+YAW_RES    = 2*pi / N_YAW;  % 22.5 deg per bin (preserves steer angle resolution)
 WB         = 2.7;       % vehicle wheelbase [m]  (same as vehicle_kinematics.m)
 ARC_L      = 1.2;       % arc length per expansion [m]
 ARC_STEP   = 0.3;       % integration step along arc [m]
@@ -120,7 +120,7 @@ HARD_BLOCK = 250;       % costmap value treated as impassable
 COST_WT    = 0.015;     % weight: costmap value -> g-cost contribution
 STEER_WT   = 0.15;      % weight: steer angle penalty (prefer straight driving)
 SC_WT      = 0.10;      % weight: steer-change penalty (prefer smooth turns)
-MAX_ITER   = 60000;     % max iterations before giving up and falling back
+MAX_ITER   = 3500;      % cap search iterations to avoid slow stalls on impassable roads
 
 % World bounds — now taken from grid_origin (rolling window)
 x_max = x_min + (cmap_cols - 1) * grid_res;
