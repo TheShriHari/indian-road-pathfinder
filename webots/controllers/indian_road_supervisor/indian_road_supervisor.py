@@ -206,7 +206,6 @@ class IndianRoadSupervisor:
         print("="*65)
 
         self.ego_node = self.supervisor.getFromDef("EGO_VEHICLE")
-        self.viewpoint_node = self.supervisor.getFromDef("VIEWPOINT")
         self.ped1_node = self.supervisor.getFromDef("PEDESTRIAN_1")
         self.ped2_node = self.supervisor.getFromDef("PEDESTRIAN_2")
         self.auto_node = self.supervisor.getFromDef("AUTO_RICKSHAW")
@@ -252,18 +251,7 @@ class IndianRoadSupervisor:
             except Exception as e:
                 self.server_sock = None
 
-    def update_camera_follow(self):
-        """
-        Bird's Eye View: elevated high above the road surface, moving steadily along
-        the centerline of the road (Y=0.0) following road progression, NOT the car's
-        lateral swerves or yaw rotations.
-        """
-        if self.viewpoint_node:
-            cam_x = max(-7.5, self.ego_x - 7.5)
-            cam_y = 0.0               # Strictly centered on the road (not following car laterally)
-            cam_z = 9.5               # Elevated bird's eye view overlooking both lanes and obstacles
-            self.viewpoint_node.getField("position").setSFVec3f([cam_x, cam_y, cam_z])
-            self.viewpoint_node.getField("orientation").setSFRotation([0.10, 0.36, -0.92, 1.32])
+
 
     def update_dynamic_obstacles(self):
         if not self.ped1_active and self.ego_x >= CONFIG["pedestrian_1"]["trigger_ego_x"]:
@@ -348,7 +336,6 @@ class IndianRoadSupervisor:
                 step += 1
                 t_sim += self.dt
 
-                self.update_camera_follow()
                 self.update_dynamic_obstacles()
                 obstacles = self.get_obstacles_telemetry()
                 collision, col_reason = self.check_collisions()
