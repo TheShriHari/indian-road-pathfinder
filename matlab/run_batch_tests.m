@@ -1,15 +1,17 @@
-function results = run_batch_tests(num_trials, csv_out_name)
+function results = run_batch_tests(num_trials, csv_out_name, seed_start)
 %% RUN_BATCH_TESTS  Runs closed-loop simulation across N randomized ODD scenarios.
 %
 % Syntax:
 %   results = run_batch_tests(num_trials)
 %   results = run_batch_tests(num_trials, csv_out_name)
+%   results = run_batch_tests(num_trials, csv_out_name, seed_start)
 %
 % Parameters:
 %   num_trials   : number of trials (default: 1000)
 %   csv_out_name : base name for output CSV (default: 'batch_test_results').
 %                  Pass 'batch_test_results_sensor_layer' to avoid overwriting
 %                  the oracle-feed baseline.
+%   seed_start   : starting seed for trial suite (default: 1)
 %
 % Metrics & Outcomes recorded per trial:
 %   - Outcome: 'SUCCESS' | 'TIMEOUT' | 'COLLISION' | 'STALLED' | 'ERROR'
@@ -31,6 +33,9 @@ if nargin < 1 || isempty(num_trials)
 end
 if nargin < 2 || isempty(csv_out_name)
     csv_out_name = 'batch_test_results';
+end
+if nargin < 3 || isempty(seed_start)
+    seed_start = 1;
 end
 
 fprintf('=========================================================================\n');
@@ -68,7 +73,7 @@ error_cnt     = 0;
 safe_stop_cnt = 0;
 
 for i = 1:num_trials
-    seed = i;
+    seed = seed_start + i - 1;
     scenario = generate_random_scenario(seed);
 
     % Reset persistent EKF filter and sensor detection states across trials
