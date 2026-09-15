@@ -32,3 +32,9 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# ── Reference Repositories (large cloned codebases) ──
+resources/repos/
+repos/
+workspace_resources/
+
