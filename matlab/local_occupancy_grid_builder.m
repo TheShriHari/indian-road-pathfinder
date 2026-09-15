@@ -157,11 +157,15 @@ end
 %% ── Nested Function: Continuous Exponential Inflation Field ───────────────
 % Avoids 45,000-cell full scan via local bounding box cropping:
 % r in [row(yh - R - 1.2), row(yh + R + 1.2)]
-% c in [col(xh - R - 1.2), col(xh + R + 1.2)]
 function apply_exponential_inflation(cx, cy, radius)
     d_safe   = 0.35; % safe vehicle cushion (m)
     d_margin = 1.20; % inflation field extent (m)
     alpha    = 2.50; % exponential decay rate (m^-1)
+    if isfield(map_config, 'alpha_cost') && ~isempty(map_config.alpha_cost)
+        alpha = map_config.alpha_cost;
+    elseif isfield(map_config, 'alpha') && ~isempty(map_config.alpha)
+        alpha = map_config.alpha;
+    end
     
     r_total = radius + d_margin;
     

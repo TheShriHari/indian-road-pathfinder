@@ -96,12 +96,17 @@ if ~isfield(obstacle_config, 'road_boundaries') || isempty(obstacle_config.road_
 end
 
 % Execute simulation with error handling
+params = [];
+if isfield(sim_opts, 'params'), params = sim_opts.params; end
+record_telemetry = false;
+if isfield(sim_opts, 'record_telemetry'), record_telemetry = sim_opts.record_telemetry; end
+
 try
     if verbose
-        result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose);
+        result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry);
     else
         % Suppress internal diagnostic prints using evalc
-        evalc('result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose);');
+        evalc('result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry);');
     end
 catch ME
     result.outcome = 'ERROR';
@@ -118,12 +123,23 @@ catch ME
     result.error_msg = ME.message;
     result.error_stack = getReport(ME, 'extended', 'hyperlinks', 'off');
     result.obstacle_config = obstacle_config;
+    result.replan_latencies = [];
+    result.mean_latency_ms = NaN;
+    result.p99_latency_ms = NaN;
+    result.mean_jerk = NaN;
+    result.p99_jerk = NaN;
+    result.max_jerk = NaN;
+    result.kinematic_violation = false;
+    result.telemetry = [];
 end
 
 end
 
 %% ── Core Simulation Function ─────────────────────────────────────────────
-function result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose)
+function result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry)
+
+if nargin < 8, params = []; end
+if nargin < 9 || isempty(record_telemetry), record_telemetry = false; end
 
 % Reset persistent EKF state and sensor simulation state
 clear dynamic_obstacle_predictor;
@@ -131,6 +147,68 @@ clear simulate_sensor_detection;
 
 if nargin >= 2 && ~isempty(seed)
     rng(seed);
+end
+
+% Default hyperparameters
+K_v        = 1.2;
+L_min      = 3.0;
+w_steer    = 0.06;
+delta_hyst = 0.50;
+alpha_cost = 2.50;
+
+if ~isempty(params)
+    if isnumeric(params) && length(params) >= 5
+        K_v        = params(1);
+        L_min      = params(2);
+        w_steer    = params(3);
+        delta_hyst = params(4);
+        alpha_cost = params(5);
+    elseif isstruct(params)
+        if isfield(params, 'K_v') && ~isempty(params.K_v), K_v = params.K_v; end
+        if isfield(params, 'k_lookahead') && ~isempty(params.k_lookahead), K_v = params.k_lookahead; end
+        if isfield(params, 'L_min') && ~isempty(params.L_min), L_min = params.L_min; end
+        if isfield(params, 'min_lookahead') && ~isempty(params.min_lookahead), L_min = params.min_lookahead; end
+        if isfield(params, 'w_steer') && ~isempty(params.w_steer), w_steer = params.w_steer; end
+        if isfield(params, 'steer_wt') && ~isempty(params.steer_wt), w_steer = params.steer_wt; end
+        if isfield(params, 'delta_hyst') && ~isempty(params.delta_hyst), delta_hyst = params.delta_hyst; end
+        if isfield(params, 'W_hyst') && ~isempty(params.W_hyst), delta_hyst = params.W_hyst; end
+        if isfield(params, 'alpha_cost') && ~isempty(params.alpha_cost), alpha_cost = params.alpha_cost; end
+        if isfield(params, 'alpha') && ~isempty(params.alpha), alpha_cost = params.alpha; end
+    end
+else
+    % Attempt loading best_params.mat if available
+    bp_files = {'best_params.mat', fullfile('matlab', 'best_params.mat'), fullfile('..', 'matlab', 'best_params.mat')};
+    for bpf = bp_files
+        if exist(bpf{1}, 'file')
+            try
+                loaded = load(bpf{1});
+                if isfield(loaded, 'best_params')
+                    bp = loaded.best_params;
+                elseif isfield(loaded, 'theta_best')
+                    bp = loaded.theta_best;
+                elseif isfield(loaded, 'params')
+                    bp = loaded.params;
+                else
+                    bp = loaded;
+                end
+                if isnumeric(bp) && length(bp) >= 5
+                    K_v        = bp(1);
+                    L_min      = bp(2);
+                    w_steer    = bp(3);
+                    delta_hyst = bp(4);
+                    alpha_cost = bp(5);
+                elseif isstruct(bp)
+                    if isfield(bp, 'K_v') && ~isempty(bp.K_v), K_v = bp.K_v; end
+                    if isfield(bp, 'L_min') && ~isempty(bp.L_min), L_min = bp.L_min; end
+                    if isfield(bp, 'w_steer') && ~isempty(bp.w_steer), w_steer = bp.w_steer; end
+                    if isfield(bp, 'delta_hyst') && ~isempty(bp.delta_hyst), delta_hyst = bp.delta_hyst; end
+                    if isfield(bp, 'alpha_cost') && ~isempty(bp.alpha_cost), alpha_cost = bp.alpha_cost; end
+                end
+                break;
+            catch
+            end
+        end
+    end
 end
 
 % Vehicle parameters (matching CARLA specification)
@@ -141,10 +219,11 @@ N_HORIZON     = 35;     % 3.5s prediction horizon (increased from 20 steps)
 REPLAN_EVERY  = 8;
 
 % Rolling costmap config
-map_cfg.grid_res  = 0.2;
-map_cfg.range_fwd = 50.0;
-map_cfg.range_bwd = 10.0;
-map_cfg.range_lat = 15.0;
+map_cfg.grid_res   = 0.2;
+map_cfg.range_fwd  = 50.0;
+map_cfg.range_bwd  = 10.0;
+map_cfg.range_lat  = 15.0;
+map_cfg.alpha_cost = alpha_cost;
 
 % Sensor simulation config (realistic perception limitations layer)
 sensor_cfg.max_detection_range = 35.0;   % m
@@ -189,6 +268,14 @@ innov_log        = [];   % Nx1 vector of |innov| norms (measurement updates only
 total_dropouts   = 0;    % sensor dropout event counter
 total_misclasses = 0;    % sensor misclassification event counter
 
+% KPI & Telemetry tracking
+prev_accel       = 0.0;
+prev_steer       = 0.0;
+jerk_log         = [];
+steer_rate_log   = [];
+replan_latencies = [];
+telemetry        = struct('t', {}, 'x', {}, 'y', {}, 'yaw', {}, 'v', {}, 'steer', {}, 'accel', {}, 'jerk', {}, 'min_clearance', {}, 'bsm_state', {}, 'costmap_slice', {});
+
 step = 0;
 
 potholes       = obstacle_config.potholes;
@@ -204,10 +291,14 @@ while step < max_steps
     step = step + 1;
     t    = step * dt;
 
-    % ── A. Update dynamic agents linearly in MOCK mode ───────────────────
+    % ── A. Update dynamic agents in MOCK mode (with acceleration) ────────
     raw_obstacles = struct([]);
     for k = 1:length(dynamic_agents)
-        pos = dynamic_agents(k).position + dynamic_agents(k).velocity * t;
+        if isfield(dynamic_agents(k), 'accel') && ~isempty(dynamic_agents(k).accel)
+            pos = dynamic_agents(k).position + dynamic_agents(k).velocity * t + 0.5 * dynamic_agents(k).accel * (t^2);
+        else
+            pos = dynamic_agents(k).position + dynamic_agents(k).velocity * t;
+        end
         raw_obstacles(k).id               = dynamic_agents(k).id;
         raw_obstacles(k).type             = dynamic_agents(k).type;
         raw_obstacles(k).position         = pos;
@@ -287,9 +378,11 @@ while step < max_steps
         cur_pose   = [ego_state(1), ego_state(2), ego_state(3)];
         local_goal = compute_local_goal(ego_state(1:2)', path, LOCAL_GOAL_HORIZON, goal_pose, rolling_costmap, grid_meta, map_cfg.grid_res, predictions);
         grid_org   = [grid_meta.x_min, grid_meta.y_min];
-        [path_new, ~, ~, plan_ok] = adaptive_path_planner( ...
+        p_opts     = struct('w_steer', w_steer);
+        [path_new, ~, lat_replan, plan_ok] = adaptive_path_planner( ...
             cur_pose, local_goal, rolling_costmap, predictions, ...
-            map_cfg.grid_res, grid_org);
+            map_cfg.grid_res, grid_org, p_opts);
+        replan_latencies(end+1) = lat_replan;
         if plan_ok && size(path_new, 1) > 2
             path = path_new;
             replan_cnt = replan_cnt + 1;
@@ -364,6 +457,7 @@ while step < max_steps
 
     bsm_params = struct();
     bsm_params.virtual_stop_active = vstop_active;
+    bsm_params.W_hyst = delta_hyst;
     if vstop_active
         bsm_params.stop_line_dist = max(0.0, bottleneck.station_s - 3.5);
     end
@@ -384,8 +478,8 @@ while step < max_steps
         prev_target = [NaN, NaN];
     elseif size(path, 1) >= 2
         pp_params.L             = L_WB;
-        pp_params.k_lookahead   = 0.45;
-        pp_params.min_lookahead = 2.2;
+        pp_params.k_lookahead   = K_v;
+        pp_params.min_lookahead = L_min;
         pp_params.Kp_v          = 1.0;
         pp_params.max_steer     = MAX_STEER_RAD;
         pp_params.prev_target   = prev_target;
@@ -409,6 +503,13 @@ while step < max_steps
         steer_rad = 0.0;
         accel     = min(accel, -2.5);
     end
+
+    % Discrete longitudinal jerk & steering slew tracking
+    step_jerk = abs(accel - prev_accel) / dt;
+    prev_accel = accel;
+    jerk_log(end+1) = step_jerk; %#ok<AGROW>
+    steer_rate_log(end+1) = abs(steer_rad - prev_steer) / dt; %#ok<AGROW>
+    prev_steer = steer_rad;
 
     % ── I. Kinematic Integration ──────────────────────────────────────────
     mock_v     = max(0.0, min(8.0, mock_v + accel * dt));
@@ -496,17 +597,17 @@ while step < max_steps
         stopped_wait_steps = 0;
     end
 
-    % Stalled if velocity < 0.1 m/s for > 3 consecutive seconds without being in YIELD_WAIT or SAFE_STOP
+    % Deadlock check: speed < 0.1 m/s outside VSL for > 5.0 consecutive seconds
     if ego_state(4) < 0.1 && ~strcmp(bsm_state, 'YIELD_WAIT') && ~safe_stop_active
         stall_consecutive_steps = stall_consecutive_steps + 1;
     else
         stall_consecutive_steps = 0;
     end
 
-    if stall_consecutive_steps > round(3.0 / dt)
-        outcome = 'STALLED';
+    if stall_consecutive_steps > round(5.0 / dt)
+        outcome = 'DEADLOCK';
         if verbose
-            fprintf('[SIM] STALLED at t=%.1fs (v=%.2fm/s in state %s for >3.0s)\n', ...
+            fprintf('[SIM] DEADLOCK at t=%.1fs (v=%.2fm/s in state %s for >5.0s outside VSL)\n', ...
                 t, ego_state(4), bsm_state);
         end
         break;
@@ -522,6 +623,30 @@ while step < max_steps
                 time_to_goal, replan_cnt);
         end
         break;
+    end
+
+    % ── L. Telemetry Logging (if requested) ───────────────────────────────
+    if record_telemetry
+        cur_t.t = t;
+        cur_t.x = round(mock_x, 3);
+        cur_t.y = round(mock_y, 3);
+        cur_t.yaw = round(mock_theta, 4);
+        cur_t.v = round(mock_v, 2);
+        cur_t.steer = round(steer_rad, 4);
+        cur_t.accel = round(accel, 3);
+        cur_t.jerk = round(step_jerk, 3);
+        cur_t.min_clearance = round(min_clearance, 3);
+        cur_t.bsm_state = bsm_state;
+        if mod(step, 5) == 1
+            r_c = round((mock_y - grid_meta.y_min) / map_cfg.grid_res) + 1;
+            c_c = round((mock_x - grid_meta.x_min) / map_cfg.grid_res) + 1;
+            r_sub = max(1, r_c - 15) : min(grid_meta.nY, r_c + 15);
+            c_sub = max(1, c_c - 30) : min(grid_meta.nX, c_c + 30);
+            cur_t.costmap_slice = rolling_costmap(r_sub, c_sub);
+        else
+            cur_t.costmap_slice = [];
+        end
+        telemetry(end+1) = cur_t; %#ok<AGROW>
     end
 
     if verbose && (mod(step, 5) == 0 || step == 1)
@@ -576,6 +701,29 @@ result.num_agents             = length(dynamic_agents);
 result.error_msg              = '';
 result.error_stack            = '';
 result.obstacle_config        = obstacle_config;
+
+% Latency & Jerk KPI fields
+result.replan_latencies       = replan_latencies;
+if ~isempty(replan_latencies)
+    result.mean_latency_ms    = mean(replan_latencies);
+    result.p99_latency_ms     = prctile(replan_latencies, 99);
+else
+    result.mean_latency_ms    = 0.0;
+    result.p99_latency_ms     = 0.0;
+end
+
+if ~isempty(jerk_log)
+    result.mean_jerk          = mean(jerk_log);
+    result.p99_jerk           = prctile(jerk_log, 99);
+    result.max_jerk           = max(jerk_log);
+else
+    result.mean_jerk          = 0.0;
+    result.p99_jerk           = 0.0;
+    result.max_jerk           = 0.0;
+end
+result.kinematic_violation    = any(steer_rate_log > (15.0 * pi / 180 + 0.05));
+result.telemetry              = telemetry;
+
 % Sensor layer stats
 result.innov_log              = innov_log;
 result.total_dropouts         = total_dropouts;

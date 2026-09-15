@@ -153,6 +153,7 @@ for idx = 1:length(s_eval)
         pinch_width       = W_free;
         pinch_pt          = pt;
         pinch_yaw         = yaw;
+        pinch_all_widths  = run_widths;
         break; % Evaluate earliest squeeze point encountered
     end
 end
@@ -205,24 +206,35 @@ bottleneck_info.station_s = pinch_station_rel;
 bottleneck_info.min_width = pinch_width;
 
 if pinch_width < W_chassis
-    % Condition 3: Complete Road Blockage (< 1.85 m static) -> Must Halt
-    virtual_stop_active          = true;
-    bottleneck_info.detour_required = false;
-    
-    % Upstream VSL Clamping: s_vsl = max(0.5, s_pinch - 3.5)
-    if pinch_station_rel <= 1.0
-        bottleneck_info.immediate_standstill = true;
-        s_vsl = 0.0;
-        stop_pose = [ego_x, ego_y, ego_theta];
+    if exist('pinch_all_widths', 'var') && any(pinch_all_widths >= W_chassis)
+        % Road has an open corridor elsewhere (e.g. detour around pothole possible)
+        % Invalidate current colliding path to force replan through open corridor
+        virtual_stop_active          = false;
+        bottleneck_info.detour_required = true;
+        bottleneck_info.path_invalid = true;
+        bottleneck_info.vsl_station  = NaN;
+        bottleneck_info.reason = sprintf('Path Pinch: Local opening %.2fm < %.2fm chassis width, detour available', ...
+                                         pinch_width, W_chassis);
     else
-        bottleneck_info.immediate_standstill = false;
-        s_vsl = max(0.5, pinch_station_rel - params.stop_buffer);
-        vsl_xy = interp1(cum_s, planned_path, s_ego + s_vsl, 'linear');
-        stop_pose = [vsl_xy(1), vsl_xy(2), pinch_yaw];
+        % Condition 3: True Complete Road Blockage (< 1.85 m static everywhere) -> Must Halt
+        virtual_stop_active          = true;
+        bottleneck_info.detour_required = false;
+        
+        % Upstream VSL Clamping: s_vsl = max(0.5, s_pinch - 3.5)
+        if pinch_station_rel <= 1.0
+            bottleneck_info.immediate_standstill = true;
+            s_vsl = 0.0;
+            stop_pose = [ego_x, ego_y, ego_theta];
+        else
+            bottleneck_info.immediate_standstill = false;
+            s_vsl = max(0.5, pinch_station_rel - params.stop_buffer);
+            vsl_xy = interp1(cum_s, planned_path, s_ego + s_vsl, 'linear');
+            stop_pose = [vsl_xy(1), vsl_xy(2), pinch_yaw];
+        end
+        bottleneck_info.vsl_station = s_vsl;
+        bottleneck_info.reason = sprintf('Complete Road Blockage: Width=%.2fm < %.2fm chassis width at +%.1fm', ...
+                                         pinch_width, W_chassis, pinch_station_rel);
     end
-    bottleneck_info.vsl_station = s_vsl;
-    bottleneck_info.reason = sprintf('Complete Road Blockage: Width=%.2fm < %.2fm chassis width at +%.1fm', ...
-                                     pinch_width, W_chassis, pinch_station_rel);
 
 elseif has_oncoming_dynamic
     % Condition 2: Dynamic Squeeze Point -> Halt at Upstream Virtual Stop Line
