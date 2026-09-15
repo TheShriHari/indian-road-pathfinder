@@ -1,51 +1,44 @@
 function [virtual_stop_active, stop_pose, bottleneck_info] = universal_bottleneck_decider(ego_state, planned_path, costmap, grid_meta, dynamic_predictions, params)
-% UNIVERSAL_BOTTLENECK_DECIDER Evaluates spatio-temporal corridor squeeze without hardcoded map positions.
+%% UNIVERSAL_BOTTLENECK_DECIDER Evaluates forward corridor squeeze and arbitrates VSL vs detour (Phase 3).
+%   [virtual_stop_active, stop_pose, bottleneck_info] = universal_bottleneck_decider(...)
 %
-% This algorithm computes the continuous traversable width W_free(s) along the ego
-% path horizon. If at any longitudinal station s ahead, the navigable corridor narrows
-% below (vehicle_width + 2*safety_margin) due to ANY combination of static clutter
-% and dynamic predicted agents, it establishes a Virtual Stop Line upstream of the pinch.
-%
-% Inputs:
-%   ego_state           : [x, y, theta, v]
-%   planned_path        : (N x 2) waypoints [x, y] ahead of ego
-%   costmap             : (nY x nX) matrix of lethal/soft costs from local_occupancy_grid_builder
-%   grid_meta           : Coordinate transform metadata
-%   dynamic_predictions : Struct array from dynamic_obstacle_predictor (EKF)
-%   params              : (Optional) tuning parameters:
-%                           .vehicle_width : Vehicle body width (default: 1.85m)
-%                           .min_clearance : Minimum lateral margin required (default: 0.35m)
-%                           .scan_horizon  : Maximum distance ahead to evaluate (default: 30.0m)
-%                           .stop_buffer   : Standstill buffer before bottleneck (default: 3.5m)
-%
-% Outputs:
-%   virtual_stop_active : Boolean flag indicating that ego must halt
-%   stop_pose           : [x_stop, y_stop, theta_stop] Virtual Stop Line coordinates
-%   bottleneck_info     : Struct with bottleneck station s, bottleneck width, and reason
+% Algorithm:
+%   1. Profiles continuous traversable width W_free(s) along forward path stations s in [0, 30] m.
+%   2. Enforces Disjoint Free Opening Rule: extracts the single contiguous opening containing
+%      or closest to the reference path (never sums disjoint clear gaps).
+%   3. Evaluates against W_crit = W_veh + 2*clearance = 1.85 + 2*0.35 = 2.55 m.
+%   4. Arbitrates among:
+%      - Static Narrowing (1.85 <= W_free < 2.55 m, no oncoming actor) -> detour_required = true, virtual_stop = false
+%      - Dynamic Squeeze (W_free < 2.55 m + oncoming actor v_rel < -0.5 m/s) -> virtual_stop = true (VSL at s - 3.5 m)
+%      - Complete Blockage (W_free < 1.85 m static) -> virtual_stop = true (VSL at s - 3.5 m)
+%      - Clear (W_free >= 2.55 m) -> virtual_stop = false, detour_required = false
 
-% ── Build defaults, then merge any caller-supplied fields on top ──────────
-% Same pattern as behavior_state_machine.m — prevents missing-field crashes
-% when the bridge passes only a subset (e.g. only virtual_stop_active).
-defaults_ubd.vehicle_width = 1.85; % Standard sedan width (m)
-defaults_ubd.min_clearance = 0.35; % Lateral margin each side (m)
-defaults_ubd.scan_horizon  = 30.0; % Forward scan horizon (m)
-defaults_ubd.stop_buffer   = 3.5;  % Halt this many metres upstream of pinch
-if nargin < 6 || isempty(params)
-    params = defaults_ubd;
-else
-    fnames_ubd = fieldnames(defaults_ubd);
-    for fi_ubd = 1:length(fnames_ubd)
-        if ~isfield(params, fnames_ubd{fi_ubd})
-            params.(fnames_ubd{fi_ubd}) = defaults_ubd.(fnames_ubd{fi_ubd});
-        end
+% ── Configuration Defaults ─────────────────────────────────────────────────
+defaults_ubd.vehicle_width   = 1.85;  % standard chassis width (m)
+defaults_ubd.min_clearance   = 0.35;  % lateral clearance per side (m)
+defaults_ubd.scan_horizon    = 30.0;  % scan ahead horizon (m)
+defaults_ubd.stop_buffer     = 3.5;   % VSL offset upstream of bottleneck (m)
+defaults_ubd.cost_threshold  = 90.0;  % cost < 90 is traversable corridor (excludes lethal core)
+
+if nargin < 6 || isempty(params), params = defaults_ubd; end
+fnames = fieldnames(defaults_ubd);
+for fi = 1:length(fnames)
+    if ~isfield(params, fnames{fi})
+        params.(fnames{fi}) = defaults_ubd.(fnames{fi});
     end
 end
 
-min_traversable_width = params.vehicle_width + 2 * params.min_clearance; % ~2.55m
+if nargin < 5, dynamic_predictions = []; end
+
+W_crit = params.vehicle_width + 2.0 * params.min_clearance; % 2.55 m
+W_chassis = params.vehicle_width;                           % 1.85 m
 
 virtual_stop_active = false;
-stop_pose = [];
-bottleneck_info = struct('station_s', Inf, 'min_width', Inf, 'reason', 'Clear', 'path_invalid', false);
+stop_pose           = [];
+bottleneck_info     = struct('station_s', Inf, 'min_width', Inf, ...
+                             'detour_required', false, 'vsl_station', NaN, ...
+                             'reason', 'Clear Open Road', 'path_invalid', false, ...
+                             'immediate_standstill', false);
 
 if isempty(planned_path) || size(planned_path, 1) < 2
     return;
@@ -53,162 +46,211 @@ end
 
 ego_x = ego_state(1);
 ego_y = ego_state(2);
-ego_theta = ego_state(3);
-
-% 1. Sample trajectory along path up to scan_horizon
-cum_s = 0;
-path_stations = zeros(size(planned_path, 1), 1);
-for k = 2:size(planned_path, 1)
-    cum_s = cum_s + hypot(planned_path(k,1) - planned_path(k-1,1), planned_path(k,2) - planned_path(k-1,2));
-    path_stations(k) = cum_s;
+if length(ego_state) >= 3
+    ego_theta = ego_state(3);
+else
+    ego_theta = 0.0;
 end
 
-% Project ego vehicle onto path to find ego station
-d_ego_pts = hypot(planned_path(:,1) - ego_x, planned_path(:,2) - ego_y);
-[~, nearest_idx] = min(d_ego_pts);
-s_ego = path_stations(nearest_idx);
+% ── Step 1: Compute Path Cumulative Stations ───────────────────────────────
+N_pts = size(planned_path, 1);
+cum_s = zeros(N_pts, 1);
+for k = 2:N_pts
+    cum_s(k) = cum_s(k-1) + hypot(planned_path(k,1) - planned_path(k-1,1), ...
+                                  planned_path(k,2) - planned_path(k-1,2));
+end
 
-% 2. Evaluate lateral width at regular station intervals strictly ahead of ego
-ds = 1.0; % 1-meter evaluation resolution
+% Find ego station along path
+d_ego = hypot(planned_path(:,1) - ego_x, planned_path(:,2) - ego_y);
+[~, nearest_idx] = min(d_ego);
+s_ego = cum_s(nearest_idx);
+
+% ── Step 2: Forward Corridor Width Profiling (s in [0, 30] m) ──────────────
+ds = 1.0; % 1-meter evaluation step
 s_start = s_ego + 1.0;
-s_end   = min(cum_s, s_ego + params.scan_horizon);
+s_end   = min(cum_s(end), s_ego + params.scan_horizon);
+
 if s_start >= s_end
     return;
 end
+
 s_eval = s_start:ds:s_end;
+res = grid_meta.res;
+y_min = grid_meta.y_min;
+y_max = grid_meta.y_max;
+nY = grid_meta.nY;
+nX = grid_meta.nX;
+row_ys = y_min + ((1:nY) - 0.5) * res;
+
+found_pinch       = false;
+pinch_station_rel = Inf;
+pinch_width       = Inf;
+pinch_pt          = [0, 0];
+pinch_yaw         = ego_theta;
 
 for idx = 1:length(s_eval)
-    s = s_eval(idx);
-    dist_ahead = s - s_ego;
+    s_curr = s_eval(idx);
+    dist_ahead = s_curr - s_ego;
     
-    % Interpolate path point and tangent direction at station s
-    pt = interp1(path_stations, planned_path, s, 'linear');
-    pt_next = interp1(path_stations, planned_path, min(cum_s, s + 0.5), 'linear');
-    tangent_yaw = atan2(pt_next(2) - pt(2), pt_next(1) - pt(1));
+    pt = interp1(cum_s, planned_path, s_curr, 'linear');
+    pt_next = interp1(cum_s, planned_path, min(cum_s(end), s_curr + 0.5), 'linear');
+    yaw = atan2(pt_next(2) - pt(2), pt_next(1) - pt(1));
     
-    % Normal vector to path (pointing Left: +90 deg, Right: -90 deg)
-    n_left  = [-sin(tangent_yaw),  cos(tangent_yaw)];
-    n_right = [ sin(tangent_yaw), -cos(tangent_yaw)];
+    % Find costmap column index for pt(1)
+    col_idx = min(max(floor((pt(1) - grid_meta.x_min) / res) + 1, 1), nX);
+    col_costs = costmap(:, col_idx);
     
-    % Scan laterally to find closest obstacle boundary on Left and Right
-    [left_dist,  left_blocked]  = scan_lateral_clearance(pt, n_left,  costmap, grid_meta, dynamic_predictions, dist_ahead, ego_state(4));
-    [right_dist, right_blocked] = scan_lateral_clearance(pt, n_right, costmap, grid_meta, dynamic_predictions, dist_ahead, ego_state(4));
+    % Contiguous free intervals where cost < cost_threshold (40)
+    is_clear = (col_costs < params.cost_threshold);
     
-    % ── Path Collision vs Corridor Squeeze ────────────────────────────────────
-    if left_blocked || right_blocked
-        % Path centerline itself sits in lethal obstacle or dynamic agent radius
-        virtual_stop_active = false;
-        bottleneck_info.path_invalid = true;
-        bottleneck_info.station_s = dist_ahead;
-        bottleneck_info.min_width = 0.0;
-        bottleneck_info.reason = sprintf('Path Collision Detected at +%.1fm (needs immediate replan)', dist_ahead);
-        return;
-    end
-
-    corridor_width = left_dist + right_dist;
+    % Find contiguous blocks of 1s in is_clear
+    d_clear = diff([0; is_clear; 0]);
+    run_starts = find(d_clear == 1);
+    run_ends   = find(d_clear == -1) - 1;
     
-    % ── Dynamic Conflict Gate ────────────────────────────────────────────────
-    % FIX: Static pothole geometry alone must NOT trigger a virtual stop line.
-    % Potholes narrow the lane but are solvable by the Hybrid A* planner.
-    % A virtual stop line is only appropriate when a DYNAMIC agent is also
-    % predicted to occupy the squeezed corridor at arrival time, creating an
-    % active conflict that the planner cannot resolve by rerouting alone.
-    % Without this gate the vehicle deadlocked on every pothole squeeze.
-    has_dynamic_agent_in_corridor = false;
-    if corridor_width < min_traversable_width
-        for a_chk = 1:length(dynamic_predictions)
-            wpc = dynamic_predictions(a_chk).waypoints;
-            if isempty(wpc), continue; end
-            for hh = 1:min(25, size(wpc, 1))
-                dx_c = wpc(hh,1) - pt(1);
-                dy_c = wpc(hh,2) - pt(2);
-                if hypot(dx_c, dy_c) < 3.5   % within 3.5 m of squeeze point
-                    has_dynamic_agent_in_corridor = true;
-                    break;
-                end
+    if isempty(run_starts)
+        % Completely blocked column
+        W_free = 0.0;
+    else
+        % Compute width and y-bounds of each contiguous opening
+        num_runs = length(run_starts);
+        run_widths = zeros(num_runs, 1);
+        dist_to_path = zeros(num_runs, 1);
+        
+        for ri = 1:num_runs
+            y_lower = row_ys(run_starts(ri)) - 0.5 * res;
+            y_upper = row_ys(run_ends(ri))   + 0.5 * res;
+            run_widths(ri) = y_upper - y_lower;
+            
+            % Distance from reference path y to opening interval
+            if pt(2) >= y_lower && pt(2) <= y_upper
+                dist_to_path(ri) = 0.0; % reference path inside this opening
+            else
+                dist_to_path(ri) = min(abs(pt(2) - y_lower), abs(pt(2) - y_upper));
             end
-            if ~has_dynamic_agent_in_corridor && isfield(dynamic_predictions(a_chk), 'velocity') && ~isempty(dynamic_predictions(a_chk).velocity)
-                v_ag = dynamic_predictions(a_chk).velocity;
-                if v_ag(1) < -0.5 && wpc(1,1) > pt(1) && (wpc(1,1) - pt(1)) < 25.0
-                    % Oncoming vehicle within 25m of squeeze point ahead
-                    has_dynamic_agent_in_corridor = true;
-                end
-            end
-            if has_dynamic_agent_in_corridor, break; end
         end
+        
+        % Disjoint Free Opening Selection Rule:
+        % Select the single contiguous opening containing the reference path,
+        % or closest to it if none contains it. NEVER sum multiple disjoint gaps!
+        [min_dist, ~] = min(dist_to_path);
+        candidate_indices = find(dist_to_path == min_dist);
+        if length(candidate_indices) == 1
+            best_ri = candidate_indices;
+        else
+            % If equidistant, choose the larger opening
+            [~, best_sub] = max(run_widths(candidate_indices));
+            best_ri = candidate_indices(best_sub);
+        end
+        
+        W_free = run_widths(best_ri);
     end
     
-    % Only trigger virtual stop if geometry is squeezed AND a dynamic agent
-    % is actively contending the corridor (not a static pothole alone).
-    if corridor_width < min_traversable_width && has_dynamic_agent_in_corridor
-        virtual_stop_active = true;
-        
-        % Place stop pose upstream by params.stop_buffer
-        s_stop = max(s_ego + 0.5, s - params.stop_buffer);
-        stop_xy = interp1(path_stations, planned_path, s_stop, 'linear');
-        stop_pose = [stop_xy(1), stop_xy(2), tangent_yaw];
-        
-        bottleneck_info.path_invalid = false;
-        bottleneck_info.station_s = dist_ahead;
-        bottleneck_info.min_width = corridor_width;
-        bottleneck_info.reason = sprintf('Corridor Squeeze (Width=%.2fm < %.2fm required at +%.1fm)', ...
-                                         corridor_width, min_traversable_width, dist_ahead);
-        return;
+    % Check bottleneck threshold (W_free < W_crit = 2.55 m)
+    if W_free < W_crit
+        found_pinch       = true;
+        pinch_station_rel = dist_ahead;
+        pinch_width       = W_free;
+        pinch_pt          = pt;
+        pinch_yaw         = yaw;
+        break; % Evaluate earliest squeeze point encountered
     end
 end
 
-    % --- Nested Function: Scan Lateral Clearance from Centerline ---
-    function [clearance, is_center_blocked] = scan_lateral_clearance(center_pt, normal_dir, cmap, g_meta, dyn_preds, s_dist, ego_speed)
-        MAX_LAT_SCAN = 6.0; % Scan up to 6m left/right
-        dl = 0.2;           % 20cm search step
-        clearance = MAX_LAT_SCAN;
-        is_center_blocked = false;
+if ~found_pinch
+    % Corridor is fully clear across all 30m
+    bottleneck_info.min_width = 7.0; % nominal open width
+    return;
+end
+
+% ── Step 3: Check for Dynamic Actors in Pinch Zone ────────────────────────
+% Pinch zone: [s_pinch - 2.0 m, s_pinch + 4.0 m]
+has_oncoming_dynamic = false;
+
+if ~isempty(dynamic_predictions)
+    for ai = 1:length(dynamic_predictions)
+        dp = dynamic_predictions(ai);
         
-        % Estimated arrival time at station s ahead of ego
-        if ego_speed > 0.5
-            t_arrival = s_dist / ego_speed;
-        else
-            t_arrival = s_dist / 3.0; % Nominal assumption if currently slow/stopped
+        % Check velocity: approaching relative velocity (v_rel < -0.5 m/s)
+        is_approaching = false;
+        if isfield(dp, 'x_est') && ~isempty(dp.x_est)
+            v_x = dp.x_est(3);
+            if v_x < -0.5
+                is_approaching = true;
+            end
         end
-        horizon_step = max(1, min(20, round(t_arrival / 0.1)));
         
-        for lat_dist = 0:dl:MAX_LAT_SCAN
-            test_x = center_pt(1) + lat_dist * normal_dir(1);
-            test_y = center_pt(2) + lat_dist * normal_dir(2);
-            
-            % Check static/rolling costmap cell
-            if test_x >= g_meta.x_min && test_x <= g_meta.x_max && ...
-               test_y >= g_meta.y_min && test_y <= g_meta.y_max
-                c = min(max(round((test_x - g_meta.x_min) / g_meta.res) + 1, 1), g_meta.nX);
-                r = min(max(round((test_y - g_meta.y_min) / g_meta.res) + 1, 1), g_meta.nY);
-                if cmap(r, c) >= 200
-                    if lat_dist == 0
-                        is_center_blocked = true;
-                    end
-                    clearance = lat_dist;
-                    return;
+        % Check if waypoints intersect the pinch zone
+        intersects_pinch = false;
+        if isfield(dp, 'waypoints') && ~isempty(dp.waypoints)
+            wps = dp.waypoints;
+            for h = 1:min(20, size(wps, 1))
+                d_to_pinch = hypot(wps(h, 1) - pinch_pt(1), wps(h, 2) - pinch_pt(2));
+                if d_to_pinch < 3.5
+                    intersects_pinch = true;
+                    break;
                 end
             end
-            
-            % Check dynamic agents' predicted positions for direct path centerline collisions
-            if lat_dist == 0
-                for a_idx = 1:length(dyn_preds)
-                    wp = dyn_preds(a_idx).waypoints;
-                    if isempty(wp), continue; end
-                    h_idx = min(horizon_step, size(wp, 1));
-                    ag_x = wp(h_idx, 1);
-                    ag_y = wp(h_idx, 2);
-                    
-                    % Direct collision with predicted agent position
-                    d_ag = hypot(test_x - ag_x, test_y - ag_y);
-                    if d_ag <= 1.2
-                        is_center_blocked = true;
-                        clearance = 0;
-                        return;
-                    end
-                end
-            end
+        end
+        
+        if is_approaching && intersects_pinch
+            has_oncoming_dynamic = true;
+            break;
         end
     end
+end
+
+% ── Step 4: Three-Way Bottleneck State Arbitration ────────────────────────
+bottleneck_info.station_s = pinch_station_rel;
+bottleneck_info.min_width = pinch_width;
+
+if pinch_width < W_chassis
+    % Condition 3: Complete Road Blockage (< 1.85 m static) -> Must Halt
+    virtual_stop_active          = true;
+    bottleneck_info.detour_required = false;
+    
+    % Upstream VSL Clamping: s_vsl = max(0.5, s_pinch - 3.5)
+    if pinch_station_rel <= 1.0
+        bottleneck_info.immediate_standstill = true;
+        s_vsl = 0.0;
+        stop_pose = [ego_x, ego_y, ego_theta];
+    else
+        bottleneck_info.immediate_standstill = false;
+        s_vsl = max(0.5, pinch_station_rel - params.stop_buffer);
+        vsl_xy = interp1(cum_s, planned_path, s_ego + s_vsl, 'linear');
+        stop_pose = [vsl_xy(1), vsl_xy(2), pinch_yaw];
+    end
+    bottleneck_info.vsl_station = s_vsl;
+    bottleneck_info.reason = sprintf('Complete Road Blockage: Width=%.2fm < %.2fm chassis width at +%.1fm', ...
+                                     pinch_width, W_chassis, pinch_station_rel);
+
+elseif has_oncoming_dynamic
+    % Condition 2: Dynamic Squeeze Point -> Halt at Upstream Virtual Stop Line
+    virtual_stop_active          = true;
+    bottleneck_info.detour_required = false;
+    
+    if pinch_station_rel <= 1.0
+        bottleneck_info.immediate_standstill = true;
+        s_vsl = 0.0;
+        stop_pose = [ego_x, ego_y, ego_theta];
+    else
+        bottleneck_info.immediate_standstill = false;
+        s_vsl = max(0.5, pinch_station_rel - params.stop_buffer);
+        vsl_xy = interp1(cum_s, planned_path, s_ego + s_vsl, 'linear');
+        stop_pose = [vsl_xy(1), vsl_xy(2), pinch_yaw];
+    end
+    bottleneck_info.vsl_station = s_vsl;
+    bottleneck_info.reason = sprintf('Dynamic Squeeze: Oncoming actor in narrow corridor (Width=%.2fm at +%.1fm)', ...
+                                     pinch_width, pinch_station_rel);
+
+else
+    % Condition 1: Static Narrowing Only (1.85 m <= W_free < 2.55 m) -> Local Detour
+    virtual_stop_active          = false;
+    bottleneck_info.detour_required = true;
+    bottleneck_info.vsl_station  = NaN;
+    stop_pose                    = [];
+    bottleneck_info.reason       = sprintf('Static Road Narrowing: Detour required (Width=%.2fm at +%.1fm)', ...
+                                     pinch_width, pinch_station_rel);
+end
 
 end
