@@ -38,3 +38,7 @@ resources/repos/
 repos/
 workspace_resources/
 
+# ── Temporary outputs & logs ────────────────────────
+.tmp/
+
+

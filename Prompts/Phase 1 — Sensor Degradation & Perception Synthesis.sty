@@ -1,0 +1,144 @@
+# Antigravity Task: Phase 1 — Sensor Degradation & Perception Synthesis
+
+## Objective
+Implement, test, and mathematically verify the sensor degradation and synthetic perception layer (`matlab/simulate_sensor_detection.m`) under the 3-Layer Architecture. The module must bridge ground-truth simulation environments with real-world sensor limitations observed on Indian roads (inspired by IDD data distributions).
+
+---
+
+## Mathematical & Algorithmic Formulation
+
+### 1. Spatial Gating (Range & FoV Filters)
+Let the ego vehicle state in the global frame be:
+$$\mathbf{x}_{\text{ego}} = [x_0, y_0, \theta_0]^T$$
+For an obstacle $k$ located at $\mathbf{p}_k = [x_k, y_k]^T$:
+
+* **Euclidean Distance Gate:**
+  $$d_k = \|\mathbf{p}_k - [x_0, y_0]^T\|_2 = \sqrt{(x_k - x_0)^2 + (y_k - y_0)^2}$$
+  The target is discarded if $d_k > R_{\max}$, where $R_{\max} = 35\text{ m}$.
+
+* **Azimuth / Horizontal Field-of-View (FoV) Gate:**
+  The bearing to obstacle $k$ in the global frame is:
+  $$\beta_k = \operatorname{atan2}(y_k - y_0, x_k - x_0)$$
+  The relative bearing $\theta_{\text{rel}, k}$ with respect to ego heading $\theta_0$ is wrapped to the interval $[-\pi, \pi]$:
+  $$\theta_{\text{rel}, k} = \operatorname{atan2}(\sin(\beta_k - \theta_0), \cos(\beta_k - \theta_0))$$
+  The detection passes the angular gate if:
+  $$|\theta_{\text{rel}, k}| \le \frac{\Phi}{2}, \quad \text{where } \Phi = 140^\circ \implies \frac{\Phi}{2} = 70^\circ \; \left(\approx 1.2217\text{ rad}\right)$$
+
+---
+
+### 2. Heteroscedastic (Range-Dependent) Measurement Noise
+Radar and camera depth errors increase monotonically with distance. We model position measurement error as range-scaled zero-mean Gaussian noise:
+
+$$\mathbf{z}_{p, k} = \mathbf{p}_k + \mathbf{w}_{p, k}, \quad \mathbf{w}_{p, k} \sim \mathcal{N}\left(\mathbf{0}, \sigma_p^2(d_k) \mathbf{I}_2\right)$$
+
+The standard deviation $\sigma_p(d_k)$ linearly interpolates between minimum near-field accuracy ($\sigma_{\min} = 0.15\text{ m}$) and maximum far-field noise ($\sigma_{\max} = 0.30\text{ m}$):
+$$\sigma_p(d_k) = \sigma_{\min} + (\sigma_{\max} - \sigma_{\min})\left(\frac{d_k}{R_{\max}}\right)$$
+
+Velocity measurement noise (approximating Doppler radar / optical flow derivation) is perturbed identically:
+$$\mathbf{z}_{v, k} = \mathbf{v}_k + \mathbf{w}_{v, k}, \quad \mathbf{w}_{v, k} \sim \mathcal{N}\left(\mathbf{0}, \sigma_v^2 \mathbf{I}_2\right), \quad \sigma_v = 0.20\text{ m/s}$$
+
+---
+
+### 3. Non-Linear Stochastic Dropout (Bernoulli Sampling)
+Detections suffer from occlusion, beam dispersal, and low LiDAR reflectivity on organic targets. The probability of detection dropout $P_{\text{drop}}(d_k)$ follows a quadratic profile over distance:
+
+$$P_{\text{drop}}(d_k) = P_{\text{base}} + (P_{\max} - P_{\text{base}})\left(\frac{d_k}{R_{\max}}\right)^2 + \delta_{\text{class}}$$
+
+* Baseline dropout: $P_{\text{base}} = 0.05$ (5%)
+* Maximum far-field dropout: $P_{\max} = 0.10$ (10%)
+* Class penalty $\delta_{\text{class}}$: $+0.02$ if target is `'pedestrian'` or `'cattle'` (smaller RCS / lower cross-section); $0.00$ otherwise.
+
+For every valid obstacle, draw $u_k \sim \mathcal{U}(0, 1)$. If $u_k < P_{\text{drop}}(d_k)$, the detection is dropped for the current frame.
+
+---
+
+### 4. Semantic Label Confusion Matrix
+To simulate vision classifier misclassification under dust, adverse illumination, or camera shake, apply a categorical mutation:
+$$P(\hat{c}_k \ne c_k^*) = 0.03 \quad (3\% \text{ error rate})$$
+If triggered, sample $\hat{c}_k$ uniformly from the remaining Indian ODD classes:
+$$\mathcal{C} = \{\text{'cattle'}, \text{'auto\_rickshaw'}, \text{'pedestrian'}, \text{'pushcart'}\} \setminus \{c_k^*\}$$
+
+---
+
+### 5. Transport Delay (FIFO Buffer)
+To replicate computation latency (200 ms total across neural network inference and point cloud clustering), detections are pushed into a 2-tick FIFO queue ($\Delta t = 0.1\text{ s}$ per step):
+$$\mathbf{Z}_{\text{out}}(t) = \mathbf{Z}_{\text{in}}(t - 2\Delta t)$$
+
+---
+
+## 3-Layer Architecture Specification
+
+### Layer 1: Directive (`directives/01_sensor_degradation.md`)
+Create this file defining:
+1. Inputs: `ground_truth_obstacles` (struct array with fields `.id`, `.type`, `.position`, `.velocity`), `ego_pose` $[x, y, \theta]$, `sensor_params`.
+2. Execution steps: Range gate $\to$ FoV gate $\to$ Dropout check $\to$ Gaussian noise injection $\to$ Label confusion $\to$ FIFO delay push.
+3. Outputs: `noisy_detections` struct array matching downstream EKF tracker interfaces.
+4. Edge cases: Obstacle exactly at 35.0 m boundary; heading crossing the $\pm \pi$ branch cut; empty scene input.
+
+### Layer 2: Orchestration Logic
+* Ensure scripts write intermediate logs and outputs strictly to `.tmp/`.
+* Spawns MATLAB headlessly via Python using command line:
+  `matlab -batch "run('matlab/test_sensor_layer.m')"`
+* Inspects exit codes and stack traces in `.tmp/sensor_test.log`.
+* If assertion failure occurs, fixes `matlab/simulate_sensor_detection.m`, reruns, and self-anneals by recording the error in `directives/01_sensor_degradation.md`.
+
+### Layer 3: Deterministic Execution Tooling
+* **Script 1:** `matlab/simulate_sensor_detection.m` — The core degradation function implementing the math above.
+* **Script 2:** `matlab/test_sensor_layer.m` — Unit test suite verifying:
+  - Range filter strictly prunes actors at $d = 35.1\text{ m}$.
+  - FoV filter strictly prunes actors at $\theta_{\text{rel}} = \pm 75^\circ$.
+  - Empirical noise mean $\mu \approx 0$ and variance matches $\sigma_p(d)^2$ over $10^4$ trials.
+  - Dropout frequency matches $P_{\text{drop}}(d)$ within a $1.5\%$ margin of error.
+* **Script 3:** `execution/verify_sensor_layer.py` — Deterministic Python wrapper executing headless MATLAB, parsing results, and exporting summary status to `.tmp/sensor_metrics.json`.
+
+---
+## Grounding Resources & Literature Mapping (Phase 1)
+
+The agent must cross-reference and validate all perception parameters, sensor bounds, and noise distributions against the local assets in `resources/`:
+
+### 1. Indian ODD Classes & Misclassification Probabilities
+* **Primary Reference:** `resources/papers_md/Varma_2018_IDD_IndiaDrivingDataset_arXiv1811.10200.md`
+* **Applicable Parameters:**
+  - Class Label Dictionary: `{'cattle', 'auto_rickshaw', 'pedestrian', 'pushcart'}`
+  - Typical Dimensions & RCS Bounds:
+    - `auto_rickshaw`: $2.6\text{ m} \times 1.3\text{ m}$ (nominal detection cross-section)
+    - `cattle`: $2.0\text{ m} \times 0.8\text{ m}$ (low-reflection organic body, prone to $+2\%$ dropout penalty)
+    - `pedestrian`: $0.5\text{ m} \times 0.5\text{ m}$ (low radar cross-section, range-decayed SNR)
+    - `pushcart`: $1.8\text{ m} \times 1.0\text{ m}$ (low speed, non-standard geometric profile)
+  - Confusion Matrix Motivation: Dust plumes, intense sunlight glare, and non-rigid bodies justify the uniform $3\%$ categorical mutation across classes.
+
+---
+
+### 2. Sensor Measurement Noise & Covariance Formulation
+* **Primary Reference:** Darms, Rybski & Urmson (IEEE IVS 2008, Boss / DARPA Urban Challenge)
+  - *Context in Repo:* `IMPORTED_RESOURCES.md` (Section: Obstacle Tracking)
+* **Applicable Parameters:**
+  - Range-dependent variance model $\sigma_p(d)^2$: Models radar beam divergence and stereo disparity degradation where error grows quadratically or linearly with depth:
+    $$\sigma_p(d) = 0.15 + 0.15 \left(\frac{d}{35}\right) \quad [\text{m}]$$
+  - Doppler velocity error standard deviation $\sigma_v = 0.20\text{ m/s}$.
+  - Informs the measurement noise covariance matrix $R$ expected downstream by `matlab/dynamic_obstacle_predictor.m`:
+    $$R = \operatorname{diag}\left(\sigma_p^2(d), \sigma_p^2(d)\right)$$
+
+---
+
+### 3. Field-of-View & Sensor Pipeline Latency
+* **Primary Reference:** *What goes into sensing for autonomous driving?* & *A Survey of Motion Planning and Control Techniques* (`resources/papers_md/Paden_2016_MotionPlanningSurvey_arXiv1604.07446.md`)
+* **Applicable Parameters:**
+  - **$140^\circ$ Horizontal FoV ($\pm 70^\circ$):** Matches dual forward-facing short/medium-range automotive cameras + wide-angle solid-state LiDAR coverage.
+  - **$35\text{ m}$ Forward Gate:** Reflects stopping distance constraints for non-highway speeds ($40\text{ km/h} \approx 11.1\text{ m/s}$) where planning horizons beyond $35\text{ m}$ are non-critical and computationally wasteful on unstructured terrain.
+  - **2-Tick FIFO Buffer ($200\text{ ms}$ Latency):** Directly derived from realistic embedded perception stacks: $30\text{--}50\text{ ms}$ camera exposure/shutter, $50\text{--}70\text{ ms}$ neural network object detection inference (YOLO/PointPillars), and $50\text{ ms}$ track association time.
+
+---
+
+### 4. Boundary & Obstacle Edge Occlusion
+* **Primary Reference:** `resources/web_docs/oxford_road_boundaries.md` & Ososinski & Labrosse (2015, `resources/papers_md/Ososinski_2015_IllDefinedRoads_preprint.md`)
+* **Applicable Parameters:**
+  - Edge cases where unpaved rural road boundaries blend into gravel or vegetation, validating why dynamic obstacles near road limits require wider uncertainty ellipsoids.
+## Exit Criteria
+- `execution/verify_sensor_layer.py` returns exit code 0.
+- `.tmp/sensor_metrics.json` records:
+  - `"range_gate_passed": true`
+  - `"fov_gate_passed": true`
+  - `"noise_distribution_valid": true`
+  - `"fifo_delay_ticks": 2`
+- All code is committed to Git with no extraneous temporary files tracked outside `.tmp/`.
