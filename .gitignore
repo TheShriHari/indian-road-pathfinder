@@ -1,8 +1,34 @@
+# ── Python ──────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
-*.asv
+*.egg-info/
+dist/
+build/
+
+# ── MATLAB ──────────────────────────────────────────
+*.asv                   # MATLAB auto-save backup files
+*.m~                    # Editor temp files
+slprj/                  # Simulink build cache
+*.slxc
+*.mex*                  # MEX compiled binaries
+codegen/                # MATLAB Coder output
+
+# ── Simulation Outputs ───────────────────────────────
+*.gif                   # Demo animation exports
+*.csv                   # Batch test result CSVs
+trial*_trace.txt        # Per-trial debug logs
+trial*.txt
+batch_test_results*.csv
+batch_test_results_sensor_layer*.csv
+
+# ── OS ───────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-trial*_trace.txt
-trial*.txt
+desktop.ini
+
+# ── IDE / Editor ────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
