@@ -1,0 +1,37 @@
+{
+  "Kv": {
+    "min": 1.0,
+    "max": 1.5,
+    "default": 1.2,
+    "step": 0.05,
+    "description": "Pure Pursuit speed lookahead gain (s)"
+  },
+  "L_min": {
+    "min": 3.0,
+    "max": 4.0,
+    "default": 3.5,
+    "step": 0.1,
+    "description": "Minimum lookahead distance floor (m)"
+  },
+  "w_steer": {
+    "min": 0.02,
+    "max": 0.10,
+    "default": 0.05,
+    "step": 0.01,
+    "description": "Hybrid A* steering effort penalty"
+  },
+  "delta_hyst": {
+    "min": 0.35,
+    "max": 0.70,
+    "default": 0.50,
+    "step": 0.05,
+    "description": "FSM lateral unlatch hysteresis band (m)"
+  },
+  "alpha_cost": {
+    "min": 2.2,
+    "max": 3.1,
+    "default": 2.6,
+    "step": 0.1,
+    "description": "Costmap exponential decay rate (1/m)"
+  }
+}

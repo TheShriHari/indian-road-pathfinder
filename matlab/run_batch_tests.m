@@ -23,6 +23,12 @@ addpath(fullfile(script_dir, '..'));
 if nargin < 1 || isempty(num_trials)
     num_trials = 1000;
 end
+if isnumeric(num_trials) && length(num_trials) > 1
+    seeds_list = num_trials(:)';
+    num_trials = length(seeds_list);
+else
+    seeds_list = 1:num_trials;
+end
 if nargin < 2 || isempty(csv_out_name)
     csv_out_name = 'batch_test_results';
 end
@@ -48,7 +54,8 @@ end
 
 fprintf('=========================================================================\n');
 fprintf('  SIH PS-26037: Phase 5 Autonomous Monte Carlo Batch Testing Engine       \n');
-fprintf('  Total Randomized Trials: %d  (5 Domains x 200 Seeds)                  \n', num_trials);
+fprintf('  Total Randomized Trials: %d  (Seed Range: %d to %d)                     \n', ...
+    num_trials, seeds_list(1), seeds_list(end));
 fprintf('  Thread Pool Cap: 6 Physical Cores | Headless Mode: ON                 \n');
 fprintf('=========================================================================\n\n');
 
@@ -97,7 +104,7 @@ deadlock_cnt  = 0;
 telemetry_store = struct();
 
 for i = 1:num_trials
-    seed = i;
+    seed = seeds_list(i);
     scenario = generate_random_scenario(seed);
 
     % Reset persistent filter and sensor detection states across trials
@@ -159,7 +166,7 @@ for i = 1:num_trials
         atypes = strjoin(types_cell, ';');
     end
 
-    results(i).trial_id               = i;
+    results(i).trial_id               = seed;
     results(i).seed                   = seed;
     results(i).domain_id              = scenario.domain_id;
     results(i).domain_name            = scenario.domain_name;

@@ -100,13 +100,17 @@ params = [];
 if isfield(sim_opts, 'params'), params = sim_opts.params; end
 record_telemetry = false;
 if isfield(sim_opts, 'record_telemetry'), record_telemetry = sim_opts.record_telemetry; end
+force_uniform_slew = false;
+if isfield(sim_opts, 'force_uniform_slew'), force_uniform_slew = sim_opts.force_uniform_slew; end
+slew_limit = 0.95;
+if isfield(sim_opts, 'slew_limit'), slew_limit = sim_opts.slew_limit; end
 
 try
     if verbose
-        result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry);
+        result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry, force_uniform_slew, slew_limit);
     else
         % Suppress internal diagnostic prints using evalc
-        evalc('result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry);');
+        evalc('result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry, force_uniform_slew, slew_limit);');
     end
 catch ME
     result.outcome = 'ERROR';
@@ -136,10 +140,12 @@ end
 end
 
 %% ── Core Simulation Function ─────────────────────────────────────────────
-function result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry)
+function result = run_simulation_core(obstacle_config, seed, dt, max_steps, collision_thresh, goal_dist_tol, verbose, params, record_telemetry, force_uniform_slew, slew_limit)
 
 if nargin < 8, params = []; end
 if nargin < 9 || isempty(record_telemetry), record_telemetry = false; end
+if nargin < 10 || isempty(force_uniform_slew), force_uniform_slew = false; end
+if nargin < 11 || isempty(slew_limit), slew_limit = 0.95; end
 
 % Reset persistent EKF state and sensor simulation state
 clear dynamic_obstacle_predictor;
@@ -275,10 +281,12 @@ total_misclasses = 0;    % sensor misclassification event counter
 % KPI & Telemetry tracking
 prev_accel       = 0.0;
 prev_steer       = 0.0;
+emergency_brake_latch = false;
+emergency_latch_timer = 0.0;
 jerk_log         = [];
 steer_rate_log   = [];
 replan_latencies = [];
-telemetry        = struct('t', {}, 'x', {}, 'y', {}, 'yaw', {}, 'v', {}, 'steer', {}, 'accel', {}, 'jerk', {}, 'min_clearance', {}, 'bsm_state', {}, 'replan', {}, 'accel_source', {}, 'costmap_slice', {});
+telemetry        = [];
 
 step = 0;
 
@@ -597,13 +605,74 @@ while step < max_steps
         end
     end
 
-    % ── Shared Acceleration Slew-Rate Limiter (|da/dt| <= JERK_LIMIT) ─────
-    % All acceleration demands (Pure Pursuit, FSM v_ref, and reflex emergency braking)
-    % are capped to the SIH jerk requirement (1.0 m/s^3) to eliminate ping-pong chatter.
-    JERK_LIMIT = 0.95; % m/s^3 (< 1.0 m/s^3 target)
-    max_delta_accel = JERK_LIMIT * dt;
+    % ── Asymmetric Jerk Limiter with Anti-Chatter Brake Latch ─────────────
+    % Under emergency braking (REFLEX active, target_a < -2.0, or latch active),
+    % allow aggressive braking jerk up to 8.0 m/s^3 to avoid high-speed collisions.
+    % When releasing brakes or applying throttle (delta_a > 0), strictly enforce 0.95 m/s^3 comfort.
+    is_reflex_trigger = strncmp(accel_source, 'REFLEX', 6) || ...
+                        strcmp(accel_source, 'OFF_ROAD_GUARD') || ...
+                        strcmp(accel_source, 'SAFE_STOP');
+
+    % Update Anti-Chatter Emergency Brake Latch:
+    % Only latch on true reflex triggers (imminent collision, lead vehicle, oncoming vehicle)
+    if is_reflex_trigger
+        emergency_brake_latch = true;
+        emergency_latch_timer = 0.0; % Reset dwell timer
+    elseif emergency_brake_latch
+        emergency_latch_timer = emergency_latch_timer + dt;
+        % Release latch once dwell time (0.50 s) has elapsed OR vehicle is stopped
+        if emergency_latch_timer >= 0.50 || ego_state(4) <= 0.2
+            emergency_brake_latch = false;
+            emergency_latch_timer = 0.0;
+        end
+    end
+
+    % While latched under emergency, prevent throttle chatter
+    if emergency_brake_latch && ~force_uniform_slew
+        accel = min(accel, -2.5);
+        if ~is_reflex_trigger && ~strcmp(accel_source, 'SAFE_STOP')
+            accel_source = 'BRAKE_LATCH';
+        end
+        if ego_state(4) < 0.2
+            safe_stop_active = true;
+        end
+    end
+
     accel_demanded = accel;
-    accel = min(max(accel_demanded, prev_accel - max_delta_accel), prev_accel + max_delta_accel);
+
+    % When vehicle is at standstill (v <= 0.05 m/s) and commanded to accelerate,
+    % vehicle is physically at rest (a = 0). Reset prior brake acceleration to 0.0
+    % so acceleration ramps forward smoothly without a 3.7s dead-time delay.
+    if ego_state(4) <= 0.05 && accel_demanded > 0
+        prev_accel = max(0.0, prev_accel);
+    end
+
+    if force_uniform_slew
+        % ── Test 1: PURE UNIFORM SLEW LIMITER (No Emergency Exception) ────
+        max_delta_accel = slew_limit * dt;
+        accel = min(max(accel_demanded, prev_accel - max_delta_accel), prev_accel + max_delta_accel);
+    else
+        % ── Test 2 / Production: ASYMMETRIC LIMITER + ANTI-CHATTER LATCH ──
+        delta_a_demanded = accel_demanded - prev_accel;
+        if delta_a_demanded < 0
+            % Braking harder (negative delta_a):
+            % Only apply emergency 8.0 m/s^3 jerk limit during genuine reflex triggers or latches.
+            % Nominal driving/cornering deceleration uses 0.95 m/s^3 comfort limit.
+            if is_reflex_trigger || emergency_brake_latch
+                jerk_limit_neg = 8.0; % Emergency braking jerk allowance up to 8.0 m/s^3
+            else
+                jerk_limit_neg = 0.95; % Nominal comfort decel limit
+            end
+            max_delta_neg = jerk_limit_neg * dt;
+            accel = max(accel_demanded, prev_accel - max_delta_neg);
+        else
+            % Releasing brakes or applying throttle (positive delta_a):
+            % Strictly enforce 0.95 m/s^3 passenger comfort limit
+            jerk_limit_pos = 0.95;
+            max_delta_pos = jerk_limit_pos * dt;
+            accel = min(accel_demanded, prev_accel + max_delta_pos);
+        end
+    end
 
     % Discrete longitudinal jerk & steering slew tracking
     step_jerk = abs(accel - prev_accel) / dt;
@@ -735,14 +804,20 @@ while step < max_steps
     % ── L. Telemetry Logging (if requested) ───────────────────────────────
     if record_telemetry
         cur_t.t = t;
+        cur_t.time = t;
         cur_t.x = round(mock_x, 3);
         cur_t.y = round(mock_y, 3);
         cur_t.yaw = round(mock_theta, 4);
-        cur_t.v = round(mock_v, 2);
+        cur_t.v = round(mock_v, 3);
         cur_t.steer = round(steer_rad, 4);
         cur_t.accel = round(accel, 3);
+        cur_t.actual_a = round(accel, 3);
+        cur_t.target_a = round(accel_demanded, 3);
         cur_t.jerk = round(step_jerk, 3);
         cur_t.min_clearance = round(min_clearance, 3);
+        cur_t.min_obstacle_dist = round(min_clearance, 3);
+        cur_t.latch_active = emergency_brake_latch;
+        cur_t.reflex_active = is_reflex_trigger;
         cur_t.bsm_state = bsm_state;
         cur_t.replan = replan_this_step;
         cur_t.accel_source = accel_source;
@@ -755,7 +830,11 @@ while step < max_steps
         else
             cur_t.costmap_slice = [];
         end
-        telemetry(end+1) = cur_t; %#ok<AGROW>
+        if isempty(telemetry)
+            telemetry = cur_t;
+        else
+            telemetry(end+1) = cur_t; %#ok<AGROW>
+        end
     end
 
     if verbose && (mod(step, 5) == 0 || step == 1)
