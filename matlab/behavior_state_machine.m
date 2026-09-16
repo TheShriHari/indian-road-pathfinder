@@ -73,16 +73,30 @@ elseif isfield(params, 'corridor_width'),  W_free = params.corridor_width;
 elseif isfield(params, 'min_width'),       W_free = params.min_width;
 end
 
-% ── Scan Dynamic Predicted Agents ──────────────────────────────────────────
+% ── Scan Dynamic Predicted Agents & ACC Lead Vehicle ────────────────────────
 min_dist      = Inf;
 nearest_lon   = Inf;
 nearest_lat   = Inf;
 agent_in_path = false;
+lead_dist     = Inf;
+lead_v        = Inf;
+
+has_oncoming  = false;
 
 if ~isempty(predicted_agents)
     for i = 1:length(predicted_agents)
         wp = predicted_agents(i).waypoints;
         if isempty(wp), continue; end
+        
+        vx_ag = 0;
+        if isfield(predicted_agents(i), 'x_est') && ~isempty(predicted_agents(i).x_est)
+            vx_ag = predicted_agents(i).x_est(3);
+        elseif isfield(predicted_agents(i), 'velocity') && ~isempty(predicted_agents(i).velocity)
+            vx_ag = predicted_agents(i).velocity(1);
+        end
+        if vx_ag < -0.5
+            has_oncoming = true;
+        end
         
         d0 = hypot(wp(1, 1) - ego_x, wp(1, 2) - ego_y);
         lon0 =  (wp(1, 1) - ego_x) * cos(ego_theta) + (wp(1, 2) - ego_y) * sin(ego_theta);
@@ -91,6 +105,29 @@ if ~isempty(predicted_agents)
             min_dist = d0;
             nearest_lon = lon0;
             nearest_lat = lat0;
+        end
+        
+        % Check if agent is currently ahead OR predicted to merge into ego path
+        will_enter_lane = (lat0 < 2.2);
+        if ~will_enter_lane && ~isempty(wp)
+            for h = 1:min(35, size(wp, 1))
+                lat_h = abs(-(wp(h, 1) - ego_x) * sin(ego_theta) + (wp(h, 2) - ego_y) * cos(ego_theta));
+                lon_h =  (wp(h, 1) - ego_x) * cos(ego_theta) + (wp(h, 2) - ego_y) * sin(ego_theta);
+                if lon_h > 0.0 && lon_h < 35.0 && lat_h < 2.2
+                    will_enter_lane = true;
+                    break;
+                end
+            end
+        end
+        if lon0 > 0.5 && lon0 < 30.0 && will_enter_lane
+            if lon0 < lead_dist
+                lead_dist = lon0;
+                if isfield(predicted_agents(i), 'x_est') && ~isempty(predicted_agents(i).x_est)
+                    lead_v = max(0.0, predicted_agents(i).x_est(3));
+                else
+                    lead_v = 3.5;
+                end
+            end
         end
         
         for h = 1:min(20, size(wp, 1))
@@ -111,6 +148,14 @@ debug_info.agent_in_path       = agent_in_path;
 debug_info.virtual_stop_active = virtual_stop_active;
 debug_info.stop_line_dist      = stop_line_dist;
 debug_info.W_free              = W_free;
+debug_info.has_oncoming        = has_oncoming;
+
+% ── Dynamic Yielding & Stop Trigger ─────────────────────────────────────────
+needs_yield = virtual_stop_active || (agent_in_path && min_dist < 24.0);
+effective_stop_dist = stop_line_dist;
+if agent_in_path && min_dist < 24.0
+    effective_stop_dist = min(stop_line_dist, max(1.0, min_dist - 3.2));
+end
 
 % ── 5-State Finite State Machine Transitions ───────────────────────────────
 W_unlatch = params.W_crit + params.W_hyst; % 2.55 + 0.50 = 3.05 m
@@ -118,8 +163,8 @@ W_unlatch = params.W_crit + params.W_hyst; % 2.55 + 0.50 = 3.05 m
 switch current_state
     
     case 'CRUISE'
-        if virtual_stop_active
-            if ego_v <= 0.1 && stop_line_dist <= 1.0
+        if needs_yield
+            if (ego_v <= 0.3 && effective_stop_dist <= 3.5) || effective_stop_dist <= 2.0
                 new_state = 'YIELD_WAIT';
             else
                 new_state = 'YIELD_DECEL';
@@ -131,8 +176,8 @@ switch current_state
         end
         
     case 'NUDGE'
-        if virtual_stop_active
-            if ego_v <= 0.1 && stop_line_dist <= 1.0
+        if needs_yield
+            if (ego_v <= 0.3 && effective_stop_dist <= 3.5) || effective_stop_dist <= 2.0
                 new_state = 'YIELD_WAIT';
             else
                 new_state = 'YIELD_DECEL';
@@ -146,23 +191,23 @@ switch current_state
         end
         
     case 'YIELD_DECEL'
-        if ~virtual_stop_active
+        if ~needs_yield
             new_state = 'RESUME';
-        elseif ego_v <= 0.1 && stop_line_dist <= 1.0
+        elseif (ego_v <= 0.3 && effective_stop_dist <= 3.5) || effective_stop_dist <= 2.0
             new_state = 'YIELD_WAIT';
         else
             new_state = 'YIELD_DECEL';
         end
         
     case 'YIELD_WAIT'
-        if ~virtual_stop_active
+        if ~virtual_stop_active && (~agent_in_path || min_dist >= params.d_clear)
             new_state = 'RESUME';
         else
             new_state = 'YIELD_WAIT';
         end
         
     case 'RESUME'
-        if virtual_stop_active
+        if needs_yield
             new_state = 'YIELD_DECEL';
         elseif (W_free >= W_unlatch) && (~agent_in_path || min_dist >= params.d_clear)
             new_state = 'CRUISE';
@@ -183,11 +228,13 @@ switch new_state
     case 'NUDGE'
         v_ref = params.v_nudge;
     case 'YIELD_DECEL'
-        % Approach virtual stop line smoothly under comfortable deceleration
-        if stop_line_dist > 1.0 && ~isinf(stop_line_dist)
-            v_approach = min(params.v_decel, sqrt(2.0 * 1.5 * max(0.1, stop_line_dist - 0.5)));
-            v_ref = max(0.8, v_approach);
-        elseif isinf(stop_line_dist)
+        % Approach virtual stop line or crossing obstacle smoothly under comfortable deceleration
+        if has_oncoming && min_dist < 22.0
+            v_ref = 0.0; % Immediately halt for oncoming vehicle to let it pass
+        elseif effective_stop_dist > 2.5 && ~isinf(effective_stop_dist)
+            v_approach = min(params.v_decel, sqrt(2.0 * 1.5 * max(0.1, effective_stop_dist - 2.5)));
+            v_ref = v_approach;
+        elseif isinf(effective_stop_dist)
             v_ref = params.v_decel;
         else
             v_ref = 0.0;
@@ -199,6 +246,21 @@ switch new_state
         v_ref = min(params.v_resume, max(1.5, ego_v + 1.0 * dt));
     otherwise
         v_ref = params.v_cruise;
+end
+
+% ── Adaptive Cruise Control (ACC) Headway Regulation ────────────────────────
+if ~isinf(lead_dist) && ~isinf(lead_v)
+    d_des = 7.0 + max(2.5, ego_v * 1.5); % 1.5s time headway + 7.0m margin
+    if lead_dist < d_des
+        v_acc = max(0.0, lead_v - 0.8 * (d_des - lead_dist));
+        v_ref = min(v_ref, v_acc);
+    end
+    if lead_dist < 6.5
+        v_ref = min(v_ref, max(0.0, lead_v - 1.0));
+    end
+    if lead_dist < 4.0
+        v_ref = 0.0;
+    end
 end
 
 end

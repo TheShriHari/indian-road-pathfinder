@@ -14,11 +14,11 @@ function [virtual_stop_active, stop_pose, bottleneck_info] = universal_bottlenec
 %      - Clear (W_free >= 2.55 m) -> virtual_stop = false, detour_required = false
 
 % ── Configuration Defaults ─────────────────────────────────────────────────
-defaults_ubd.vehicle_width   = 1.85;  % standard chassis width (m)
-defaults_ubd.min_clearance   = 0.35;  % lateral clearance per side (m)
+defaults_ubd.vehicle_width   = 1.50;  % Indian standard compact vehicle width (m)
+defaults_ubd.min_clearance   = 0.20;  % lateral clearance per side (m)
 defaults_ubd.scan_horizon    = 30.0;  % scan ahead horizon (m)
 defaults_ubd.stop_buffer     = 3.5;   % VSL offset upstream of bottleneck (m)
-defaults_ubd.cost_threshold  = 90.0;  % cost < 90 is traversable corridor (excludes lethal core)
+defaults_ubd.cost_threshold  = 95.0;  % cost < 95 is traversable corridor (excludes lethal core)
 
 if nargin < 6 || isempty(params), params = defaults_ubd; end
 fnames = fieldnames(defaults_ubd);
@@ -59,6 +59,14 @@ for k = 2:N_pts
     cum_s(k) = cum_s(k-1) + hypot(planned_path(k,1) - planned_path(k-1,1), ...
                                   planned_path(k,2) - planned_path(k-1,2));
 end
+
+% Filter out duplicate/zero-distance waypoints so cum_s is strictly monotonic
+[cum_s_uniq, uniq_idx] = unique(cum_s, 'stable');
+if length(cum_s_uniq) < 2
+    return;
+end
+planned_path = planned_path(uniq_idx, :);
+cum_s        = cum_s_uniq;
 
 % Find ego station along path
 d_ego = hypot(planned_path(:,1) - ego_x, planned_path(:,2) - ego_y);
@@ -181,13 +189,13 @@ if ~isempty(dynamic_predictions)
             end
         end
         
-        % Check if waypoints intersect the pinch zone
+        % Check if waypoints intersect the pinch zone or oncoming actor heads toward pinch
         intersects_pinch = false;
         if isfield(dp, 'waypoints') && ~isempty(dp.waypoints)
             wps = dp.waypoints;
-            for h = 1:min(20, size(wps, 1))
+            for h = 1:min(25, size(wps, 1))
                 d_to_pinch = hypot(wps(h, 1) - pinch_pt(1), wps(h, 2) - pinch_pt(2));
-                if d_to_pinch < 3.5
+                if d_to_pinch < 12.0 || (is_approaching && wps(h, 1) > pinch_pt(1) - 2.0 && wps(h, 1) < pinch_pt(1) + 30.0)
                     intersects_pinch = true;
                     break;
                 end
@@ -206,9 +214,8 @@ bottleneck_info.station_s = pinch_station_rel;
 bottleneck_info.min_width = pinch_width;
 
 if pinch_width < W_chassis
-    if exist('pinch_all_widths', 'var') && any(pinch_all_widths >= W_chassis)
-        % Road has an open corridor elsewhere (e.g. detour around pothole possible)
-        % Invalidate current colliding path to force replan through open corridor
+    if exist('pinch_all_widths', 'var') && any(pinch_all_widths >= W_chassis) && ~has_oncoming_dynamic
+        % Road has an open corridor elsewhere (e.g. detour around pothole possible) AND no oncoming vehicle!
         virtual_stop_active          = false;
         bottleneck_info.detour_required = true;
         bottleneck_info.path_invalid = true;

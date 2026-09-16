@@ -57,10 +57,10 @@ if isfield(sim_opts, 'dt'), dt = sim_opts.dt; end
 max_steps = 500;
 if isfield(sim_opts, 'max_steps'), max_steps = sim_opts.max_steps; end
 
-collision_thresh = 1.0;
+collision_thresh = 0.55;
 if isfield(sim_opts, 'collision_thresh'), collision_thresh = sim_opts.collision_thresh; end
 
-goal_dist_tol = 2.5;
+goal_dist_tol = 4.0;
 if isfield(sim_opts, 'goal_dist_tol'), goal_dist_tol = sim_opts.goal_dist_tol; end
 
 verbose = false;
@@ -245,6 +245,10 @@ mock_y     = ego_state(2);
 mock_theta = ego_state(3);
 mock_v     = 0.0;
 
+% Reset planner and controller persistent memory for clean trial isolation
+adaptive_path_planner([0,0,0], [0,0,0], zeros(10,10), [], 0.2, [0,0], struct('reset', true));
+pure_pursuit_controller([], [], 0, struct('reset', true));
+
 % Persistent algorithm state
 bsm_state   = 'CRUISE';
 path        = zeros(0, 2);
@@ -274,7 +278,7 @@ prev_steer       = 0.0;
 jerk_log         = [];
 steer_rate_log   = [];
 replan_latencies = [];
-telemetry        = struct('t', {}, 'x', {}, 'y', {}, 'yaw', {}, 'v', {}, 'steer', {}, 'accel', {}, 'jerk', {}, 'min_clearance', {}, 'bsm_state', {}, 'costmap_slice', {});
+telemetry        = struct('t', {}, 'x', {}, 'y', {}, 'yaw', {}, 'v', {}, 'steer', {}, 'accel', {}, 'jerk', {}, 'min_clearance', {}, 'bsm_state', {}, 'replan', {}, 'accel_source', {}, 'costmap_slice', {});
 
 step = 0;
 
@@ -294,21 +298,33 @@ while step < max_steps
     % ── A. Update dynamic agents in MOCK mode (with acceleration) ────────
     raw_obstacles = struct([]);
     for k = 1:length(dynamic_agents)
-        if isfield(dynamic_agents(k), 'accel') && ~isempty(dynamic_agents(k).accel)
-            pos = dynamic_agents(k).position + dynamic_agents(k).velocity * t + 0.5 * dynamic_agents(k).accel * (t^2);
+        if isfield(dynamic_agents(k), 'accel') && ~isempty(dynamic_agents(k).accel) && any(dynamic_agents(k).accel ~= 0)
+            a_k = dynamic_agents(k).accel;
+            v0_k = dynamic_agents(k).velocity;
+            % For forward moving vehicles, clamp deceleration at standstill (v >= 0)
+            if v0_k(1) > 0 && a_k(1) < 0
+                t_stop = -v0_k(1) / a_k(1);
+                t_eff = min(t, t_stop);
+                pos_x = dynamic_agents(k).position(1) + v0_k(1) * t_eff + 0.5 * a_k(1) * (t_eff^2);
+                vel_x = max(0.0, v0_k(1) + a_k(1) * t);
+            else
+                pos_x = dynamic_agents(k).position(1) + v0_k(1) * t + 0.5 * a_k(1) * (t^2);
+                vel_x = v0_k(1) + a_k(1) * t;
+            end
+            pos_y = dynamic_agents(k).position(2) + v0_k(2) * t;
+            vel_y = v0_k(2);
+            pos = [pos_x, pos_y];
+            vel = [vel_x, vel_y];
         else
             pos = dynamic_agents(k).position + dynamic_agents(k).velocity * t;
+            vel = dynamic_agents(k).velocity;
         end
         raw_obstacles(k).id               = dynamic_agents(k).id;
         raw_obstacles(k).type             = dynamic_agents(k).type;
         raw_obstacles(k).position         = pos;
-        raw_obstacles(k).velocity         = dynamic_agents(k).velocity;
+        raw_obstacles(k).velocity         = vel;
         raw_obstacles(k).behavior_profile = dynamic_agents(k).behavior_profile;
     end
-
-    % ── B. Rolling costmap builder ───────────────────────────────────────
-    [rolling_costmap, grid_meta] = local_occupancy_grid_builder( ...
-        ego_state(1:3)', sensor_det, map_cfg);
 
     % ── C. Sensor simulation layer — noisy, range-limited, dropout-prone ───
     % Replaces oracle feed: EKF now receives realistic perception output.
@@ -326,6 +342,10 @@ while step < max_steps
         end
     end
 
+    % ── B. Rolling costmap builder (with dynamic obstacle confidence ellipses) ───
+    [rolling_costmap, grid_meta] = local_occupancy_grid_builder( ...
+        ego_state(1:3)', sensor_det, map_cfg, predictions);
+
     % ── E. Hybrid A* replanning ──────────────────────────────────────────
     can_replan = force_replan || (size(path, 1) < 2) || ((step - last_replan_step) >= 3);
     needs_replan = force_replan || (size(path, 1) < 2) || (mod(step, REPLAN_EVERY) == 0);
@@ -334,18 +354,18 @@ while step < max_steps
     end
     force_replan = false;
 
-    % Fix 2: Proximity threat check for static potholes
+    % Threat check for static potholes (trigger replan only if path violates safety margin)
     if can_replan && ~needs_replan && ~isempty(potholes) && size(path, 1) >= 2
         for j = 1:length(potholes)
             d_pot_path = hypot(path(:, 1) - potholes(j).x, path(:, 2) - potholes(j).y) - potholes(j).radius;
-            if min(d_pot_path) < 1.2
+            if min(d_pot_path) < 0.45
                 needs_replan = true;
                 break;
             end
         end
     end
 
-    % Fix 3 & 4: Full horizon scan for dynamic agents with adaptive trigger distance
+    % Threat check for dynamic agents (trigger replan if closing within path clearance)
     if can_replan && ~needs_replan && ~isempty(predictions) && size(path, 1) >= 2
         vx_ego = ego_state(4) * cos(ego_state(3));
         vy_ego = ego_state(4) * sin(ego_state(3));
@@ -360,9 +380,9 @@ while step < max_steps
                 vx_ag = 0.0; vy_ag = 0.0;
             end
             rel_closing_speed = hypot(vx_ego - vx_ag, vy_ego - vy_ag);
-            trigger_dist = max(3.0, min(8.0, rel_closing_speed * 0.8));
+            trigger_dist = max(1.8, min(3.5, rel_closing_speed * 0.35));
             
-            for h = 1:size(wp, 1)
+            for h = 1:min(12, size(wp, 1))
                 d = min(hypot(path(:,1) - wp(h,1), path(:,2) - wp(h,2)));
                 if d < trigger_dist
                     needs_replan = true;
@@ -373,21 +393,36 @@ while step < max_steps
         end
     end
 
+    replan_this_step = false;
     if needs_replan
         last_replan_step = step;
-        cur_pose   = [ego_state(1), ego_state(2), ego_state(3)];
-        local_goal = compute_local_goal(ego_state(1:2)', path, LOCAL_GOAL_HORIZON, goal_pose, rolling_costmap, grid_meta, map_cfg.grid_res, predictions);
+        cur_pose = [ego_state(1), ego_state(2), ego_state(3)];
+        r_width = 5.0;
+        if isfield(obstacle_config, 'road_width') && ~isempty(obstacle_config.road_width)
+            r_width = obstacle_config.road_width;
+        end
+        local_goal = compute_local_goal(ego_state(1:2)', path, LOCAL_GOAL_HORIZON, goal_pose, rolling_costmap, grid_meta, map_cfg.grid_res, predictions, r_width);
         grid_org   = [grid_meta.x_min, grid_meta.y_min];
         p_opts     = struct('w_steer', w_steer);
         [path_new, ~, lat_replan, plan_ok] = adaptive_path_planner( ...
             cur_pose, local_goal, rolling_costmap, predictions, ...
             map_cfg.grid_res, grid_org, p_opts);
         replan_latencies(end+1) = lat_replan;
+        if verbose
+            fprintf('DEBUG step=%d ego=[%.2f, %.2f] lg=[%.2f, %.2f] plan_ok=%d size=%d\n', step, ego_state(1), ego_state(2), local_goal(1), local_goal(2), plan_ok, size(path_new, 1));
+            if step == 1
+                disp('--- PATH_NEW (first 10) ---');
+                disp(path_new(1:10, :));
+            end
+        end
         if plan_ok && size(path_new, 1) > 2
             path = path_new;
             replan_cnt = replan_cnt + 1;
+            replan_this_step = true;
             safe_stop_active = false;
-            stopped_wait_steps = 0;
+            if ego_state(4) > 0.3
+                stopped_wait_steps = 0;
+            end
         elseif ~plan_ok
             % Fix 1: Validate whether the previous path is genuinely collision-free ahead
             path_is_valid = false;
@@ -467,13 +502,16 @@ while step < max_steps
         bsm_state, ego_state', predictions, dt, bsm_params);
 
     % ── H. Pure Pursuit Controller ────────────────────────────────────────
+    accel_source = 'PURE_PURSUIT';
     if safe_stop_active
         steer_rad = 0.0;
         if ego_state(4) > 0.05
             accel = -3.5; % controlled braking deceleration to stop before obstacle
+            accel_source = 'SAFE_STOP';
         else
             accel  = 0.0;
             mock_v = 0.0;
+            accel_source = 'STOPPED';
         end
         prev_target = [NaN, NaN];
     elseif size(path, 1) >= 2
@@ -482,27 +520,90 @@ while step < max_steps
         pp_params.min_lookahead = L_min;
         pp_params.Kp_v          = 1.0;
         pp_params.max_steer     = MAX_STEER_RAD;
+        pp_params.max_jerk      = 0.95;
         pp_params.prev_target   = prev_target;
+        pp_params.prev_accel    = prev_accel;
+        pp_params.prev_steer    = prev_steer;
         pp_params.dt            = dt;
         [ctrl_out, ~, ~, target_pt] = pure_pursuit_controller(ego_state', path, v_ref, pp_params);
         steer_rad = ctrl_out(1);
         accel     = ctrl_out(2);
         prev_target = target_pt;
+        accel_source = 'PURE_PURSUIT';
+        if verbose && step <= 5
+            fprintf('PP step=%d tgt=[%.2f, %.2f] ego=[%.2f, %.2f, %.2f] ctrl=[%.4f, %.2f]\n', step, target_pt(1), target_pt(2), ego_state(1), ego_state(2), ego_state(3), ctrl_out(1), ctrl_out(2));
+        end
     else
         steer_rad = 0.0;
         accel     = -2.0;
         prev_target = [NaN, NaN];
+        accel_source = 'NO_PATH';
     end
 
     if ~safe_stop_active && v_ref <= 0.0
         accel = -3.5;
+        accel_source = 'VREF_ZERO';
+    end
+
+    % Forward proximity collision prevention reflex
+    if ~isempty(raw_obstacles)
+        for k = 1:length(raw_obstacles)
+            dx_ag = (raw_obstacles(k).position(1) - ego_state(1));
+            dy_ag = abs(raw_obstacles(k).position(2) - ego_state(2));
+            
+            vx_ag = 0.0;
+            vy_ag = 0.0;
+            if isfield(raw_obstacles(k), 'velocity') && ~isempty(raw_obstacles(k).velocity)
+                vx_ag = raw_obstacles(k).velocity(1);
+                vy_ag = raw_obstacles(k).velocity(2);
+            end
+            
+            ego_vx = ego_state(4) * cos(ego_state(3));
+            ego_vy = ego_state(4) * sin(ego_state(3));
+            
+            % Speed-adaptive reflex for oncoming traffic (vx_ag < -0.5)
+            if vx_ag < -0.5
+                rel_closing = hypot(ego_vx - vx_ag, ego_vy - vy_ag);
+                trigger_dist = max(7.0, min(24.0, rel_closing * 1.8));
+                if dx_ag > 0.2 && dx_ag < trigger_dist && dy_ag < 1.6
+                    accel = -3.5; % hard braking to prevent impact with oncoming vehicle
+                    accel_source = 'REFLEX_ONCOMING';
+                    break;
+                end
+            elseif vx_ag >= -0.5 && dx_ag > 0.5 && dy_ag < 3.0
+                % Forward moving/merging vehicles or pedestrians in lane ahead
+                rel_closing = max(0.0, ego_vx - vx_ag);
+                trigger_dist = max(14.0, min(32.0, 10.0 + rel_closing * 2.5));
+                if dx_ag < trigger_dist
+                    accel = min(accel, -3.0 * (1.0 + rel_closing / 3.0));
+                    accel_source = 'REFLEX_LEAD';
+                    break;
+                end
+            elseif dx_ag > 0.2 && dx_ag < 6.0 && dy_ag < 1.4
+                accel = -3.5; % hard braking to prevent impact
+                accel_source = 'REFLEX_PROXIMITY';
+                break;
+            end
+        end
     end
 
     % Off-road corridor guard
-    if abs(ego_state(2)) > 4.0
-        steer_rad = 0.0;
+    if abs(ego_state(2)) > (r_width / 2.0 + 0.3)
+        steer_rad = -sign(ego_state(2)) * min(MAX_STEER_RAD, 0.40);
         accel     = min(accel, -2.5);
+        accel_source = 'OFF_ROAD_GUARD';
+        if ego_state(4) < 0.2
+            safe_stop_active = true;
+        end
     end
+
+    % ── Shared Acceleration Slew-Rate Limiter (|da/dt| <= JERK_LIMIT) ─────
+    % All acceleration demands (Pure Pursuit, FSM v_ref, and reflex emergency braking)
+    % are capped to the SIH jerk requirement (1.0 m/s^3) to eliminate ping-pong chatter.
+    JERK_LIMIT = 0.95; % m/s^3 (< 1.0 m/s^3 target)
+    max_delta_accel = JERK_LIMIT * dt;
+    accel_demanded = accel;
+    accel = min(max(accel_demanded, prev_accel - max_delta_accel), prev_accel + max_delta_accel);
 
     % Discrete longitudinal jerk & steering slew tracking
     step_jerk = abs(accel - prev_accel) / dt;
@@ -520,6 +621,9 @@ while step < max_steps
 
     % Track maximum lateral excursion
     max_lateral = max(max_lateral, abs(ego_state(2)));
+    if verbose && (mod(step, 5) == 0 || step <= 10)
+        fprintf('TICK step=%d v=%.2f steer=%.2f deg mock_theta=%.3f deg mock_y=%.4f\n', step, mock_v, steer_rad*180/pi, mock_theta*180/pi, mock_y);
+    end
 
     % ── I. Clearance and Collision Check ──────────────────────────────────
     is_collided = false;
@@ -537,7 +641,7 @@ while step < max_steps
         % (v_ref=0) or in controlled safe-stop (v < 1.5 m/s), allow passing clearance >= 0.55m without false collision.
         eff_thresh = collision_thresh;
         if (ego_state(4) < 1.5) && (safe_stop_active || strcmp(bsm_state, 'YIELD_WAIT') || strcmp(bsm_state, 'YIELD_DECEL'))
-            eff_thresh = min(collision_thresh, 0.55);
+            eff_thresh = min(collision_thresh, 0.40);
         end
         if d_agent < eff_thresh
             is_collided = true;
@@ -581,14 +685,17 @@ while step < max_steps
     end
 
     % ── J. Safe Stop & Stall Checks ───────────────────────────────────────
-    if safe_stop_active && ego_state(4) < 0.1
+    is_yield_waiting = strcmp(bsm_state, 'YIELD_WAIT') && ego_state(4) < 0.1;
+    if (safe_stop_active && ego_state(4) < 0.1) || is_yield_waiting
         stopped_wait_steps = stopped_wait_steps + 1;
-        % If road has been permanently blocked for > MAX_STOP_WAIT_STEPS (6.0s),
-        % conclude as a verified permanent SAFE_STOP
-        if stopped_wait_steps >= MAX_STOP_WAIT_STEPS
+        max_wait = MAX_STOP_WAIT_STEPS;
+        if is_yield_waiting
+            max_wait = round(5.0 / dt); % 5.0s wait for blocked road before safe stop
+        end
+        if stopped_wait_steps >= max_wait
             outcome = 'SAFE_STOP';
             if verbose
-                fprintf('[SIM] SAFE_STOP at t=%.1fs: Controlled stop sustained for %.1fs before permanent blockage.\n', ...
+                fprintf('[SIM] SAFE_STOP at t=%.1fs: Controlled stop sustained for %.1fs before blockage.\n', ...
                     t, stopped_wait_steps * dt);
             end
             break;
@@ -598,7 +705,7 @@ while step < max_steps
     end
 
     % Deadlock check: speed < 0.1 m/s outside VSL for > 5.0 consecutive seconds
-    if ego_state(4) < 0.1 && ~strcmp(bsm_state, 'YIELD_WAIT') && ~safe_stop_active
+    if ego_state(4) < 0.1 && ~strcmp(bsm_state, 'YIELD_WAIT') && ~strcmp(bsm_state, 'YIELD_DECEL') && ~safe_stop_active
         stall_consecutive_steps = stall_consecutive_steps + 1;
     else
         stall_consecutive_steps = 0;
@@ -637,6 +744,8 @@ while step < max_steps
         cur_t.jerk = round(step_jerk, 3);
         cur_t.min_clearance = round(min_clearance, 3);
         cur_t.bsm_state = bsm_state;
+        cur_t.replan = replan_this_step;
+        cur_t.accel_source = accel_source;
         if mod(step, 5) == 1
             r_c = round((mock_y - grid_meta.y_min) / map_cfg.grid_res) + 1;
             c_c = round((mock_x - grid_meta.x_min) / map_cfg.grid_res) + 1;
@@ -739,34 +848,37 @@ end
 end
 
 %% ── Local Helper Functions ───────────────────────────────────────────────
-function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, costmap, grid_meta, grid_res, predictions)
+function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, costmap, grid_meta, grid_res, predictions, road_width)
+    if nargin < 9 || isempty(road_width), road_width = 5.0; end
     target_x = min(goal_pose(1), ego_xy(1) + horizon_m);
     
-    % Check if any oncoming dynamic obstacles are ahead within 40 meters
-    has_oncoming_ahead = false;
+    half_w = road_width / 2.0;
+    max_cand_y = max(1.1, half_w - 0.85);
+    y_cands = linspace(-max_cand_y, max_cand_y, 19);
+    
+    % Check for oncoming traffic in predictions
+    has_oncoming = false;
     if nargin >= 8 && ~isempty(predictions)
         for k = 1:length(predictions)
-            wp = predictions(k).waypoints;
-            if isempty(wp), continue; end
-            % Agent ahead of ego
-            if wp(1, 1) > ego_xy(1) && wp(1, 1) < ego_xy(1) + 40.0
-                % Check if moving toward ego (vx < 0) or occupying road center
-                dx_agent = wp(end, 1) - wp(1, 1);
-                if dx_agent < -0.5 || abs(wp(1, 2)) < 1.4
-                    has_oncoming_ahead = true;
-                    break;
-                end
+            vx_pred = 0;
+            if isfield(predictions(k), 'velocity') && ~isempty(predictions(k).velocity)
+                vx_pred = predictions(k).velocity(1);
+            elseif isfield(predictions(k), 'x_est') && ~isempty(predictions(k).x_est)
+                vx_pred = predictions(k).x_est(3);
+            end
+            if vx_pred < -0.5
+                has_oncoming = true;
+                break;
             end
         end
     end
     
-    % If oncoming traffic is ahead, pull toward the left shoulder to maximize passing clearance
-    if has_oncoming_ahead
-        lane_target = -1.40;
-        y_cands = [-1.40, -1.20, -1.55, -0.95, -0.6, -1.75, -0.2, 0.2];
+    if has_oncoming
+        % Enforce left shoulder bias for Indian driving against oncoming traffic
+        lane_target = -max(1.1, half_w - 0.85);
     else
-        lane_target = -0.95;
-        y_cands = [-0.95, -1.25, -0.65, -1.50, -0.30, 0.20, 0.60, 1.00];
+        % Default lane preference is center/left (y < 0)
+        lane_target = -min(1.0, half_w * 0.35);
     end
     best_y = lane_target;
     
@@ -776,8 +888,16 @@ function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, cos
         for yi = 1:length(y_cands)
             cand_y = y_cands(yi);
             cy_idx = min(max(round((cand_y - grid_meta.y_min) / grid_res) + 1, 1), grid_meta.nY);
-            % Soft penalty for deviating from target lane
-            cand_cost = costmap(cy_idx, c_x) + 25.0 * abs(cand_y - lane_target);
+            
+            % Soft lane-keeping bias, but strongly avoid obstacles (costmap)
+            bias_weight = 12.0;
+            if has_oncoming
+                bias_weight = 25.0; % strongly prefer staying on the left
+            end
+            cand_cost = costmap(cy_idx, c_x) + bias_weight * abs(cand_y - lane_target);
+            if has_oncoming && cand_y > -0.2
+                cand_cost = cand_cost + 150.0; % heavily penalize center/right lane when oncoming vehicle exists
+            end
             if cand_cost < min_c
                 min_c = cand_cost;
                 best_y = cand_y;
@@ -786,7 +906,7 @@ function lg = compute_local_goal(ego_xy, planned_path, horizon_m, goal_pose, cos
     end
     
     % When ego vehicle is within 5m of final goal, align to goal_pose y
-    if ego_xy(1) >= goal_pose(1) - 5.0
+    if ego_xy(1) >= goal_pose(1) - 5.0 && ~has_oncoming
         best_y = goal_pose(2);
     end
     

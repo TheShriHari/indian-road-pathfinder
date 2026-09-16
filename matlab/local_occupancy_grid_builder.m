@@ -64,20 +64,35 @@ grid_meta.grid2world = @(r, c) [x_min + (c - 0.5) * res, y_min + (r - 0.5) * res
 %% 1. Ingest Road Boundaries
 if isfield(sensor_detections, 'road_boundaries') && ~isempty(sensor_detections.road_boundaries)
     rb = sensor_detections.road_boundaries;
-    % Check if road boundaries are provided as left/right points
-    rb_right = rb(rb(:, 2) < ego_pose(2), :);
-    rb_left  = rb(rb(:, 2) >= ego_pose(2), :);
+    % Robustly separate left and right road boundaries by median y
+    med_y = median(rb(:, 2));
+    rb_right = rb(rb(:, 2) < med_y, :);
+    rb_left  = rb(rb(:, 2) >= med_y, :);
     
     col_xs = x_min + ((1:nX) - 0.5) * res;
     
     if ~isempty(rb_right) && size(rb_right, 1) >= 2
-        y_r_interp = interp1(rb_right(:, 1), rb_right(:, 2), col_xs, 'linear', 'extrap');
+        [~, sort_idx] = sort(rb_right(:, 1));
+        rb_right = rb_right(sort_idx, :);
+        [x_r_uniq, u_r] = unique(rb_right(:, 1), 'stable');
+        if length(x_r_uniq) >= 2
+            y_r_interp = interp1(x_r_uniq, rb_right(u_r, 2), col_xs, 'linear', 'extrap');
+        else
+            y_r_interp = repmat(-2.35, 1, nX);
+        end
     else
         y_r_interp = repmat(-2.35, 1, nX);
     end
     
     if ~isempty(rb_left) && size(rb_left, 1) >= 2
-        y_l_interp = interp1(rb_left(:, 1), rb_left(:, 2), col_xs, 'linear', 'extrap');
+        [~, sort_idx] = sort(rb_left(:, 1));
+        rb_left = rb_left(sort_idx, :);
+        [x_l_uniq, u_l] = unique(rb_left(:, 1), 'stable');
+        if length(x_l_uniq) >= 2
+            y_l_interp = interp1(x_l_uniq, rb_left(u_l, 2), col_xs, 'linear', 'extrap');
+        else
+            y_l_interp = repmat(2.35, 1, nX);
+        end
     else
         y_l_interp = repmat(2.35, 1, nX);
     end
@@ -122,44 +137,50 @@ if isfield(sensor_detections, 'static_points') && ~isempty(sensor_detections.sta
     end
 end
 
-%% 5. Ingest Dynamic Obstacle Confidence Ellipses (from Phase 2)
+%% 5. Ingest Dynamic Obstacle Confidence Ellipses & Future Trajectory Swaths
 if ~isempty(dynamic_predictions)
     for k = 1:length(dynamic_predictions)
         dp = dynamic_predictions(k);
-        % Current track position
-        if isfield(dp, 'x_est') && ~isempty(dp.x_est)
-            px = dp.x_est(1);
-            py = dp.x_est(2);
-            psi = atan2(dp.x_est(4), dp.x_est(3));
-        elseif isfield(dp, 'waypoints') && ~isempty(dp.waypoints)
-            px = dp.waypoints(1, 1);
-            py = dp.waypoints(1, 2);
-            psi = 0.0;
-        else
+        if ~isfield(dp, 'waypoints') || isempty(dp.waypoints)
             continue;
         end
+        wp = dp.waypoints;
+        n_wp = size(wp, 1);
         
+        % Ellipse dimensions
+        a = 1.2;
+        b = 0.8;
         if isfield(dp, 'semi_major') && ~isempty(dp.semi_major) && dp.semi_major(1) > 0
             a = dp.semi_major(1);
             b = max(dp.semi_minor(1), 0.3);
-            if isfield(dp, 'orientation') && ~isempty(dp.orientation)
-                psi = dp.orientation(1);
-            end
-        else
-            a = 1.2;
-            b = 0.8;
         end
         
-        apply_dynamic_ellipse_cost(px, py, a, b, psi);
+        % Current track position gets full ellipse
+        psi = 0.0;
+        if isfield(dp, 'orientation') && ~isempty(dp.orientation)
+            psi = dp.orientation(1);
+        elseif isfield(dp, 'x_est') && length(dp.x_est) >= 4
+            psi = atan2(dp.x_est(4), dp.x_est(3));
+        end
+        apply_dynamic_ellipse_cost(wp(1, 1), wp(1, 2), a, b, psi);
+        
+        % Future predicted waypoints: stamp hazard swath (stride 2 for high throughput)
+        for h = 2:2:min(16, n_wp)
+            px_h = wp(h, 1);
+            py_h = wp(h, 2);
+            if px_h >= (x_min - 2.0) && px_h <= (x_max + 2.0) && py_h >= (y_min - 2.0) && py_h <= (y_max + 2.0)
+                growth = min(1.3, 1.0 + 0.02 * h);
+                apply_dynamic_ellipse_cost(px_h, py_h, a * growth, b * growth, psi);
+            end
+        end
     end
 end
 
 %% ── Nested Function: Continuous Exponential Inflation Field ───────────────
 % Avoids 45,000-cell full scan via local bounding box cropping:
-% r in [row(yh - R - 1.2), row(yh + R + 1.2)]
 function apply_exponential_inflation(cx, cy, radius)
-    d_safe   = 0.35; % safe vehicle cushion (m)
-    d_margin = 1.20; % inflation field extent (m)
+    d_safe   = 0.85; % safe vehicle envelope (half-width cushion)
+    d_margin = 1.40; % inflation field extent (m)
     alpha    = 2.50; % exponential decay rate (m^-1)
     if isfield(map_config, 'alpha_cost') && ~isempty(map_config.alpha_cost)
         alpha = map_config.alpha_cost;

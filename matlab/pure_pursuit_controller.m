@@ -180,7 +180,7 @@ raw_accel = Kp_v * (v_ref - v);
 % Clamp raw acceleration to vehicle physical envelope [-3.5, +2.5] m/s^2
 raw_accel = min(max(raw_accel, -3.5), 2.5);
 
-% Longitudinal jerk limit: |a - last_accel| <= jerk_max * dt
+% Longitudinal jerk limit: comfort for acceleration and braking (|da/dt| <= jerk_max)
 max_delta_a = jerk_max * dt;
 a_cmd = min(max(raw_accel, last_accel - max_delta_a), last_accel + max_delta_a);
 

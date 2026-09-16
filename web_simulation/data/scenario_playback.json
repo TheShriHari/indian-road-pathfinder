@@ -1,0 +1,2628 @@
+{
+  "metadata": {
+    "title": "SIH PS-26037 Autonomous Pathfinder Playback",
+    "frequency_hz": 20,
+    "downsampling_factor": 5,
+    "bounding_box_m": {
+      "length": 60.0,
+      "width": 30.0
+    },
+    "scenarios": [
+      "Scenario 1: Unmarked Rural Road",
+      "Scenario 5: Sudden Cattle Crossing"
+    ]
+  },
+  "scenarios": {
+    "scenario_1_seed_1": [
+      {
+        "t": 0.1,
+        "x": 2.003,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 0.03,
+        "steer": 0.0011,
+        "accel": 0.27,
+        "jerk": 2.7,
+        "min_clearance": 8.192,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 0.6,
+        "x": 2.088,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.3,
+        "steer": 0.0027,
+        "accel": 0.72,
+        "jerk": 0.9,
+        "min_clearance": 8.106,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 1.1,
+        "x": 2.376,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 0.79,
+        "steer": -0.0002,
+        "accel": 1.17,
+        "jerk": 0.9,
+        "min_clearance": 7.819,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 1.6,
+        "x": 2.979,
+        "y": 0.0,
+        "yaw": 0.0004,
+        "v": 1.51,
+        "steer": 0.0033,
+        "accel": 1.62,
+        "jerk": 0.9,
+        "min_clearance": 7.217,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 2.1,
+        "x": 4.01,
+        "y": 0.002,
+        "yaw": 0.0072,
+        "v": 2.46,
+        "steer": 0.0254,
+        "accel": 2.07,
+        "jerk": 0.9,
+        "min_clearance": 6.19,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 2.6,
+        "x": 5.58,
+        "y": 0.035,
+        "yaw": 0.0481,
+        "v": 3.63,
+        "steer": 0.0931,
+        "accel": 2.5,
+        "jerk": 0.7,
+        "min_clearance": 4.637,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 3.1,
+        "x": 7.759,
+        "y": 0.214,
+        "yaw": 0.1229,
+        "v": 4.88,
+        "steer": 0.0649,
+        "accel": 2.5,
+        "jerk": 0.0,
+        "min_clearance": 2.561,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 3.6,
+        "x": 10.543,
+        "y": 0.571,
+        "yaw": 0.1099,
+        "v": 6.08,
+        "steer": -0.0507,
+        "accel": 2.138,
+        "jerk": 2.375,
+        "min_clearance": 0.754,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 4.1,
+        "x": 13.803,
+        "y": 0.834,
+        "yaw": 0.0499,
+        "v": 6.77,
+        "steer": -0.0162,
+        "accel": 0.888,
+        "jerk": 2.5,
+        "min_clearance": 0.754,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 4.6,
+        "x": 17.229,
+        "y": 1.01,
+        "yaw": 0.0518,
+        "v": 6.84,
+        "steer": -0.0,
+        "accel": -0.362,
+        "jerk": 2.5,
+        "min_clearance": 0.754,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 5.1,
+        "x": 20.502,
+        "y": 1.179,
+        "yaw": 0.0518,
+        "v": 6.28,
+        "steer": 0.0,
+        "accel": -1.613,
+        "jerk": 2.5,
+        "min_clearance": 0.754,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 5.6,
+        "x": 23.196,
+        "y": 1.319,
+        "yaw": 0.0518,
+        "v": 4.7,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.754,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 6.1,
+        "x": 25.017,
+        "y": 1.414,
+        "yaw": 0.0518,
+        "v": 2.95,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.754,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 6.6,
+        "x": 25.964,
+        "y": 1.463,
+        "yaw": 0.0518,
+        "v": 1.2,
+        "steer": -0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.754,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 7.1,
+        "x": 26.113,
+        "y": 1.47,
+        "yaw": 0.0518,
+        "v": 0.0,
+        "steer": 0.0262,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.754,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      }
+    ],
+    "scenario_2_seed_201": [
+      {
+        "t": 0.1,
+        "x": 2.008,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 0.08,
+        "steer": 0.0,
+        "accel": 0.752,
+        "jerk": 7.517,
+        "min_clearance": 22.218,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 0.6,
+        "x": 2.189,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 0.59,
+        "steer": 0.0,
+        "accel": 1.202,
+        "jerk": 0.9,
+        "min_clearance": 21.974,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 1.1,
+        "x": 2.694,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 1.32,
+        "steer": 0.0,
+        "accel": 1.652,
+        "jerk": 0.9,
+        "min_clearance": 21.419,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 1.6,
+        "x": 3.634,
+        "y": 0.0,
+        "yaw": -0.0,
+        "v": 2.28,
+        "steer": -0.0,
+        "accel": 2.102,
+        "jerk": 0.9,
+        "min_clearance": 20.441,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 2.1,
+        "x": 5.122,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 3.46,
+        "steer": -0.0,
+        "accel": 2.5,
+        "jerk": 0.383,
+        "min_clearance": 18.924,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 2.6,
+        "x": 7.229,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 4.71,
+        "steer": 0.0,
+        "accel": 2.5,
+        "jerk": 0.0,
+        "min_clearance": 16.797,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 3.1,
+        "x": 9.958,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 5.94,
+        "steer": 0.0,
+        "accel": 2.287,
+        "jerk": 2.135,
+        "min_clearance": 14.054,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 3.6,
+        "x": 13.051,
+        "y": -0.0,
+        "yaw": 0.0,
+        "v": 5.8,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 10.951,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 4.1,
+        "x": 15.426,
+        "y": 0.0,
+        "yaw": -0.0,
+        "v": 4.05,
+        "steer": -0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 8.573,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 4.6,
+        "x": 16.926,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 2.3,
+        "steer": -0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 5.304,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 5.1,
+        "x": 17.551,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.55,
+        "steer": 0.0001,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 2.326,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 5.6,
+        "x": 17.571,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.0,
+        "steer": -0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 1.085,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 6.1,
+        "x": 17.571,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.0,
+        "steer": -0.0001,
+        "accel": -0.663,
+        "jerk": 0.9,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 6.6,
+        "x": 17.571,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.0,
+        "steer": -0.0001,
+        "accel": -0.213,
+        "jerk": 0.9,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 7.1,
+        "x": 17.578,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.04,
+        "steer": -0.0001,
+        "accel": 0.237,
+        "jerk": 0.9,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 7.6,
+        "x": 17.667,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.3,
+        "steer": -0.0001,
+        "accel": 0.687,
+        "jerk": 0.9,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 8.1,
+        "x": 17.95,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.78,
+        "steer": -0.0,
+        "accel": 1.137,
+        "jerk": 0.9,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 8.6,
+        "x": 18.54,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 1.48,
+        "steer": 0.0001,
+        "accel": 1.587,
+        "jerk": 0.9,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 9.1,
+        "x": 19.55,
+        "y": 0.0,
+        "yaw": -0.0001,
+        "v": 2.41,
+        "steer": -0.0017,
+        "accel": 2.037,
+        "jerk": 0.9,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 9.6,
+        "x": 21.091,
+        "y": -0.003,
+        "yaw": -0.0132,
+        "v": 3.56,
+        "steer": -0.0548,
+        "accel": 2.487,
+        "jerk": 0.9,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 10.1,
+        "x": 23.243,
+        "y": -0.107,
+        "yaw": -0.1229,
+        "v": 4.81,
+        "steer": -0.1857,
+        "accel": 2.5,
+        "jerk": 0.0,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 10.6,
+        "x": 25.974,
+        "y": -0.596,
+        "yaw": -0.2314,
+        "v": 6.02,
+        "steer": -0.0548,
+        "accel": 2.195,
+        "jerk": 2.439,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 11.1,
+        "x": 29.158,
+        "y": -1.349,
+        "yaw": -0.2011,
+        "v": 6.83,
+        "steer": 0.0761,
+        "accel": 1.296,
+        "jerk": 1.44,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 11.6,
+        "x": 32.692,
+        "y": -1.822,
+        "yaw": -0.0137,
+        "v": 7.31,
+        "steer": 0.1452,
+        "accel": 0.765,
+        "jerk": 0.85,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 12.1,
+        "x": 36.434,
+        "y": -1.68,
+        "yaw": 0.0791,
+        "v": 7.59,
+        "steer": 0.0163,
+        "accel": 0.452,
+        "jerk": 0.502,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 12.6,
+        "x": 40.271,
+        "y": -1.366,
+        "yaw": 0.0788,
+        "v": 7.76,
+        "steer": -0.0096,
+        "accel": 0.267,
+        "jerk": 0.296,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 13.1,
+        "x": 44.173,
+        "y": -1.099,
+        "yaw": 0.0491,
+        "v": 7.86,
+        "steer": -0.0242,
+        "accel": 0.158,
+        "jerk": 0.175,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 13.6,
+        "x": 48.118,
+        "y": -0.959,
+        "yaw": 0.0175,
+        "v": 7.92,
+        "steer": -0.0182,
+        "accel": 0.093,
+        "jerk": 0.103,
+        "min_clearance": 1.085,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      }
+    ],
+    "scenario_3_seed_401": [
+      {
+        "t": 0.1,
+        "x": 2.001,
+        "y": 0.0,
+        "yaw": -0.0,
+        "v": 0.01,
+        "steer": -0.0043,
+        "accel": 0.115,
+        "jerk": 1.154,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 0.6,
+        "x": 2.056,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 0.2,
+        "steer": 0.0,
+        "accel": 0.565,
+        "jerk": 0.9,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 1.1,
+        "x": 2.274,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 0.62,
+        "steer": 0.0,
+        "accel": 1.015,
+        "jerk": 0.9,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 1.6,
+        "x": 2.769,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 1.26,
+        "steer": 0.0,
+        "accel": 1.465,
+        "jerk": 0.9,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 2.1,
+        "x": 3.653,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 2.13,
+        "steer": 0.0,
+        "accel": 1.915,
+        "jerk": 0.9,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 2.6,
+        "x": 5.038,
+        "y": -0.0,
+        "yaw": 0.0,
+        "v": 3.23,
+        "steer": 0.0,
+        "accel": 2.365,
+        "jerk": 0.9,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 3.1,
+        "x": 7.023,
+        "y": -0.0,
+        "yaw": 0.0,
+        "v": 4.47,
+        "steer": -0.0,
+        "accel": 2.5,
+        "jerk": 0.0,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 3.6,
+        "x": 9.633,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 5.72,
+        "steer": -0.0,
+        "accel": 2.5,
+        "jerk": 0.0,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 4.1,
+        "x": 12.793,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 6.65,
+        "steer": -0.0,
+        "accel": 1.495,
+        "jerk": 1.662,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 4.6,
+        "x": 16.297,
+        "y": -0.0,
+        "yaw": 0.0,
+        "v": 7.21,
+        "steer": 0.0,
+        "accel": 0.883,
+        "jerk": 0.981,
+        "min_clearance": 19.931,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 5.1,
+        "x": 20.004,
+        "y": -0.001,
+        "yaw": -0.0087,
+        "v": 7.53,
+        "steer": -0.0261,
+        "accel": 0.521,
+        "jerk": 0.579,
+        "min_clearance": 19.33,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 5.6,
+        "x": 23.827,
+        "y": -0.154,
+        "yaw": -0.0782,
+        "v": 7.72,
+        "steer": -0.0289,
+        "accel": 0.308,
+        "jerk": 0.342,
+        "min_clearance": 17.369,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 6.1,
+        "x": 27.712,
+        "y": -0.477,
+        "yaw": -0.0776,
+        "v": 7.84,
+        "steer": 0.0181,
+        "accel": 0.182,
+        "jerk": 0.202,
+        "min_clearance": 15.366,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 6.6,
+        "x": 31.636,
+        "y": -0.676,
+        "yaw": -0.0024,
+        "v": 7.83,
+        "steer": 0.0602,
+        "accel": -0.367,
+        "jerk": 2.5,
+        "min_clearance": 13.357,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 7.1,
+        "x": 35.407,
+        "y": -0.568,
+        "yaw": 0.0703,
+        "v": 7.27,
+        "steer": 0.0436,
+        "accel": -1.617,
+        "jerk": 2.5,
+        "min_clearance": 11.54,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 7.6,
+        "x": 38.701,
+        "y": -0.285,
+        "yaw": 0.1,
+        "v": 6.09,
+        "steer": 0.0097,
+        "accel": -2.867,
+        "jerk": 2.5,
+        "min_clearance": 10.229,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 8.1,
+        "x": 41.234,
+        "y": -0.034,
+        "yaw": 0.0968,
+        "v": 4.4,
+        "steer": 0.0004,
+        "accel": -3.41,
+        "jerk": 0.9,
+        "min_clearance": 9.696,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 8.6,
+        "x": 42.946,
+        "y": 0.132,
+        "yaw": 0.0969,
+        "v": 2.83,
+        "steer": -0.0003,
+        "accel": -2.96,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 9.1,
+        "x": 43.944,
+        "y": 0.229,
+        "yaw": 0.0955,
+        "v": 1.49,
+        "steer": -0.0205,
+        "accel": -2.51,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "RESUME",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 9.6,
+        "x": 44.34,
+        "y": 0.266,
+        "yaw": 0.0897,
+        "v": 0.37,
+        "steer": -0.0494,
+        "accel": -2.06,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 10.1,
+        "x": 44.357,
+        "y": 0.267,
+        "yaw": 0.0893,
+        "v": 0.0,
+        "steer": -0.0533,
+        "accel": -1.61,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 10.6,
+        "x": 44.357,
+        "y": 0.267,
+        "yaw": 0.0893,
+        "v": 0.0,
+        "steer": -0.0597,
+        "accel": -1.16,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 11.1,
+        "x": 44.357,
+        "y": 0.267,
+        "yaw": 0.0893,
+        "v": 0.0,
+        "steer": -0.0597,
+        "accel": -0.71,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 11.6,
+        "x": 44.357,
+        "y": 0.267,
+        "yaw": 0.0893,
+        "v": 0.0,
+        "steer": -0.0597,
+        "accel": -0.26,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 12.1,
+        "x": 44.361,
+        "y": 0.268,
+        "yaw": 0.0892,
+        "v": 0.03,
+        "steer": -0.0597,
+        "accel": 0.19,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 12.6,
+        "x": 44.436,
+        "y": 0.274,
+        "yaw": 0.0876,
+        "v": 0.26,
+        "steer": -0.0584,
+        "accel": 0.64,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 13.1,
+        "x": 44.692,
+        "y": 0.296,
+        "yaw": 0.0814,
+        "v": 0.71,
+        "steer": -0.0681,
+        "accel": 1.09,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 13.6,
+        "x": 45.243,
+        "y": 0.338,
+        "yaw": 0.065,
+        "v": 1.39,
+        "steer": -0.0848,
+        "accel": 1.54,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 14.1,
+        "x": 46.202,
+        "y": 0.388,
+        "yaw": 0.0321,
+        "v": 2.3,
+        "steer": -0.0942,
+        "accel": 1.99,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 14.6,
+        "x": 47.682,
+        "y": 0.407,
+        "yaw": -0.0122,
+        "v": 3.43,
+        "steer": -0.0676,
+        "accel": 2.44,
+        "jerk": 0.9,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      },
+      {
+        "t": 15.1,
+        "x": 49.771,
+        "y": 0.345,
+        "yaw": -0.0662,
+        "v": 4.68,
+        "steer": -0.1027,
+        "accel": 2.5,
+        "jerk": 0.0,
+        "min_clearance": 9.693,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 0.0
+        }
+      }
+    ],
+    "scenario_4_seed_601": [
+      {
+        "t": 0.1,
+        "x": 2.005,
+        "y": 0.0,
+        "yaw": 0.0001,
+        "v": 0.05,
+        "steer": 0.0464,
+        "accel": 0.482,
+        "jerk": 4.816,
+        "min_clearance": 16.489,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 0.6,
+        "x": 2.133,
+        "y": 0.0,
+        "yaw": 0.0002,
+        "v": 0.42,
+        "steer": 0.0,
+        "accel": 0.932,
+        "jerk": 0.9,
+        "min_clearance": 15.767,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 1.1,
+        "x": 2.486,
+        "y": 0.0,
+        "yaw": 0.0002,
+        "v": 0.88,
+        "steer": 0.0,
+        "accel": 0.879,
+        "jerk": 0.9,
+        "min_clearance": 14.82,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 1.6,
+        "x": 3.029,
+        "y": 0.0,
+        "yaw": 0.0002,
+        "v": 1.18,
+        "steer": 0.0,
+        "accel": 0.496,
+        "jerk": 0.9,
+        "min_clearance": 13.684,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 2.1,
+        "x": 3.662,
+        "y": 0.0,
+        "yaw": 0.0002,
+        "v": 1.31,
+        "steer": -0.0,
+        "accel": 0.207,
+        "jerk": 0.23,
+        "min_clearance": 12.458,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 2.6,
+        "x": 4.354,
+        "y": 0.0,
+        "yaw": 0.0002,
+        "v": 1.45,
+        "steer": 0.0,
+        "accel": 0.438,
+        "jerk": 0.9,
+        "min_clearance": 11.175,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 3.1,
+        "x": 5.164,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 1.71,
+        "steer": -0.0,
+        "accel": 0.208,
+        "jerk": 2.5,
+        "min_clearance": 9.775,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 3.6,
+        "x": 5.997,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 1.63,
+        "steer": 0.0,
+        "accel": -0.147,
+        "jerk": 0.163,
+        "min_clearance": 8.354,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 4.1,
+        "x": 6.795,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 1.58,
+        "steer": 0.0,
+        "accel": -0.087,
+        "jerk": 0.096,
+        "min_clearance": 6.969,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 4.6,
+        "x": 7.574,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 1.55,
+        "steer": -0.0,
+        "accel": -0.051,
+        "jerk": 0.057,
+        "min_clearance": 5.609,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 5.1,
+        "x": 8.133,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.49,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 4.472,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 5.6,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 3.876,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 6.1,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 3.299,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 6.6,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 2.729,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 7.1,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 2.172,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 7.6,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 1.643,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 8.1,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 1.178,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 8.6,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.886,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 9.1,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 9.6,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 10.1,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 10.6,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 11.1,
+        "x": 8.147,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.0,
+        "steer": 0.0,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 11.6,
+        "x": 8.156,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.05,
+        "steer": 0.0,
+        "accel": 0.27,
+        "jerk": 0.9,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 12.1,
+        "x": 8.255,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.32,
+        "steer": 0.0,
+        "accel": 0.72,
+        "jerk": 0.9,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 12.6,
+        "x": 8.556,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 0.82,
+        "steer": 0.0,
+        "accel": 1.17,
+        "jerk": 0.9,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 13.1,
+        "x": 9.173,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 1.54,
+        "steer": -0.0,
+        "accel": 1.62,
+        "jerk": 0.9,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 13.6,
+        "x": 10.217,
+        "y": 0.001,
+        "yaw": 0.0002,
+        "v": 2.48,
+        "steer": 0.0,
+        "accel": 2.07,
+        "jerk": 0.9,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 14.1,
+        "x": 11.8,
+        "y": 0.002,
+        "yaw": 0.0002,
+        "v": 3.65,
+        "steer": -0.0,
+        "accel": 2.5,
+        "jerk": 0.7,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 14.6,
+        "x": 14.001,
+        "y": 0.007,
+        "yaw": 0.0141,
+        "v": 4.9,
+        "steer": 0.0398,
+        "accel": 2.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 15.1,
+        "x": 16.818,
+        "y": 0.115,
+        "yaw": 0.0663,
+        "v": 6.1,
+        "steer": 0.0319,
+        "accel": 2.113,
+        "jerk": 2.348,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 15.6,
+        "x": 20.11,
+        "y": 0.328,
+        "yaw": 0.0346,
+        "v": 6.88,
+        "steer": -0.0726,
+        "accel": 1.248,
+        "jerk": 1.386,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 16.1,
+        "x": 23.693,
+        "y": 0.259,
+        "yaw": -0.0836,
+        "v": 7.34,
+        "steer": -0.0548,
+        "accel": 0.737,
+        "jerk": 0.819,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 16.6,
+        "x": 27.433,
+        "y": -0.089,
+        "yaw": -0.0944,
+        "v": 7.61,
+        "steer": 0.0018,
+        "accel": 0.435,
+        "jerk": 0.483,
+        "min_clearance": 0.862,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 17.1,
+        "x": 31.229,
+        "y": -0.447,
+        "yaw": -0.094,
+        "v": 7.55,
+        "steer": 0.0,
+        "accel": -0.608,
+        "jerk": 2.5,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 17.6,
+        "x": 34.811,
+        "y": -0.782,
+        "yaw": -0.0874,
+        "v": 6.88,
+        "steer": 0.0134,
+        "accel": -1.858,
+        "jerk": 2.5,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 18.1,
+        "x": 37.874,
+        "y": -1.012,
+        "yaw": -0.0498,
+        "v": 5.57,
+        "steer": 0.0443,
+        "accel": -3.108,
+        "jerk": 2.5,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 18.6,
+        "x": 40.14,
+        "y": -1.09,
+        "yaw": -0.0111,
+        "v": 3.83,
+        "steer": 0.0465,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 19.1,
+        "x": 41.532,
+        "y": -1.092,
+        "yaw": 0.0137,
+        "v": 2.08,
+        "steer": 0.0472,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 19.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.33,
+        "steer": 0.0454,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 20.1,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": 0.0453,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 20.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": 0.0475,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 21.1,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": 0.0475,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 21.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 22.1,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 22.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 23.1,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 23.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 24.1,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 24.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 25.1,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 25.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 26.1,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 26.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 27.1,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 27.6,
+        "x": 42.05,
+        "y": -1.083,
+        "yaw": 0.0225,
+        "v": 0.0,
+        "steer": -0.0002,
+        "accel": -3.5,
+        "jerk": 0.0,
+        "min_clearance": 0.862,
+        "bsm_state": "YIELD_WAIT",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      }
+    ],
+    "scenario_5_seed_801": [
+      {
+        "t": 0.1,
+        "x": 2.001,
+        "y": 0.0,
+        "yaw": -0.0,
+        "v": 0.01,
+        "steer": -0.0,
+        "accel": 0.09,
+        "jerk": 0.9,
+        "min_clearance": 11.239,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 0.6,
+        "x": 2.05,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 0.19,
+        "steer": -0.0,
+        "accel": 0.54,
+        "jerk": 0.9,
+        "min_clearance": 10.948,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 1.1,
+        "x": 2.257,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 0.59,
+        "steer": -0.0,
+        "accel": 0.99,
+        "jerk": 0.9,
+        "min_clearance": 10.537,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 1.6,
+        "x": 2.673,
+        "y": -0.0,
+        "yaw": 0.0,
+        "v": 0.97,
+        "steer": 0.0,
+        "accel": 0.594,
+        "jerk": 0.66,
+        "min_clearance": 9.954,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 2.1,
+        "x": 3.226,
+        "y": 0.0,
+        "yaw": 0.0,
+        "v": 1.18,
+        "steer": 0.0,
+        "accel": 0.351,
+        "jerk": 0.39,
+        "min_clearance": 9.271,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 2.6,
+        "x": 3.86,
+        "y": 0.0,
+        "yaw": -0.0,
+        "v": 1.31,
+        "steer": 0.0,
+        "accel": 0.207,
+        "jerk": 0.23,
+        "min_clearance": 8.548,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 3.1,
+        "x": 4.541,
+        "y": 0.0,
+        "yaw": -0.0,
+        "v": 1.39,
+        "steer": -0.0,
+        "accel": 0.122,
+        "jerk": 0.136,
+        "min_clearance": 7.83,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 3.6,
+        "x": 5.251,
+        "y": -0.0,
+        "yaw": -0.0,
+        "v": 1.43,
+        "steer": 0.0,
+        "accel": 0.072,
+        "jerk": 0.08,
+        "min_clearance": 7.152,
+        "bsm_state": "YIELD_DECEL",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 4.1,
+        "x": 6.001,
+        "y": -0.0,
+        "yaw": 0.0,
+        "v": 1.57,
+        "steer": 0.0001,
+        "accel": 0.46,
+        "jerk": 0.9,
+        "min_clearance": 6.523,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 4.6,
+        "x": 6.889,
+        "y": 0.0,
+        "yaw": -0.0001,
+        "v": 1.94,
+        "steer": -0.0004,
+        "accel": 0.91,
+        "jerk": 0.9,
+        "min_clearance": 5.891,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 5.1,
+        "x": 8.027,
+        "y": -0.0,
+        "yaw": 0.0003,
+        "v": 2.53,
+        "steer": 0.0018,
+        "accel": 1.36,
+        "jerk": 0.9,
+        "min_clearance": 5.238,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 5.6,
+        "x": 9.527,
+        "y": -0.001,
+        "yaw": -0.0087,
+        "v": 3.34,
+        "steer": -0.047,
+        "accel": 1.81,
+        "jerk": 0.9,
+        "min_clearance": 4.7,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 6.1,
+        "x": 11.501,
+        "y": -0.077,
+        "yaw": -0.1033,
+        "v": 4.38,
+        "steer": -0.1779,
+        "accel": 2.26,
+        "jerk": 0.9,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 6.6,
+        "x": 14.019,
+        "y": -0.511,
+        "yaw": -0.2459,
+        "v": 5.61,
+        "steer": -0.0994,
+        "accel": 2.5,
+        "jerk": 0.0,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 7.1,
+        "x": 17.029,
+        "y": -1.334,
+        "yaw": -0.2682,
+        "v": 6.59,
+        "steer": 0.0315,
+        "accel": 1.565,
+        "jerk": 1.739,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 7.6,
+        "x": 20.42,
+        "y": -2.109,
+        "yaw": -0.1245,
+        "v": 7.17,
+        "steer": 0.1624,
+        "accel": 0.924,
+        "jerk": 1.027,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 8.1,
+        "x": 24.103,
+        "y": -2.172,
+        "yaw": 0.1215,
+        "v": 7.51,
+        "steer": 0.1362,
+        "accel": 0.546,
+        "jerk": 0.606,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 8.6,
+        "x": 27.866,
+        "y": -1.53,
+        "yaw": 0.2029,
+        "v": 7.71,
+        "steer": 0.0053,
+        "accel": 0.322,
+        "jerk": 0.358,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 9.1,
+        "x": 31.697,
+        "y": -0.85,
+        "yaw": 0.0967,
+        "v": 7.83,
+        "steer": -0.1256,
+        "accel": 0.19,
+        "jerk": 0.211,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 9.6,
+        "x": 35.628,
+        "y": -0.804,
+        "yaw": -0.0865,
+        "v": 7.9,
+        "steer": -0.079,
+        "accel": 0.112,
+        "jerk": 0.125,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 10.1,
+        "x": 39.57,
+        "y": -1.208,
+        "yaw": -0.0871,
+        "v": 7.94,
+        "steer": 0.0519,
+        "accel": 0.066,
+        "jerk": 0.074,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 10.6,
+        "x": 43.54,
+        "y": -1.427,
+        "yaw": -0.009,
+        "v": 7.96,
+        "steer": 0.0499,
+        "accel": 0.039,
+        "jerk": 0.044,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      },
+      {
+        "t": 11.1,
+        "x": 47.527,
+        "y": -1.371,
+        "yaw": 0.0378,
+        "v": 7.98,
+        "steer": 0.0165,
+        "accel": 0.023,
+        "jerk": 0.026,
+        "min_clearance": 4.628,
+        "bsm_state": "CRUISE",
+        "costmap_info": {
+          "rows": 31,
+          "cols": 61,
+          "hazard_peak": 100.0
+        }
+      }
+    ]
+  }
+}

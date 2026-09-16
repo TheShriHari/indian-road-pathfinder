@@ -75,8 +75,10 @@ y_max = y_min + (cmap_rows - 1) * grid_res;
 % ── 1. Warm-Start Cache Evaluation ─────────────────────────────────────────
 warm_started = false;
 if ~isempty(p_prev_path) && size(p_prev_path, 1) >= 10
-    % Check goal alignment
-    if hypot(p_prev_path(end, 1) - goal_pose(1), p_prev_path(end, 2) - goal_pose(2)) < 5.0
+    % Check goal alignment (strict lateral alignment to ensure lane changes re-plan)
+    dx_goal = abs(p_prev_path(end, 1) - goal_pose(1));
+    dy_goal = abs(p_prev_path(end, 2) - goal_pose(2));
+    if dx_goal < 4.0 && dy_goal < 0.25
         % Find closest point on previous path to current ego position
         dists_to_prev = hypot(p_prev_path(:, 1) - start_pose(1), p_prev_path(:, 2) - start_pose(2));
         [min_d, idx_near] = min(dists_to_prev);
