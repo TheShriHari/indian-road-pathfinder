@@ -1,4 +1,5 @@
-%% INVESTIGATE_ROOT_CAUSES  Stage 2: Failure Mining & Root Cause Triage Engine.
+function summary_struct = investigate_root_causes(csv_override)
+%% INVESTIGATE_ROOT_CAUSES  Stage 2/3: Failure Mining & Root Cause Triage Engine.
 %
 % Parses Monte Carlo batch results across all 5 domains, filters edge cases failing:
 %   - Clearance < 0.8m
@@ -12,7 +13,7 @@
 %   - CHATTER
 % Dumps edge case diagnostics to .tmp/failures/ and exports .tmp/failure_analysis.json.
 
-clear; clc;
+if nargin < 1, csv_override = ''; end
 
 % ── Constraint 2: Thread pool throttling ──────────────────────────────────
 try
@@ -21,7 +22,7 @@ catch
 end
 
 fprintf('=========================================================================\n');
-fprintf('  STAGE 2: FAILURE MINING & ROOT CAUSE TRIAGE ENGINE                     \n');
+fprintf('  FAILURE MINING & ROOT CAUSE TRIAGE ENGINE                             \n');
 fprintf('=========================================================================\n\n');
 
 script_dir = fileparts(mfilename('fullpath'));
@@ -30,18 +31,30 @@ addpath(script_dir);
 addpath(fullfile(script_dir, '..'));
 
 % Locate input CSV
-csv_candidates = { ...
-    fullfile(script_dir, 'batch_test_results_baseline.csv'), ...
-    fullfile(script_dir, '..', 'batch_test_results_baseline.csv'), ...
-    fullfile(script_dir, 'batch_test_results.csv'), ...
-    fullfile(script_dir, '..', 'batch_test_results.csv') ...
-};
-
 csv_file = '';
-for i = 1:length(csv_candidates)
-    if exist(csv_candidates{i}, 'file')
-        csv_file = csv_candidates{i};
-        break;
+if ~isempty(csv_override)
+    if exist(csv_override, 'file')
+        csv_file = csv_override;
+    elseif exist(fullfile(script_dir, '..', csv_override), 'file')
+        csv_file = fullfile(script_dir, '..', csv_override);
+    end
+end
+
+if isempty(csv_file)
+    csv_candidates = { ...
+        fullfile(script_dir, 'batch_test_results_verified.csv'), ...
+        fullfile(script_dir, '..', 'batch_test_results_verified.csv'), ...
+        fullfile(script_dir, 'batch_test_results_baseline.csv'), ...
+        fullfile(script_dir, '..', 'batch_test_results_baseline.csv'), ...
+        fullfile(script_dir, 'batch_test_results.csv'), ...
+        fullfile(script_dir, '..', 'batch_test_results.csv') ...
+    };
+
+    for i = 1:length(csv_candidates)
+        if exist(csv_candidates{i}, 'file')
+            csv_file = csv_candidates{i};
+            break;
+        end
     end
 end
 
