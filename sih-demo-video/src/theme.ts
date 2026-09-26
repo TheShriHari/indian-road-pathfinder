@@ -1,50 +1,51 @@
 export const FPS = 30;
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
-export const TOTAL_FRAMES = 2850; // 95s (within 90s–105s target budget)
+export const TOTAL_FRAMES = 5160; // 172s (within 165–180s target budget)
 
 export const COLORS = {
-  bg: "#0B0F19",
-  road: "#161E2E",
-  grid: "#2A3A52", // Brightened from #1E293B for enhanced contrast
-  cyan: "#38BDF8",
-  amber: "#F59E0B",
-  red: "#EF4444",
-  green: "#10B981",
-  text: "#F8FAFC",
-  textMuted: "#E2E8F0", // Crisp off-white boosted from #94A3B8 / #334155
+  bg: "#0B111E",         // Base canvas/background everywhere
+  road: "#172033",       // All road/asphalt fills
+  curb: "#2D3B55",       // Road edges, shoulder erosion strokes
+  grid: "#2D3B55",       // Grid texture lines (15-30% opacity)
+  cyan: "#00F0FF",       // Electric cyan: vehicle chassis, canopy glow, primary HUD accents
+  amber: "#FFB703",      // Golden amber: dynamic hazards (cattle/rickshaw), calipers
+  orange: "#FB8500",     // Safety orange: hazard vectors, dynamic markers
+  red: "#FF0054",        // Neon crimson: lethal zones, virtual stop lines, fail state
+  green: "#06D6A0",      // Emerald green: safe path spline, SUCCESS states, fixed state
+  text: "#F8FAFC",       // Crisp off-white monospace
+  textMuted: "#94A3B8",  // Secondary muted labels
 } as const;
 
-// Segment / scene frame ranges — single source of truth.
-// Target total length: 95s = 2850 frames at 30 fps
+// Spring physics presets (Section 1.5)
+export const SPRING_PRESETS = {
+  overshoot: { stiffness: 180, damping: 12, mass: 0.7 }, // ~112% overshoot for UI/caliper arrivals
+  gentle: { stiffness: 120, damping: 14, mass: 0.9 },
+  camera: { stiffness: 90, damping: 18, mass: 1.0 },
+} as const;
+
+// 12-Beat Timeline Architecture (total: 5160 frames = 172.0s @ 30 FPS)
 export const TIMING = {
-  segment1: { from: 0, durationInFrames: 450 },
-  scene1_1_realityIntro:        { from: 0,    durationInFrames: 150 }, // 5s (trimmed from 12s)
-  scene1_2_assumptionBreakdown: { from: 150,  durationInFrames: 180 }, // 6s (accelerated from 10s)
-  scene1_3_titleCard:           { from: 330,  durationInFrames: 120 }, // 4s (reduced from 12s)
-
-  segment2: { from: 450, durationInFrames: 1410 },
-  step1_perceptionScan:    { from: 450,  durationInFrames: 210 }, // 7s
-  step2_motionPrediction:  { from: 660,  durationInFrames: 210 }, // 7s
-  step3_costmapBuild:      { from: 870,  durationInFrames: 210 }, // 7s
-  step4_corridorCheck:     { from: 1080, durationInFrames: 210 }, // 7s
-  step5_pathPlanning:      { from: 1290, durationInFrames: 180 }, // 6s
-  step6_behaviorFSM:       { from: 1470, durationInFrames: 240 }, // 8s
-  step7_steeringControl:   { from: 1710, durationInFrames: 150 }, // 5s
-
-  segment3: { from: 1860, durationInFrames: 600 },
-  scene3_1_scenarioGrid: { from: 1860, durationInFrames: 240 }, // 8s (condensed from 19s)
-  scene3_2_rigorKpis:    { from: 2100, durationInFrames: 360 }, // 12s
-
-  segment4: { from: 2460, durationInFrames: 390 },
-  scene4_1_closingBranding: { from: 2460, durationInFrames: 390 }, // 13s
+  totalFrames: 5160,
+  beat1_titleCard:        { from: 0,    durationInFrames: 180 }, // 6s (0:00 - 0:06)
+  beat2_problemStatement: { from: 180,  durationInFrames: 540 }, // 18s (0:06 - 0:24)
+  beat3_perceptionScan:   { from: 720,  durationInFrames: 420 }, // 14s (0:24 - 0:38)
+  beat4_motionPrediction: { from: 1140, durationInFrames: 420 }, // 14s (0:38 - 0:52)
+  beat5_costmapBuild:     { from: 1560, durationInFrames: 390 }, // 13s (0:52 - 1:05)
+  beat6_corridorCheck:    { from: 1950, durationInFrames: 450 }, // 15s (1:05 - 1:20)
+  beat7_pathPlanning:     { from: 2400, durationInFrames: 420 }, // 14s (1:20 - 1:34)
+  beat8_behaviorFSM:      { from: 2820, durationInFrames: 600 }, // 20s (1:34 - 1:54)
+  beat9_steeringControl:  { from: 3420, durationInFrames: 360 }, // 12s (1:54 - 2:06)
+  beat10_bugsFoundFixed:  { from: 3780, durationInFrames: 480 }, // 16s (2:06 - 2:22)
+  beat11_rigorKpis:       { from: 4260, durationInFrames: 420 }, // 14s (2:22 - 2:36)
+  beat12_closingBranding: { from: 4680, durationInFrames: 480 }, // 16s (2:36 - 2:52)
 } as const;
 
-// Physics constants used across scenes — add here, never inline
+// Physics constants used across scenes
 export const PX_PER_M = 8;                // pixels per metre in top-down views
-export const MIN_CLEARANCE_M = 2.55;      // corridor-check threshold (metres)
+export const MIN_CLEARANCE_M = 2.55;      // audited corridor-check threshold (metres)
+export const MAX_STEERING_RATE_DEG_S = 25; // max physical steering rate limit
 
-// AssumptionBreakdown timing offsets (local frames within the scene, 180 frames total)
 export const ASSUMPTION_TIMING = {
   card1Enter: 6,
   card1Strike: { start: 24, end: 38 },
@@ -54,12 +55,13 @@ export const ASSUMPTION_TIMING = {
   card3Strike: { start: 84, end: 98 },
 } as const;
 
-// BehaviorFSM state local frame ranges (240 frames total)
+// BehaviorFSM state local frame ranges (600 frames total = 20s, 4s / 120 frames per state)
 export const FSM_STATES = [
-  { label: "CRUISE",       color: "#38BDF8", speedKmh: 18, subtitle: "Open road traversal",       start: 0,   end: 45  },
-  { label: "NUDGE",        color: "#06B6D4", speedKmh: 12, subtitle: "Deflecting around hazard",  start: 45,  end: 90 },
-  { label: "YIELD_DECEL",  color: "#F59E0B", speedKmh: 5,  subtitle: "Approaching pinch corridor",start: 90,  end: 140 },
-  { label: "YIELD_WAIT",   color: "#EF4444", speedKmh: 0,  subtitle: "Holding at stop line",      start: 140, end: 195 },
-  { label: "RESUME",       color: "#10B981", speedKmh: 8,  subtitle: "Accelerating once clear",   start: 195, end: 240 },
+  { label: "CRUISE",       color: "#00F0FF", speedKmh: 18, subtitle: "Open road traversal",        start: 0,   end: 120 },
+  { label: "NUDGE",        color: "#38BDF8", speedKmh: 12, subtitle: "Deflecting around hazard",   start: 120, end: 240 },
+  { label: "YIELD_DECEL",  color: "#FFB703", speedKmh: 5,  subtitle: "Approaching pinch corridor", start: 240, end: 360 },
+  { label: "YIELD_WAIT",   color: "#FF0054", speedKmh: 0,  subtitle: "Holding at stop line",       start: 360, end: 480 },
+  { label: "RESUME",       color: "#06D6A0", speedKmh: 8,  subtitle: "Accelerating once clear",    start: 480, end: 600 },
 ] as const;
+
 

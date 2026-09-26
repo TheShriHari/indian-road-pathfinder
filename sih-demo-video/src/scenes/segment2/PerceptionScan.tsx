@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate, spring } from "remotion";
-import { COLORS, FPS, PX_PER_M } from "../../theme";
+import { COLORS, FPS, PX_PER_M, SPRING_PRESETS } from "../../theme";
 import { VehicleSprite } from "../../components/VehicleSprite";
 import { HudLabel } from "../../components/HudLabel";
 
@@ -10,15 +10,7 @@ const RANGE_M = 35;
 const RANGE_PX = RANGE_M * PX_PER_M; // 280px
 const FOV_DEG = 140;
 
-// Compute SVG arc path for the scan cone
-function scanConePath(
-  cx: number,
-  cy: number,
-  r: number,
-  startAngle: number,
-  endAngle: number
-): string {
-  // Angles measured from "up" (north), positive = clockwise
+function scanConePath(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
   const toRad = (d: number) => ((d - 90) * Math.PI) / 180;
   const x1 = cx + r * Math.cos(toRad(startAngle));
   const y1 = cy + r * Math.sin(toRad(startAngle));
@@ -28,91 +20,112 @@ function scanConePath(
   return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
 }
 
-// Objects to detect — angular position (degrees from north, from vehicle)
+// Bounding box detection objects (positions match Beat 4 and 5)
 const DETECTIONS = [
-  { id: "pothole1", label: "POTHOLE", x: 860, y: 590, angle: -20, color: COLORS.amber },
-  { id: "cow",      label: "LARGE ANIMAL", x: 780, y: 500, angle: -40, color: COLORS.red },
-  { id: "rickshaw", label: "VEHICLE",      x: 1060, y: 480, angle: 12,  color: COLORS.cyan },
-  { id: "pothole2", label: "POTHOLE", x: 1100, y: 580, angle: 24, color: COLORS.amber },
+  { id: "cow",      label: "STRAY CATTLE",  x: 800,  y: 490, triggerFrame: 100, color: COLORS.amber, w: 70, h: 48, vx: -20, vy: 40 },
+  { id: "rickshaw", label: "AUTO-RICKSHAW", x: 1080, y: 470, triggerFrame: 160, color: COLORS.orange, w: 62, h: 72, vx: -15, vy: 120 },
+  { id: "pothole",  label: "POTHOLE DEEP",  x: 940,  y: 600, triggerFrame: 70,  color: COLORS.red,    w: 52, h: 36, vx: 0,   vy: 0 },
 ] as const;
 
 export const PerceptionScan: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // Scan angle sweeps from -70° to +70° (relative to north)
-  const scanAngle = interpolate(frame, [10, 150], [-70, 70], {
+  const sceneOpacity = interpolate(frame, [0, 20], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-
-  // Range arc dash animation
-  const arcDash = interpolate(frame, [0, 30], [20, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  // HUD opacity
   const hudOpacity = interpolate(frame, [20, 50], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  const sceneOpacity = interpolate(frame, [0, 15], [0, 1], {
+  // Scan angle sweeps from -70° to +70° over frames 20 to 240 (8s)
+  const scanAngle = interpolate(frame, [20, 240], [-70, 70], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // The sweep starts at -70 and goes to current scanAngle
-  // Show full FOV arc as background, active sweep on top
-  const sweepStart = -FOV_DEG / 2;
+  // Concentric ripple pulse radiating from roof sensor
+  const rippleRadius = (frame * 6) % RANGE_PX;
+  const rippleOpacity = interpolate(rippleRadius, [0, RANGE_PX * 0.8, RANGE_PX], [0.8, 0.4, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.bg, opacity: sceneOpacity }}>
-      {/* Background grid */}
+    <AbsoluteFill style={{ backgroundColor: COLORS.bg, opacity: sceneOpacity, overflow: "hidden" }}>
       <svg width={1920} height={1080} style={{ position: "absolute", top: 0, left: 0 }}>
+        {/* Grid */}
         {Array.from({ length: 22 }).map((_, i) => (
-          <line key={`h-${i}`} x1={0} y1={i * 52} x2={1920} y2={i * 52}
-            stroke={COLORS.grid} strokeWidth={1} opacity={0.35} />
+          <line
+            key={`h-${i}`}
+            x1={0}
+            y1={i * 52}
+            x2={1920}
+            y2={i * 52}
+            stroke={COLORS.grid}
+            strokeWidth={1}
+            opacity={0.25}
+          />
         ))}
         {Array.from({ length: 38 }).map((_, i) => (
-          <line key={`v-${i}`} x1={i * 52} y1={0} x2={i * 52} y2={1080}
-            stroke={COLORS.grid} strokeWidth={1} opacity={0.35} />
+          <line
+            key={`v-${i}`}
+            x1={i * 52}
+            y1={0}
+            x2={i * 52}
+            y2={1080}
+            stroke={COLORS.grid}
+            strokeWidth={1}
+            opacity={0.25}
+          />
         ))}
 
         {/* Road */}
-        <rect x={700} y={0} width={520} height={1080} fill="#161E2E" rx={0} />
-        <rect x={700} y={0} width={8} height={1080} fill="#334155" opacity={0.5} />
-        <rect x={1212} y={0} width={8} height={1080} fill="#334155" opacity={0.5} />
+        <rect x={680} y={0} width={560} height={1080} fill={COLORS.road} />
+        <rect x={680} y={0} width={8} height={1080} fill={COLORS.curb} opacity={0.6} />
+        <rect x={1232} y={0} width={8} height={1080} fill={COLORS.curb} opacity={0.6} />
 
-        {/* Range ring — dashed */}
+        {/* Outer 35m Range ring */}
         <circle
           cx={VEHICLE_X}
           cy={VEHICLE_Y}
           r={RANGE_PX}
           fill="none"
           stroke={COLORS.cyan}
-          strokeWidth={1.5}
-          strokeDasharray={`${12 - arcDash} ${8 + arcDash}`}
-          opacity={0.45}
+          strokeWidth={1.8}
+          strokeDasharray="8 6"
+          opacity={0.5}
         />
 
-        {/* Full FOV ghost arc */}
+        {/* Concentric expanding pulse wave */}
+        <circle
+          cx={VEHICLE_X}
+          cy={VEHICLE_Y}
+          r={rippleRadius}
+          fill="none"
+          stroke={COLORS.cyan}
+          strokeWidth={2}
+          opacity={rippleOpacity}
+        />
+
+        {/* Full 140° FOV ghost arc */}
         <path
-          d={scanConePath(VEHICLE_X, VEHICLE_Y, RANGE_PX, sweepStart, FOV_DEG / 2)}
-          fill={`${COLORS.cyan}08`}
-          stroke={`${COLORS.cyan}25`}
-          strokeWidth={1}
+          d={scanConePath(VEHICLE_X, VEHICLE_Y, RANGE_PX, -FOV_DEG / 2, FOV_DEG / 2)}
+          fill={`${COLORS.cyan}0A`}
+          stroke={`${COLORS.cyan}30`}
+          strokeWidth={1.5}
         />
 
         {/* Active sweep cone */}
         <path
-          d={scanConePath(VEHICLE_X, VEHICLE_Y, RANGE_PX, sweepStart, scanAngle)}
-          fill={`${COLORS.cyan}20`}
+          d={scanConePath(VEHICLE_X, VEHICLE_Y, RANGE_PX, -FOV_DEG / 2, scanAngle)}
+          fill={`${COLORS.cyan}25`}
           stroke={COLORS.cyan}
-          strokeWidth={1.5}
+          strokeWidth={2}
         />
 
-        {/* Sweep leading edge line */}
+        {/* Leading sweep laser ray */}
         {(() => {
           const rad = ((scanAngle - 90) * Math.PI) / 180;
           return (
@@ -122,90 +135,109 @@ export const PerceptionScan: React.FC = () => {
               x2={VEHICLE_X + RANGE_PX * Math.cos(rad)}
               y2={VEHICLE_Y + RANGE_PX * Math.sin(rad)}
               stroke={COLORS.cyan}
-              strokeWidth={2}
-              opacity={0.9}
+              strokeWidth={3}
+              style={{ filter: `drop-shadow(0 0 8px ${COLORS.cyan})` }}
             />
           );
         })()}
 
         {/* Range label */}
         <text
-          x={VEHICLE_X + RANGE_PX + 10}
-          y={VEHICLE_Y - 8}
+          x={VEHICLE_X + RANGE_PX + 14}
+          y={VEHICLE_Y - 10}
           fill={COLORS.cyan}
-          fontSize={18}
+          fontSize={20}
           fontFamily="'Courier New', monospace"
           opacity={hudOpacity}
+          fontWeight="bold"
         >
-          35m
+          35m RANGE
         </text>
 
-        {/* Detection objects */}
+        {/* Persistent Bounding Box Detections (carried forward into Beat 4!) */}
         {DETECTIONS.map((det) => {
-          const detected = scanAngle >= det.angle;
-          const springVal = spring({
-            frame: detected ? frame - (
-              // approximate frame when scanAngle crossed this angle
-              interpolate(det.angle, [-70, 70], [10, 150], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
-            ) : 0,
+          const isTriggered = frame >= det.triggerFrame;
+          const pop = spring({
+            frame: isTriggered ? frame - det.triggerFrame : 0,
             fps: FPS,
-            config: { damping: 10, stiffness: 120 },
+            config: SPRING_PRESETS.overshoot,
           });
-          const scale = detected ? interpolate(springVal, [0, 1], [0, 1]) : 0;
-          const objOpacity = detected ? 1 : 0;
+          const scale = isTriggered ? interpolate(pop, [0, 1], [0.4, 1.0]) : 0;
+          const arrowLength = isTriggered ? interpolate(frame - det.triggerFrame, [10, 40], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+
+          if (!isTriggered) return null;
 
           return (
-            <g key={det.id} opacity={objOpacity}>
-              {/* Object marker */}
+            <g key={det.id} transform={`translate(${det.x}, ${det.y}) scale(${scale})`} style={{ transformOrigin: "center center" }}>
+              {/* Bounding box with 14px squircle radius */}
               <rect
-                x={det.x - 28}
-                y={det.y - 20}
-                width={56}
-                height={40}
-                fill={`${det.color}20`}
+                x={-det.w / 2}
+                y={-det.h / 2}
+                width={det.w}
+                height={det.h}
+                rx={14}
+                fill={`${det.color}25`}
                 stroke={det.color}
-                strokeWidth={1.5}
-                rx={3}
-                transform={`scale(${scale})`}
-                style={{ transformOrigin: `${det.x}px ${det.y}px` }}
+                strokeWidth={2.5}
+                style={{ filter: `drop-shadow(0 0 10px ${det.color}80)` }}
               />
-              {/* Dot center */}
-              <circle cx={det.x} cy={det.y} r={5} fill={det.color} />
+
+              {/* Center point */}
+              <circle cx={0} cy={0} r={5} fill={det.color} />
+
               {/* Label */}
               <text
-                x={det.x}
-                y={det.y - 28}
+                x={0}
+                y={-det.h / 2 - 12}
                 fill={det.color}
-                fontSize={14}
+                fontSize={15}
                 fontFamily="'Courier New', monospace"
                 textAnchor="middle"
-                opacity={scale}
+                fontWeight="bold"
               >
                 {det.label}
               </text>
+
+              {/* Sprouting velocity vector */}
+              {arrowLength > 0 && (det.vx !== 0 || det.vy !== 0) && (
+                <g opacity={arrowLength}>
+                  <line
+                    x1={0}
+                    y1={0}
+                    x2={det.vx * arrowLength}
+                    y2={det.vy * arrowLength}
+                    stroke={det.color}
+                    strokeWidth={3}
+                  />
+                  <polygon
+                    points={`${det.vx * arrowLength - 5},${det.vy * arrowLength - 8} ${det.vx * arrowLength + 5},${det.vy * arrowLength - 8} ${det.vx * arrowLength},${det.vy * arrowLength}`}
+                    fill={det.color}
+                  />
+                </g>
+              )}
             </g>
           );
         })}
       </svg>
 
-      {/* Vehicle */}
-      <VehicleSprite x={VEHICLE_X} y={VEHICLE_Y} />
+      {/* Vehicle sprite docked at sensor pod origin */}
+      <VehicleSprite x={VEHICLE_X} y={VEHICLE_Y} speedKmh={0} color={COLORS.cyan} />
 
-      {/* HUD labels */}
+      {/* HUD Labels */}
       <HudLabel
-        text="PERCEPTION · 35m range · 140° FOV"
+        text="PERCEPTION · 360° SENSOR FUSION · 35m RANGE · 140° FOV"
         x={60}
-        y={60}
+        y={80}
         opacity={hudOpacity}
-        fontSize={24}
+        fontSize={22}
         color={COLORS.cyan}
       />
       <HudLabel
-        text={`SCAN ANGLE · ${scanAngle.toFixed(0)}°`}
+        text={`SWEEP ANGLE · ${scanAngle.toFixed(0)}° AZIMUTH`}
         x={60}
-        y={100}
+        y={118}
         opacity={hudOpacity}
-        fontSize={18}
+        fontSize={16}
         color={COLORS.textMuted}
       />
 
@@ -213,12 +245,12 @@ export const PerceptionScan: React.FC = () => {
       <div
         style={{
           position: "absolute",
-          top: 60,
+          top: 80,
           right: 80,
           padding: "10px 24px",
-          border: `1.5px solid ${COLORS.cyan}60`,
-          borderRadius: 6,
-          backgroundColor: `${COLORS.cyan}10`,
+          border: `1.5px solid ${COLORS.cyan}`,
+          borderRadius: 14,
+          backgroundColor: `${COLORS.cyan}15`,
           fontFamily: "'Courier New', monospace",
           fontSize: 18,
           color: COLORS.cyan,

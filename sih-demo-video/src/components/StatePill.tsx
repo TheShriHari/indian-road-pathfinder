@@ -7,6 +7,7 @@ export interface StatePillProps {
   speedKmh: number;
   subtitle: string;
   opacity?: number;
+  scale?: number;
 }
 
 export const StatePill: React.FC<StatePillProps> = ({
@@ -15,19 +16,23 @@ export const StatePill: React.FC<StatePillProps> = ({
   speedKmh,
   subtitle,
   opacity = 1,
+  scale = 1,
 }) => {
   return (
     <div
       style={{
         opacity,
+        transform: `scale(${scale})`,
         display: "inline-flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "18px 40px",
-        borderRadius: 999,
+        padding: "16px 36px",
+        borderRadius: 18,
         border: `2px solid ${color}`,
-        backgroundColor: `${color}26`, // ~15% opacity
-        minWidth: 220,
+        backgroundColor: `${COLORS.bg}EE`,
+        boxShadow: `0 10px 30px rgba(0,0,0,0.5), inset 0 0 15px ${color}20`,
+        filter: `drop-shadow(0 0 8px ${color}66)`,
+        minWidth: 230,
         gap: 4,
       }}
     >
@@ -35,7 +40,7 @@ export const StatePill: React.FC<StatePillProps> = ({
         style={{
           fontFamily: "'Courier New', monospace",
           fontWeight: 700,
-          fontSize: 32,
+          fontSize: 28,
           letterSpacing: 3,
           color,
         }}
@@ -45,19 +50,19 @@ export const StatePill: React.FC<StatePillProps> = ({
       <span
         style={{
           fontFamily: "'Courier New', monospace",
-          fontWeight: 400,
-          fontSize: 42,
+          fontWeight: 600,
+          fontSize: 40,
           color,
           lineHeight: 1,
         }}
       >
-        {speedKmh.toFixed(0)} km/h
+        {speedKmh.toFixed(1)} km/h
       </span>
       <span
         style={{
           fontFamily: "'Courier New', monospace",
           fontWeight: 400,
-          fontSize: 20,
+          fontSize: 18,
           color: COLORS.textMuted,
           marginTop: 4,
         }}

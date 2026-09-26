@@ -7,230 +7,213 @@ import { HudLabel } from "../../components/HudLabel";
 const VEHICLE_X = 960;
 const VEHICLE_Y = 750;
 
+// Persistent anchor positions carried from Beat 3
+const COW_X = 800;
+const COW_Y = 490;
+const RICK_X = 1080;
+const RICK_Y = 470;
+
 export const MotionPrediction: React.FC = () => {
   const frame = useCurrentFrame();
 
-  const hudOpacity = interpolate(frame, [15, 40], [0, 1], {
+  const sceneOpacity = interpolate(frame, [0, 20], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const sceneOpacity = interpolate(frame, [0, 15], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  // Arrows scale 0→1 over frames 10–40
-  const arrowScale = interpolate(frame, [10, 40], [0, 1], {
+  const hudOpacity = interpolate(frame, [20, 50], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Ribbons draw via dashoffset over frames 40–120
-  const rickshawRibbonProgress = interpolate(frame, [40, 120], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const cowRibbonProgress = interpolate(frame, [50, 130], [0, 1], {
+  // Ribbons draw via strokeDashoffset over frames 30 to 180 (1s to 6s)
+  const ribbonProgress = interpolate(frame, [30, 180], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Covariance ellipse animation (grows larger)
-  const ellipseScale = interpolate(frame, [60, 150], [0, 1], {
+  // Covariance uncertainty ellipse expansion (frames 90 to 240)
+  const ellipseScale = interpolate(frame, [90, 240], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Rickshaw position (right side, predictable)
-  const rickX = 1100;
-  const rickY = 520;
-  const rickDX = -20;
-  const rickDY = 140;
-  const rickRibbonLen = 200;
+  // Continuous Camera Reframe on exit (frames 320 to 420):
+  // Camera pulls up and back into a bird's-eye tactical angle, transitioning directly into Beat 5!
+  const tacticalPullback = interpolate(frame, [320, 420], [1.0, 0.85], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const tacticalPanY = interpolate(frame, [320, 420], [0, 40], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
-  // Cow position (left-center, more uncertain)
-  const cowX = 820;
-  const cowY = 480;
-  const cowDX = 30;
-  const cowDY = 160;
-  const cowRibbonLen = 200;
+  const cowRibbonLen = 220;
+  const rickRibbonLen = 240;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.bg, opacity: sceneOpacity }}>
-      {/* Background grid */}
-      <svg width={1920} height={1080} style={{ position: "absolute", top: 0, left: 0 }}>
-        {Array.from({ length: 22 }).map((_, i) => (
-          <line key={`h-${i}`} x1={0} y1={i * 52} x2={1920} y2={i * 52}
-            stroke={COLORS.grid} strokeWidth={1} opacity={0.35} />
-        ))}
-        {Array.from({ length: 38 }).map((_, i) => (
-          <line key={`v-${i}`} x1={i * 52} y1={0} x2={i * 52} y2={1080}
-            stroke={COLORS.grid} strokeWidth={1} opacity={0.35} />
-        ))}
+    <AbsoluteFill style={{ backgroundColor: COLORS.bg, opacity: sceneOpacity, overflow: "hidden" }}>
+      {/* Dynamic Tactical Camera Reframe container */}
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          transform: `scale(${tacticalPullback}) translateY(${tacticalPanY}px)`,
+          transformOrigin: "center center",
+          position: "absolute",
+          top: 0,
+          left: 0,
+        }}
+      >
+        <svg width={1920} height={1080} style={{ position: "absolute", top: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="rickGrad" x1={RICK_X} y1={RICK_Y} x2={RICK_X - 30} y2={RICK_Y + 180} gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor={COLORS.orange} stopOpacity={0.8} />
+              <stop offset="100%" stopColor={COLORS.orange} stopOpacity={0.15} />
+            </linearGradient>
+            <linearGradient id="cowGrad" x1={COW_X} y1={COW_Y} x2={COW_X - 40} y2={COW_Y + 160} gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor={COLORS.amber} stopOpacity={0.8} />
+              <stop offset="100%" stopColor={COLORS.amber} stopOpacity={0.1} />
+            </linearGradient>
+          </defs>
 
-        {/* Road */}
-        <rect x={700} y={0} width={520} height={1080} fill="#161E2E" />
-        <rect x={700} y={0} width={8} height={1080} fill="#334155" opacity={0.5} />
-        <rect x={1212} y={0} width={8} height={1080} fill="#334155" opacity={0.5} />
+          {/* Grid */}
+          {Array.from({ length: 22 }).map((_, i) => (
+            <line
+              key={`h-${i}`}
+              x1={0}
+              y1={i * 52}
+              x2={1920}
+              y2={i * 52}
+              stroke={COLORS.grid}
+              strokeWidth={1}
+              opacity={0.25}
+            />
+          ))}
+          {Array.from({ length: 38 }).map((_, i) => (
+            <line
+              key={`v-${i}`}
+              x1={i * 52}
+              y1={0}
+              x2={i * 52}
+              y2={1080}
+              stroke={COLORS.grid}
+              strokeWidth={1}
+              opacity={0.25}
+            />
+          ))}
 
-        {/* ---- RICKSHAW trajectory (predictable, narrow ribbon) ---- */}
-        {/* Ribbon — dashoffset animation */}
-        <defs>
-          <linearGradient id="rickGrad" x1={rickX} y1={rickY} x2={rickX + rickDX * 2} y2={rickY + rickDY * 2} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor={COLORS.cyan} stopOpacity={0.8} />
-            <stop offset="100%" stopColor={COLORS.cyan} stopOpacity={0.15} />
-          </linearGradient>
-          <linearGradient id="cowGrad" x1={cowX} y1={cowY} x2={cowX + cowDX * 2} y2={cowY + cowDY * 2} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor={COLORS.amber} stopOpacity={0.7} />
-            <stop offset="100%" stopColor={COLORS.amber} stopOpacity={0.1} />
-          </linearGradient>
-        </defs>
+          {/* Road */}
+          <rect x={680} y={0} width={560} height={1080} fill={COLORS.road} />
+          <rect x={680} y={0} width={8} height={1080} fill={COLORS.curb} opacity={0.6} />
+          <rect x={1232} y={0} width={8} height={1080} fill={COLORS.curb} opacity={0.6} />
 
-        {/* Rickshaw ribbon */}
-        <line
-          x1={rickX} y1={rickY}
-          x2={rickX + rickDX * 1.5} y2={rickY + rickDY * 1.5}
-          stroke="url(#rickGrad)"
-          strokeWidth={30}
-          strokeLinecap="round"
-          strokeDasharray={rickshawRibbonProgress > 0 ? rickRibbonLen : 0}
-          strokeDashoffset={(1 - rickshawRibbonProgress) * rickRibbonLen}
-          opacity={0.7}
-        />
-
-        {/* Rickshaw velocity arrow */}
-        <g transform={`translate(${rickX}, ${rickY}) scale(${arrowScale})`} style={{ transformOrigin: `${rickX}px ${rickY}px` }}>
+          {/* ---- RICKSHAW PREDICTION TRAIL ---- */}
           <line
-            x1={0} y1={0}
-            x2={rickDX * 0.8} y2={rickDY * 0.8}
-            stroke={COLORS.cyan}
-            strokeWidth={4}
+            x1={RICK_X}
+            y1={RICK_Y}
+            x2={RICK_X - 25}
+            y2={RICK_Y + 180}
+            stroke="url(#rickGrad)"
+            strokeWidth={32}
+            strokeLinecap="round"
+            strokeDasharray={rickRibbonLen}
+            strokeDashoffset={(1 - ribbonProgress) * rickRibbonLen}
+            opacity={0.7}
           />
-          <polygon
-            points={`${rickDX * 0.8 - 6},${rickDY * 0.8 - 10} ${rickDX * 0.8 + 6},${rickDY * 0.8 - 10} ${rickDX * 0.8},${rickDY * 0.8}`}
-            fill={COLORS.cyan}
+          {/* Rickshaw small tight covariance ellipse (predictable heading) */}
+          <ellipse
+            cx={RICK_X - 25}
+            cy={RICK_Y + 180}
+            rx={18 * ellipseScale}
+            ry={28 * ellipseScale}
+            fill="none"
+            stroke={COLORS.orange}
+            strokeWidth={1.8}
+            strokeDasharray="4 4"
+            opacity={0.8 * ellipseScale}
           />
-        </g>
 
-        {/* Rickshaw covariance ellipse (small, tight) */}
-        <ellipse
-          cx={rickX + rickDX * 1.5}
-          cy={rickY + rickDY * 1.5}
-          rx={15 * ellipseScale}
-          ry={25 * ellipseScale}
-          fill="none"
-          stroke={COLORS.cyan}
-          strokeWidth={1.5}
-          strokeDasharray="4 4"
-          opacity={0.7 * ellipseScale}
-        />
+          {/* Persistent Rickshaw Bounding Box */}
+          <g transform={`translate(${RICK_X}, ${RICK_Y})`}>
+            <rect x={-31} y={-36} width={62} height={72} rx={14} fill={`${COLORS.orange}25`} stroke={COLORS.orange} strokeWidth={2.5} />
+            <text x={0} y={-46} fill={COLORS.orange} fontSize={15} fontFamily="'Courier New', monospace" textAnchor="middle" fontWeight="bold">
+              AUTO-RICKSHAW
+            </text>
+            <text x={45} y={15} fill={COLORS.orange} fontSize={14} fontFamily="'Courier New', monospace" textAnchor="start" opacity={ellipseScale}>
+              LOW UNCERTAINTY (LINEAR)
+            </text>
+          </g>
 
-        {/* Rickshaw object marker */}
-        <rect x={rickX - 30} y={rickY - 45} width={60} height={50}
-          rx={4} fill={`${COLORS.cyan}20`} stroke={COLORS.cyan} strokeWidth={1.5} />
-        <text x={rickX} y={rickY - 52} fill={COLORS.cyan} fontSize={16}
-          fontFamily="'Courier New', monospace" textAnchor="middle">AUTO-RICKSHAW</text>
-
-        {/* ---- COW trajectory (uncertain, wide ribbon) ---- */}
-        {/* Cow ribbon — wobblier, wider */}
-        <line
-          x1={cowX} y1={cowY}
-          x2={cowX + cowDX * 1.5} y2={cowY + cowDY * 1.5}
-          stroke="url(#cowGrad)"
-          strokeWidth={55}
-          strokeLinecap="round"
-          strokeDasharray={cowRibbonProgress > 0 ? cowRibbonLen : 0}
-          strokeDashoffset={(1 - cowRibbonProgress) * cowRibbonLen}
-          opacity={0.5}
-        />
-
-        {/* Cow velocity arrow */}
-        <g transform={`translate(${cowX}, ${cowY}) scale(${arrowScale})`} style={{ transformOrigin: `${cowX}px ${cowY}px` }}>
+          {/* ---- COW PREDICTION TRAIL (Wide uncertain fan) ---- */}
           <line
-            x1={0} y1={0}
-            x2={cowDX * 0.6} y2={cowDY * 0.6}
+            x1={COW_X}
+            y1={COW_Y}
+            x2={COW_X - 45}
+            y2={COW_Y + 160}
+            stroke="url(#cowGrad)"
+            strokeWidth={56}
+            strokeLinecap="round"
+            strokeDasharray={cowRibbonLen}
+            strokeDashoffset={(1 - ribbonProgress) * cowRibbonLen}
+            opacity={0.55}
+          />
+          {/* Cow large wide covariance ellipse (stochastic wandering) */}
+          <ellipse
+            cx={COW_X - 45}
+            cy={COW_Y + 160}
+            rx={44 * ellipseScale}
+            ry={54 * ellipseScale}
+            fill="none"
             stroke={COLORS.amber}
-            strokeWidth={5}
+            strokeWidth={2}
+            strokeDasharray="8 6"
+            opacity={0.85 * ellipseScale}
           />
-          <polygon
-            points={`${cowDX * 0.6 - 8},${cowDY * 0.6 - 12} ${cowDX * 0.6 + 8},${cowDY * 0.6 - 12} ${cowDX * 0.6},${cowDY * 0.6}`}
-            fill={COLORS.amber}
-          />
-        </g>
 
-        {/* Cow covariance ellipse (large, dashed — high uncertainty) */}
-        <ellipse
-          cx={cowX + cowDX * 1.5}
-          cy={cowY + cowDY * 1.5}
-          rx={40 * ellipseScale}
-          ry={50 * ellipseScale}
-          fill="none"
-          stroke={COLORS.amber}
-          strokeWidth={2}
-          strokeDasharray="8 6"
-          opacity={0.8 * ellipseScale}
-        />
+          {/* Persistent Cow Bounding Box */}
+          <g transform={`translate(${COW_X}, ${COW_Y})`}>
+            <rect x={-35} y={-24} width={70} height={48} rx={14} fill={`${COLORS.amber}25`} stroke={COLORS.amber} strokeWidth={2.5} />
+            <text x={0} y={-34} fill={COLORS.amber} fontSize={15} fontFamily="'Courier New', monospace" textAnchor="middle" fontWeight="bold">
+              STRAY CATTLE
+            </text>
+            <text x={-55} y={15} fill={COLORS.amber} fontSize={14} fontFamily="'Courier New', monospace" textAnchor="end" opacity={ellipseScale}>
+              HIGH UNCERTAINTY (STOCHASTIC)
+            </text>
+          </g>
+        </svg>
 
-        {/* Cow object marker */}
-        <ellipse cx={cowX} cy={cowY} rx={38} ry={24}
-          fill={`${COLORS.amber}20`} stroke={COLORS.amber} strokeWidth={1.5} />
-        <text x={cowX} y={cowY - 32} fill={COLORS.amber} fontSize={16}
-          fontFamily="'Courier New', monospace" textAnchor="middle">LARGE ANIMAL</text>
+        {/* Ego vehicle */}
+        <VehicleSprite x={VEHICLE_X} y={VEHICLE_Y} speedKmh={0} color={COLORS.cyan} />
+      </div>
 
-        {/* Uncertainty label for cow (shifted left of ellipse) */}
-        <text
-          x={cowX + cowDX * 1.5 - 55}
-          y={cowY + cowDY * 1.5 + 5}
-          fill={COLORS.amber}
-          fontSize={14}
-          fontFamily="'Courier New', monospace"
-          textAnchor="end"
-          opacity={ellipseScale}
-        >
-          HIGH UNCERTAINTY
-        </text>
-
-        {/* Certainty label for rickshaw (shifted right of ellipse) */}
-        <text
-          x={rickX + rickDX * 1.5 + 30}
-          y={rickY + rickDY * 1.5 + 5}
-          fill={COLORS.cyan}
-          fontSize={14}
-          fontFamily="'Courier New', monospace"
-          textAnchor="start"
-          opacity={ellipseScale}
-        >
-          LOW UNCERTAINTY
-        </text>
-      </svg>
-
-      {/* Vehicle */}
-      <VehicleSprite x={VEHICLE_X} y={VEHICLE_Y} />
-
-      {/* HUD */}
+      {/* HUD Labels */}
       <HudLabel
-        text="PREDICTION · per-agent motion model · uncertainty-aware"
+        text="MOTION PREDICTION · TIME-HORIZON REACHABLE ENVELOPES"
         x={60}
-        y={60}
+        y={80}
         opacity={hudOpacity}
-        fontSize={24}
+        fontSize={22}
         color={COLORS.cyan}
       />
 
-      <div style={{
-        position: "absolute",
-        top: 60,
-        right: 80,
-        padding: "10px 24px",
-        border: `1.5px solid ${COLORS.cyan}60`,
-        borderRadius: 6,
-        backgroundColor: `${COLORS.cyan}10`,
-        fontFamily: "'Courier New', monospace",
-        fontSize: 18,
-        color: COLORS.cyan,
-        letterSpacing: 3,
-        opacity: hudOpacity,
-      }}>
+      {/* Step badge */}
+      <div
+        style={{
+          position: "absolute",
+          top: 80,
+          right: 80,
+          padding: "10px 24px",
+          border: `1.5px solid ${COLORS.cyan}`,
+          borderRadius: 14,
+          backgroundColor: `${COLORS.cyan}15`,
+          fontFamily: "'Courier New', monospace",
+          fontSize: 18,
+          color: COLORS.cyan,
+          letterSpacing: 3,
+          opacity: hudOpacity,
+        }}
+      >
         STEP 2 / 7
       </div>
     </AbsoluteFill>
