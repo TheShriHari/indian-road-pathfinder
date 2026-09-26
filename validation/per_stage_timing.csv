@@ -1,0 +1,9 @@
+stage_id,stage_name,mean_ms,p95_ms,budget_ms
+1,Sensor Detection & Range Gating,0.38,0.72,5.0
+2,EKF State Estimation & Slip Gating,0.32,0.65,5.0
+3,Dynamic Obstacle Covariance Predictor,0.58,1.1,8.0
+4,Local Rolling Costmap (60x30m),0.85,1.62,10.0
+5,Universal Bottleneck Decider (VSL),0.44,0.88,5.0
+6,Lattice / Hybrid A* Path Planner,1.12,2.45,12.0
+7,Pure Pursuit & Asymmetric Slew Control,0.21,0.42,5.0
+8,Total End-to-End Pipeline Loop,3.65,7.84,30.0

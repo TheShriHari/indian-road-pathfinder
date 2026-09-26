@@ -1,0 +1,23 @@
+{
+  "total_trials": 1000,
+  "outcomes": {
+    "SAFE_STOP": 470,
+    "SUCCESS": 436,
+    "COLLISION": 42,
+    "DEADLOCK": 28,
+    "TIMEOUT": 23,
+    "ERROR": 1
+  },
+  "scenario_completion_rate": 0.906,
+  "success_count": 436,
+  "safe_stop_count": 470,
+  "collision_count": 42,
+  "deadlock_count": 28,
+  "timeout_count": 23,
+  "mean_replanning_latency_ms": 3.65,
+  "p99_replanning_latency_ms": 41.75,
+  "mean_longitudinal_jerk_mps3": 0.74,
+  "p99_longitudinal_jerk_mps3": 8.0,
+  "hardware": "AMD Ryzen 5 7530U (6C/12T)",
+  "zero_toolbox_verified": true
+}

@@ -1,0 +1,7 @@
+CPU Model: AMD Ryzen 5 7530U with Radeon Graphics (6 Cores, 12 Threads)
+Base Frequency: 2.00 GHz (Max Boost: 4.50 GHz)
+Architecture: x86_64 Zen 3
+System RAM: 16.0 GB DDR4
+Operating System: Windows 11 Home 64-bit
+Execution Environment: Headless MATLAB R2026a (Zero External Toolboxes)
+Algorithmic Stack: Pure First-Principles Vectorized Math (Eigen C++20 parity)

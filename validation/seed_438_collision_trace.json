@@ -1,0 +1,109 @@
+{
+  "scenario": "Seed 438 Lethal Collision Under Uniform 0.95 m/s^3 Limiter",
+  "data": [
+    {
+      "tick": 54,
+      "time": 5.4,
+      "speed_mps": 8.0,
+      "speed_kmh": 28.8,
+      "obs_dist_m": 16.655,
+      "ttc_s": 2.08,
+      "cmd_a": -9.401,
+      "act_a": 0.705,
+      "jerk": 0.95,
+      "latch": true,
+      "state": "EMERGENCY_BRAKE_ATTEMPT"
+    },
+    {
+      "tick": 58,
+      "time": 5.8,
+      "speed_mps": 8.0,
+      "speed_kmh": 28.8,
+      "obs_dist_m": 14.065,
+      "ttc_s": 1.76,
+      "cmd_a": -9.549,
+      "act_a": 0.325,
+      "jerk": 0.95,
+      "latch": true,
+      "state": "RATE_CHOKED"
+    },
+    {
+      "tick": 62,
+      "time": 6.2,
+      "speed_mps": 7.995,
+      "speed_kmh": 28.8,
+      "obs_dist_m": 11.417,
+      "ttc_s": 1.43,
+      "cmd_a": -9.697,
+      "act_a": -0.055,
+      "jerk": 0.95,
+      "latch": true,
+      "state": "RATE_CHOKED"
+    },
+    {
+      "tick": 66,
+      "time": 6.6,
+      "speed_mps": 7.878,
+      "speed_kmh": 28.4,
+      "obs_dist_m": 8.738,
+      "ttc_s": 1.11,
+      "cmd_a": -9.764,
+      "act_a": -0.435,
+      "jerk": 0.95,
+      "latch": true,
+      "state": "RATE_CHOKED"
+    },
+    {
+      "tick": 70,
+      "time": 7.0,
+      "speed_mps": 7.609,
+      "speed_kmh": 27.4,
+      "obs_dist_m": 6.088,
+      "ttc_s": 0.8,
+      "cmd_a": -9.678,
+      "act_a": -0.815,
+      "jerk": 0.95,
+      "latch": true,
+      "state": "RATE_CHOKED"
+    },
+    {
+      "tick": 74,
+      "time": 7.4,
+      "speed_mps": 7.188,
+      "speed_kmh": 25.9,
+      "obs_dist_m": 3.53,
+      "ttc_s": 0.49,
+      "cmd_a": -9.442,
+      "act_a": -1.195,
+      "jerk": 0.95,
+      "latch": true,
+      "state": "RATE_CHOKED"
+    },
+    {
+      "tick": 78,
+      "time": 7.8,
+      "speed_mps": 6.615,
+      "speed_kmh": 23.8,
+      "obs_dist_m": 1.126,
+      "ttc_s": 0.17,
+      "cmd_a": -9.066,
+      "act_a": -1.575,
+      "jerk": 0.95,
+      "latch": true,
+      "state": "INEVITABLE_COLLISION"
+    },
+    {
+      "tick": 79,
+      "time": 7.9,
+      "speed_mps": 6.448,
+      "speed_kmh": 23.2,
+      "obs_dist_m": 0.575,
+      "ttc_s": 0.09,
+      "cmd_a": -8.947,
+      "act_a": -1.67,
+      "jerk": 0.95,
+      "latch": true,
+      "state": "COLLISION_IMPACT"
+    }
+  ]
+}

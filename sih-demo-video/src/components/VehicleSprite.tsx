@@ -1,5 +1,4 @@
 import React from "react";
-import { interpolate } from "remotion";
 import { COLORS } from "../theme";
 
 export interface VehicleSpriteProps {
@@ -10,7 +9,6 @@ export interface VehicleSpriteProps {
   width?: number;
   height?: number;
   opacity?: number;
-  speedKmh?: number;     // actual computed speed from state machine (0 to 18 km/h)
   wheelAngle?: number;   // physical steering angle in degrees (-25 to +25 deg)
 }
 
@@ -19,27 +17,11 @@ export const VehicleSprite: React.FC<VehicleSpriteProps> = ({
   y,
   rotation = 0,
   color = COLORS.cyan,
-  width = 64,
-  height = 116,
+  width = 60,
+  height = 112,
   opacity = 1,
-  speedKmh = 18,
   wheelAngle = 0,
 }) => {
-  // Physical chassis squash & stretch driven by actual speed (Section 1.5)
-  // Higher speed = streamlined/extended; decelerating/stopping = nose pitch down & lateral spread
-  const chassisScaleY = interpolate(speedKmh, [0, 18], [0.92, 1.0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const chassisScaleX = interpolate(speedKmh, [0, 18], [1.05, 1.0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const pitchDeg = interpolate(speedKmh, [0, 18], [-3.5, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
   return (
     <div
       style={{
@@ -49,9 +31,8 @@ export const VehicleSprite: React.FC<VehicleSpriteProps> = ({
         width,
         height,
         opacity,
-        transform: `rotate(${rotation + pitchDeg}deg) scale(${chassisScaleX}, ${chassisScaleY})`,
+        transform: `rotate(${rotation}deg)`,
         transformOrigin: "center center",
-        filter: `drop-shadow(0 0 10px ${color}88)`,
         pointerEvents: "none",
       }}
     >
@@ -62,110 +43,105 @@ export const VehicleSprite: React.FC<VehicleSpriteProps> = ({
         style={{ display: "block" }}
       >
         {/* Left Front Wheel with dynamic steering angle */}
-        <g transform={`translate(2, 22) rotate(${wheelAngle}, 4, 10)`}>
+        <g transform={`translate(2, 20) rotate(${wheelAngle}, 4, 10)`}>
           <rect
             x={0}
             y={0}
             width={7}
             height={20}
-            rx={3}
-            fill="#1E293B"
+            rx={2}
+            fill="#0F172A"
             stroke={color}
-            strokeWidth={1}
+            strokeWidth={1.5}
           />
         </g>
 
         {/* Right Front Wheel with dynamic steering angle */}
-        <g transform={`translate(${width - 9}, 22) rotate(${wheelAngle}, 4, 10)`}>
+        <g transform={`translate(${width - 9}, 20) rotate(${wheelAngle}, 4, 10)`}>
           <rect
             x={0}
             y={0}
             width={7}
             height={20}
-            rx={3}
-            fill="#1E293B"
+            rx={2}
+            fill="#0F172A"
             stroke={color}
-            strokeWidth={1}
+            strokeWidth={1.5}
           />
         </g>
 
         {/* Rear Wheels (fixed) */}
-        <rect x={2} y={height - 38} width={7} height={20} rx={3} fill="#1E293B" stroke={color} strokeWidth={1} />
-        <rect x={width - 9} y={height - 38} width={7} height={20} rx={3} fill="#1E293B" stroke={color} strokeWidth={1} />
+        <rect x={2} y={height - 36} width={7} height={20} rx={2} fill="#0F172A" stroke={color} strokeWidth={1.5} />
+        <rect x={width - 9} y={height - 36} width={7} height={20} rx={2} fill="#0F172A" stroke={color} strokeWidth={1.5} />
 
-        {/* Aerodynamic chassis body with 14px squircle corners */}
+        {/* Utilitarian chassis body with clean engineering lines */}
         <rect
           x={6}
-          y={8}
+          y={6}
           width={width - 12}
-          height={height - 16}
-          rx={14}
-          ry={14}
-          fill={`${color}1A`}
-          stroke={color}
-          strokeWidth={2.8}
-        />
-
-        {/* Canopy / Roof Sensor Pod with neon electric glow */}
-        <rect
-          x={13}
-          y={18}
-          width={width - 26}
-          height={26}
+          height={height - 12}
           rx={8}
-          ry={8}
-          fill={`${color}40`}
-          stroke={color}
-          strokeWidth={1.5}
-        />
-
-        {/* Sensor Pod Turret */}
-        <circle
-          cx={width / 2}
-          cy={28}
-          r={5.5}
-          fill={COLORS.bg}
+          fill="#111C30"
           stroke={color}
           strokeWidth={2}
         />
+
+        {/* Windshield / Canopy */}
+        <path
+          d={`M ${12} ${34} L ${width - 12} ${34} L ${width - 16} ${56} L ${16} ${56} Z`}
+          fill="#0F172A"
+          stroke={color}
+          strokeWidth={1}
+          opacity={0.8}
+        />
+
+        {/* Rear Window */}
+        <rect
+          x={14}
+          y={height - 40}
+          width={width - 28}
+          height={14}
+          rx={3}
+          fill="#0F172A"
+          stroke={color}
+          strokeWidth={1}
+          opacity={0.8}
+        />
+
+        {/* Roof Sensor Pod (Lidar / Camera Array) */}
         <circle
           cx={width / 2}
-          cy={28}
+          cy={height / 2 - 2}
+          r={7}
+          fill="#0B111E"
+          stroke={color}
+          strokeWidth={1.5}
+        />
+        <circle
+          cx={width / 2}
+          cy={height / 2 - 2}
           r={2.5}
-          fill={COLORS.cyan}
+          fill={color}
         />
 
-        {/* Forward Headlights */}
-        <ellipse cx={17} cy={12} rx={6} ry={4} fill={color} opacity={0.95} />
-        <ellipse cx={width - 17} cy={12} rx={6} ry={4} fill={color} opacity={0.95} />
+        {/* Front Headlights */}
+        <rect x={10} y={7} width={8} height={4} rx={1.5} fill="#FFFFFF" opacity={0.9} />
+        <rect x={width - 18} y={7} width={8} height={4} rx={1.5} fill="#FFFFFF" opacity={0.9} />
 
-        {/* Rear Braking LEDs (illuminate brighter when decelerating / stopped) */}
-        <ellipse
-          cx={17}
-          cy={height - 12}
-          rx={6}
-          ry={4}
-          fill={speedKmh === 0 ? COLORS.red : "#EF4444"}
-          opacity={speedKmh < 8 ? 1.0 : 0.6}
-        />
-        <ellipse
-          cx={width - 17}
-          cy={height - 12}
-          rx={6}
-          ry={4}
-          fill={speedKmh === 0 ? COLORS.red : "#EF4444"}
-          opacity={speedKmh < 8 ? 1.0 : 0.6}
-        />
+        {/* Tail Brake Lights */}
+        <rect x={10} y={height - 10} width={8} height={3} rx={1} fill={COLORS.red} opacity={0.9} />
+        <rect x={width - 18} y={height - 10} width={8} height={3} rx={1} fill={COLORS.red} opacity={0.9} />
 
-        {/* Center Line Guide */}
+        {/* Centerline orientation reference */}
         <line
           x1={width / 2}
-          y1={46}
+          y1={12}
           x2={width / 2}
-          y2={height - 24}
-          stroke={`${color}80`}
-          strokeWidth={1.5}
-          strokeDasharray="4 4"
+          y2={28}
+          stroke={color}
+          strokeWidth={1}
+          strokeDasharray="2 2"
+          opacity={0.6}
         />
       </svg>
     </div>
