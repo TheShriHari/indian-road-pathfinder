@@ -94,7 +94,6 @@ export const RealityIntro: React.FC = () => {
     <AbsoluteFill
       style={{
         opacity: sceneOpacity,
-        transform: `translateY(${panY}px)`,
         backgroundColor: COLORS.bg,
         overflow: "hidden",
       }}
@@ -103,7 +102,7 @@ export const RealityIntro: React.FC = () => {
         width={1920}
         height={1280}
         viewBox="0 0 1920 1280"
-        style={{ position: "absolute", top: 0, left: 0 }}
+        style={{ position: "absolute", top: panY, left: 0 }}
       >
         {/* Sky / background */}
         <rect width={1920} height={1280} fill={COLORS.bg} />

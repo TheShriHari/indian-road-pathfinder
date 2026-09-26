@@ -167,7 +167,6 @@ export const TitleCard: React.FC = () => {
           letterSpacing: 3,
           textAlign: "center",
           width: 1200,
-          marginLeft: -600,
         }}
       >
         Map-Free Closed-Loop Navigation for Unstructured Environments

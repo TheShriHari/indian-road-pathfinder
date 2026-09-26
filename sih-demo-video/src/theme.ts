@@ -47,11 +47,11 @@ export const MIN_CLEARANCE_M = 2.55;      // corridor-check threshold (metres)
 // AssumptionBreakdown timing offsets (local frames within the scene, 180 frames total)
 export const ASSUMPTION_TIMING = {
   card1Enter: 6,
-  card1Strike: { start: 34, end: 48 },
-  card2Enter: 46,
-  card2Strike: { start: 74, end: 88 },
-  card3Enter: 86,
-  card3Strike: { start: 114, end: 128 },
+  card1Strike: { start: 24, end: 38 },
+  card2Enter: 36,
+  card2Strike: { start: 54, end: 68 },
+  card3Enter: 66,
+  card3Strike: { start: 84, end: 98 },
 } as const;
 
 // BehaviorFSM state local frame ranges (240 frames total)

@@ -9,9 +9,9 @@ const GAUGE_CY = 500;
 const GAUGE_R = 200;
 const MAX_STEER_DEG = 30; // max needle angle from center
 
-// Pedal bar constants
-const THROTTLE_X = 680;
-const BRAKE_X = 820;
+// Pedal bar constants (positioned on left to clear central gauge)
+const THROTTLE_X = 420;
+const BRAKE_X = 580;
 const BAR_Y_TOP = 380;
 const BAR_MAX_HEIGHT = 320;
 
@@ -210,13 +210,13 @@ export const SteeringControl: React.FC = () => {
         </g>
 
         {/* "SMOOTH" label */}
-        <text x={750} y={BAR_Y_TOP + BAR_MAX_HEIGHT / 2}
+        <text x={535} y={BAR_Y_TOP + BAR_MAX_HEIGHT / 2}
           fill={COLORS.textMuted} fontSize={14}
           fontFamily="'Courier New', monospace"
           textAnchor="middle" opacity={hudOpacity}>
           RATE-
         </text>
-        <text x={750} y={BAR_Y_TOP + BAR_MAX_HEIGHT / 2 + 20}
+        <text x={535} y={BAR_Y_TOP + BAR_MAX_HEIGHT / 2 + 20}
           fill={COLORS.textMuted} fontSize={14}
           fontFamily="'Courier New', monospace"
           textAnchor="middle" opacity={hudOpacity}>

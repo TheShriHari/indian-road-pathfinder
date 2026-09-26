@@ -177,25 +177,27 @@ export const MotionPrediction: React.FC = () => {
         <text x={cowX} y={cowY - 32} fill={COLORS.amber} fontSize={16}
           fontFamily="'Courier New', monospace" textAnchor="middle">LARGE ANIMAL</text>
 
-        {/* Uncertainty label for cow */}
+        {/* Uncertainty label for cow (shifted left of ellipse) */}
         <text
-          x={cowX + cowDX * 1.5 + 50}
-          y={cowY + cowDY * 1.5}
+          x={cowX + cowDX * 1.5 - 55}
+          y={cowY + cowDY * 1.5 + 5}
           fill={COLORS.amber}
           fontSize={14}
           fontFamily="'Courier New', monospace"
+          textAnchor="end"
           opacity={ellipseScale}
         >
           HIGH UNCERTAINTY
         </text>
 
-        {/* Certainty label for rickshaw */}
+        {/* Certainty label for rickshaw (shifted right of ellipse) */}
         <text
-          x={rickX + rickDX * 1.5 + 20}
-          y={rickY + rickDY * 1.5}
+          x={rickX + rickDX * 1.5 + 30}
+          y={rickY + rickDY * 1.5 + 5}
           fill={COLORS.cyan}
           fontSize={14}
           fontFamily="'Courier New', monospace"
+          textAnchor="start"
           opacity={ellipseScale}
         >
           LOW UNCERTAINTY

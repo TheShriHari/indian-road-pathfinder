@@ -202,7 +202,7 @@ export const AssumptionBreakdown: React.FC = () => {
           bottom: 160,
           left: "50%",
           transform: "translateX(-50%)",
-          opacity: interpolate(frame, [130, 155], [0, 1], {
+          opacity: interpolate(frame, [96, 115], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           }),
