@@ -1,0 +1,6 @@
+scenario=MarketDense
+fallback_used=true
+reason=RoadRunner MATLAB connector unavailable or unlicensed
+xodr_source=C:\Users\toshr\OneDrive\Desktop\Hari@Work\Shri Hari - Official Documents\IIT KGP\SIH\indian-road-pathfinder\roadrunner_scenes\MarketDense.xodr
+trace_csv=C:\Users\toshr\OneDrive\Desktop\Hari@Work\Shri Hari - Official Documents\IIT KGP\SIH\indian-road-pathfinder\roadrunner_scenes\MarketDense_parametric_trace.csv
+timestamp=2026-09-30 15:39:29

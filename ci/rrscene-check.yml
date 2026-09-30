@@ -1,0 +1,12 @@
+name: rrscene-validation
+on: [push, pull_request]
+
+jobs:
+  verify-rrscenes:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run RoadRunner Scene Integrity Guard
+        run: powershell -ExecutionPolicy Bypass -File .\check-scene.ps1

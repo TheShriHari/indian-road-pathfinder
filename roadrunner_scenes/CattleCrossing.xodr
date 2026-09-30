@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenDRIVE>
+  <header revMajor="1" revMinor="6" name="CattleCrossing" version="1.00" date="2026-09-30T15:38:48" vendor="MATLAB/SIH-Pathfinder"/>
+  <road name="CattleCrossing" length="110.0000" id="1" junction="-1">
+    <link/>
+    <planView>
+      <geometry s="0.0000" x="0.0000" y="0.0000" hdg="0.0000" length="110.0000">
+        <line/>
+      </geometry>
+    </planView>
+    <elevationProfile><elevation s="0.0" a="0.0" b="0.0" c="0.0" d="0.0"/></elevationProfile>
+    <lateralProfile><superelevation s="0.0" a="0.0" b="0.0" c="0.0" d="0.0"/></lateralProfile>
+    <lanes>
+      <laneOffset s="0.0" a="0.0" b="0.0" c="0.0" d="0.0"/>
+      <!-- Approach section -->
+      <laneSection s="0.0000">
+        <left>
+          <lane id="1" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.4000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </left>
+        <center><lane id="0" type="none" level="false"/></center>
+        <right>
+          <lane id="-1" type="driving" level="false">
+            <width sOffset="0.0" a="3.6000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+          <lane id="-2" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.4000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </right>
+      </laneSection>
+      <!-- Pinch section -->
+      <laneSection s="52.5000">
+        <left>
+          <lane id="1" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.4000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </left>
+        <center><lane id="0" type="none" level="false"/></center>
+        <right>
+          <lane id="-1" type="driving" level="false">
+            <width sOffset="0.0" a="2.2000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+          <lane id="-2" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.4000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </right>
+      </laneSection>
+      <!-- Recovery section -->
+      <laneSection s="57.5000">
+        <left>
+          <lane id="1" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.4000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </left>
+        <center><lane id="0" type="none" level="false"/></center>
+        <right>
+          <lane id="-1" type="driving" level="false">
+            <width sOffset="0.0" a="3.6000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+          <lane id="-2" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.4000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </right>
+      </laneSection>
+    </lanes>
+  </road>
+</OpenDRIVE>
