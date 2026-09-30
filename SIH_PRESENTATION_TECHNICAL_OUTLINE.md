@@ -430,7 +430,7 @@ Data extracted from systematic batch validation suites across randomized Indian 
    * Proved that without intelligent dropout coasting and bottleneck stopping, sensor noise degrades navigation in cluttered environments.
 
 3. **Stage 3 — Audited & Optimized Stack (Universal Bottleneck Decider + Horizon Extensions + Webots Closed-Loop):**
-   * *Success Rate:* **94.0%** (47 / 50 random ODD trials).
+   * *Success Rate:* **94.0%** (47 / 50 random ODD trials). *Note: 50-trial Webots closed-loop run — see Stage 4 for authoritative 1,000-trial batch.*
    * *Controlled Safe-Stop Rate:* **6.0%** (3 / 50 trials — clean standstill upstream of physically impassable bottlenecks).
    * *Collision Rate:* **0.0%** (**Zero collisions** across all test seeds).
    * *Key Engineering Upgrades:*
@@ -438,6 +438,16 @@ Data extracted from systematic batch validation suites across randomized Indian 
      2. EKF Prediction Horizon lengthened from 20 to 35 steps ($3.5\,\text{s}$ lead time): Increased spatial reaction distance from $16.6\,\text{m}$ to $29.1\,\text{m}$, fully solving high-speed oncoming encounters.
      3. Universal Bottleneck Virtual Stop Line: Converted impending spatial deadlocks into controlled yield pauses.
      4. Dual-Stage Pedestrian AEB: Complete elimination of pedestrian collisions.
+
+4. **Stage 4 — Verified 1,000-Trial Monte Carlo Batch (Authoritative Final Submission Numbers):**
+   * *Source:* `validation/final_submission_run/final_submission_run.csv`, seeds 1–1000, best_params `[1.50, 3.20, 0.07, 0.55, 2.90]`.
+   * *Scenario Completion Rate (SUCCESS + SAFE_STOP):* **90.6%** (906 / 1,000).
+   * *SUCCESS:* **43.6%** (436 / 1,000). *SAFE_STOP:* **47.0%** (470 / 1,000).
+   * *COLLISION:* **4.2%** (42 / 1,000) — **56.25% reduction** from 96-collision baseline (`batch_test_results_baseline.csv`).
+   * *DEADLOCK:* **2.8%** (28 / 1,000). *TIMEOUT:* **2.3%** (23 / 1,000).
+   * *Mean Replanning Latency:* **3.58 ms** mean, **41.21 ms** P99 (from per-trial `mean_latency_ms` column).
+   * *Mean Longitudinal Jerk:* **0.76 m/s³** (comfort limit: 0.95 m/s³).
+   * *Control Loop:* **10 Hz** (`dt = 0.1 s`, `run_single_scenario.m`).
 
 ---
 
@@ -519,9 +529,9 @@ To transition this codebase from Webots 3D / MATLAB co-simulation to an on-vehic
 * **Slide 8: Algorithmic Core III — Kinematic Hybrid A* & BSM**  
   * Lattice arc expansions with 7 steering angles; soft costmap inflation formula.
   * State transition diagram: CRUISE $\rightarrow$ NUDGE $\rightarrow$ YIELD_DECEL $\rightarrow$ YIELD_WAIT $\rightarrow$ RESUME.
-* **Slide 9: Quantitative Validation & 1,000-Trial Batch Results**  
-  * Presentation of data tables: $10\text{--}25\,\text{ms}$ latency, $10,885$ dropouts handled.
-  * Progression graph: $43.5\%$ (baseline) $\rightarrow$ $69.7\%$ (sensor layer) $\rightarrow$ **$94.0\%$ success (optimized stack, 0 collisions)**.
+* **Slide 9: Quantitative Validation — 1,000-Trial Batch Results**  
+  * Verified batch: **90.6% completion** (436 SUCCESS + 470 SAFE_STOP / 1,000 trials), **4.2% collision rate** (down 56.25% from 96-collision baseline), **3.58 ms mean** replan latency / **41.21 ms P99**, **0.76 m/s³** mean jerk. Source: `validation/final_submission_run/final_submission_run.csv`.
+  * Progression: $43.5\%$ (baseline) $\rightarrow$ $69.7\%$ (sensor layer) $\rightarrow$ **$90.6\%$ completion** (1,000-trial MATLAB batch).
 * **Slide 10: Root-Cause Investigation & Scientific Rigor**  
   * The 4-pothole feasibility proof: Proving that $32.7\%$ of baseline failures were due to physical blockage ($W_{\text{free}} < 2.55\,\text{m}$).
   * Oncoming auto-rickshaw closing speed analysis ($8.32\,\text{m/s}$ average, up to $13.8\,\text{m/s}$) justifying the $3.5\,\text{s}$ EKF lookahead extension.

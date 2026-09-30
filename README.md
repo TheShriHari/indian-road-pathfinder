@@ -168,13 +168,21 @@ indian-road-pathfinder/
 
 ## Quantitative Performance Metrics
 
-| Metric | MathWorks Target | Measured |
+> All numbers from `validation/final_submission_run/final_submission_run.csv` — 1,000-trial Monte Carlo batch, seeds 1–1000, best_params `[1.50, 3.20, 0.07, 0.55, 2.90]`.
+
+| Metric | Value | Source |
 |---|---|---|
-| **Replanning Latency** | < 50 ms | **12.4 – 16.8 ms** |
-| **Path Smoothness (Jerk)** | < 1.0 m/s³ | **0.18 m/s³** |
-| **Min Safety Clearance** | > 0.8 m | **1.2 – 2.4 m** |
-| **Scenario Completion Rate** | All 5 scenarios | **100%** |
-| **Batch Trial Success Rate** | — | Run `run_batch_tests(1000)` |
+| **Scenario Completion Rate** (SUCCESS + SAFE_STOP) | **90.6%** (906 / 1000) | `final_submission_run.csv` |
+| **SUCCESS** | 436 (43.6%) | `final_submission_run.csv` |
+| **SAFE_STOP** | 470 (47.0%) | `final_submission_run.csv` |
+| **COLLISION** | 42 (4.2%) — down **56.25%** from 96-collision baseline | `final_submission_run.csv` + `batch_test_results_baseline.csv` |
+| **DEADLOCK** | 28 (2.8%) | `final_submission_run.csv` |
+| **TIMEOUT** | 23 (2.3%) | `final_submission_run.csv` |
+| **Mean Replanning Latency** | **3.58 ms** | `final_submission_run.csv` (per-trial mean_latency_ms averaged) |
+| **P99 Replanning Latency** | **41.21 ms** | `final_submission_run.csv` (99th percentile of per-trial mean_latency_ms) |
+| **Mean Longitudinal Jerk** | **0.76 m/s³** | `final_submission_run.csv` (per-trial mean_jerk averaged) |
+| **Control Loop Rate** | **10 Hz** (`dt = 0.1 s`) | `run_single_scenario.m` line 231 |
+| **Tech Stack** | **100% MATLAB + Python — zero proprietary toolboxes** | repo contents |
 
 ---
 
