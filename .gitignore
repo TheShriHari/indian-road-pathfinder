@@ -46,3 +46,7 @@ out/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Raw external datasets
+data/raw/
+
