@@ -70,15 +70,24 @@ CorridorPinch.rrscene — STATUS: Placeholder/template only (NOT a populated Roa
   saveScene(rr, 'roadrunner_scenes/CorridorPinch.rrscene');
 - Build pipeline behaviour: CI will not claim the presence of a populated .rrscene when the saved file is below a conservative threshold (50 KB). In that case, the pipeline uses the labeled parametric kinematic fallback trace; that fallback is explicitly recorded in output CSVs and logs.
 
+### Canonical Scenarios Suite (SIH PS-26037):
+We have synthesized deterministic OpenDRIVE 1.6 geometry and 10 Hz kinematic traces for all 5 canonical Indian driving scenarios mapped to the Problem Statement:
+1. **VillageRoad**: Narrow rural road (100m, 3.7m $\to$ 2.4m pinch) with crossing cattle (`cattle_01`, 1.2 m/s).
+2. **UrbanIntersection**: Uncontrolled 4-way crossroad (120m, 4.0m $\to$ 3.2m pinch) with merging auto-rickshaw (`rickshaw_merge`, 3.5 m/s).
+3. **HighwayMerge**: Dual carriageway (160m, 4.2m $\to$ 3.0m pinch) with slow vehicle entry (`slow_tractor`, 2.2 m/s).
+4. **MarketDense**: Narrow high-density street (80m, 3.2m $\to$ 2.1m pinch) with multi-agent pedestrians and pushcart obstacles.
+5. **CattleCrossing**: Rural corridor (110m, 3.6m $\to$ 2.2m pinch) with sudden cattle herd migration (`lead_cow`, `trailing_calf`).
+
 ### Deliverables produced:
-- `roadrunner_scenes/CorridorPinch.xodr` — deterministic OpenDRIVE 1.6 network with 3.20m corridor pinch
-- `roadrunner_scenes/CorridorPinch_initial_trajectory.csv` — exported trajectory trace
-- `roadrunner_scenes/corridor_pinch_trace_seed101.csv` — seed 101, width=2.40m, cattle agent
-- `roadrunner_scenes/corridor_pinch_trace_seed102.csv` — seed 102, width=2.20m, cattle agent  
-- `roadrunner_scenes/corridor_pinch_trace_seed103.csv` — seed 103, width=2.55m, rickshaw agent
-- `roadrunner_scenes/build_corridor_pinch_scenario.m` — scenario script (runs real RR when API available)
-- `roadrunner_scenes/GUI_SETUP_INSTRUCTIONS.md` — 10-min GUI checklist for base road
-- `roadrunner_scenes/production_log.txt` — provenance log
+- Canonical OpenDRIVE 1.6 geometries: `roadrunner_scenes/{VillageRoad, UrbanIntersection, HighwayMerge, MarketDense, CattleCrossing, CorridorPinch}.xodr`
+- Canonical benchmark traces: `roadrunner_scenes/*_parametric_trace.csv` conforming to:
+  `time, ego_x, ego_y, ego_yaw, agent_id, agent_x, agent_y, collision_flag, replans, planning_latency_ms, control_latency_ms`
+- Automated fallback manifests: `roadrunner_scenes/*_fallback_manifest.txt`
+- One-command batch generator: `roadrunner_scenes/make_rrscene_or_fallback.m`
+- Scenario synthesis engine: `roadrunner_scenes/generate_scenarios.py`
+- CI scene guard script: `check-scene.ps1` and workflows `.github/workflows/rrscene-check.yml` & `ci/rrscene-check.yml`
+- Scene provenance log: `roadrunner_scenes/production_log.txt`
+- Comprehensive scenario catalog: `roadrunner_scenes/README.md`
 
 ### Planner integration validation:
 - Seed 101: corridor pinch at t=7.5s (width=2.40m) → **PASS: YIELD issued within 20 steps** ✅
