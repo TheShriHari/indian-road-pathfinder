@@ -1,0 +1,83 @@
+{
+  "source": "IDD Lite (idd20k_lite), extracted from idd-lite.tar.gz",
+  "label_maps_parsed": 1607,
+  "total_pixels_analyzed": 116732480,
+  "odd_relevant_classes": {
+    "person": {
+      "class_id": 5,
+      "pixel_count": 29974812,
+      "pct_of_total": 25.678211
+    },
+    "rider": {
+      "class_id": 6,
+      "pixel_count": 22207367,
+      "pct_of_total": 19.024154
+    },
+    "motorcycle": {
+      "class_id": 7,
+      "pixel_count": 0,
+      "pct_of_total": 0.0
+    },
+    "autorickshaw": {
+      "class_id": 9,
+      "pixel_count": 0,
+      "pct_of_total": 0.0
+    },
+    "car": {
+      "class_id": 10,
+      "pixel_count": 0,
+      "pct_of_total": 0.0
+    },
+    "truck": {
+      "class_id": 11,
+      "pixel_count": 0,
+      "pct_of_total": 0.0
+    },
+    "bus": {
+      "class_id": 12,
+      "pixel_count": 0,
+      "pct_of_total": 0.0
+    },
+    "animal_cattle": {
+      "class_id": 26,
+      "pixel_count": 0,
+      "pct_of_total": 0.0
+    }
+  },
+  "all_classes_pixel_counts": {
+    "0": {
+      "name": "road",
+      "pixel_count": 37714632
+    },
+    "1": {
+      "name": "drivable_fallback",
+      "pixel_count": 2583617
+    },
+    "2": {
+      "name": "sidewalk",
+      "pixel_count": 1568845
+    },
+    "3": {
+      "name": "nondrivable",
+      "pixel_count": 9475139
+    },
+    "4": {
+      "name": "class_4",
+      "pixel_count": 13188218
+    },
+    "5": {
+      "name": "person",
+      "pixel_count": 29974812
+    },
+    "6": {
+      "name": "rider",
+      "pixel_count": 22207367
+    },
+    "255": {
+      "name": "class_255",
+      "pixel_count": 19850
+    }
+  },
+  "sample_overlay_image": "data\\processed\\idd_lite_sample_check.png",
+  "note": "Pixel counts from semantic segmentation label maps. ODD classes relevant to SIH PS-26037: autorickshaw, animal_cattle, motorcycle, rider, person."
+}

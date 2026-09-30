@@ -1,0 +1,36 @@
+ProducedBy: toshr@ShriSkaBanSom (TheShriHari <toshrihari@gmail.com>)
+ProducedAt: 2026-09-30T15:28:00+05:30
+Tool: RoadRunner R2026a Update 4 (GUI binary present; MATLAB API connector offline)
+Command: MATLAB build_corridor_pinch_scenario.m -> generate_opendrive_pinch() -> CorridorPinch.xodr
+SHA256: 2305016F3988C0BFEE27A4FBE7D313BA24F932105C41AEA9A03565BDA13DD696 (CorridorPinch.rrscene, 6094 bytes, template)
+SHA256_XODR: 10DD51391CFEE2CBE63287FE0BEC03FF4135346E97F3F80DFB7A36C952E9AD69 (CorridorPinch.xodr, 2221 bytes, canonical)
+Notes: Template rrscene committed as placeholder. Canonical reproducible road geometry is in CorridorPinch.xodr. Parametric kinematic fallback used for simulation verification.
+
+
+# --- Canonical Scenarios Generation ---
+Timestamp: 2026-09-30T15:38:48+05:30
+Scenario: VillageRoad
+  Description: Narrow unmarked rural road, eroded shoulders, cattle crossing pinch at x=45m
+  XODR_SHA256: 5D80CA46098214EF2DF5F9B887F0B4899361D5F7D971EA91213699C253C42FE5
+  Trace_SHA256: FD3D3F6151E04F1B9F9370B4446E3FCBFFC62036D3196A2FE6878836F8BA6660
+  Mode: PARAMETRIC_FALLBACK (Deterministic geometry & kinematics)
+Scenario: UrbanIntersection
+  Description: Unsignalized 4-way urban crossroad with informal auto-rickshaw merge
+  XODR_SHA256: 970D7A8681B69C03C1A5B2BE429B0F4B45FA1B3698A14B4276B488F4474962B7
+  Trace_SHA256: 6377DC80201520AF47780F635688B24494CB46623DB662D1036F847FE1769D3D
+  Mode: PARAMETRIC_FALLBACK (Deterministic geometry & kinematics)
+Scenario: HighwayMerge
+  Description: Dual carriageway highway with slow tractor/pushcart entering lane at merge
+  XODR_SHA256: F2BA1083E9296203DD79B9D5D34F7E092F9668BCD5E3DBC0DE8FEB1418AD0910
+  Trace_SHA256: 33F9DBE2C04CAF45D24907B6349435F1C75361FFCC90DD2EA11C3B6CAC539590
+  Mode: PARAMETRIC_FALLBACK (Deterministic geometry & kinematics)
+Scenario: MarketDense
+  Description: Dense commercial street with pedestrian crowd and stationary fruit carts
+  XODR_SHA256: E4519A3F1EFB06720CDD72A73645E3FC16158E0FB8548804F3987F84618109B9
+  Trace_SHA256: 3B8E27735B90D9E93DCDF3080EF9263D7DDEFDF315534B190505E12E8543673B
+  Mode: PARAMETRIC_FALLBACK (Deterministic geometry & kinematics)
+Scenario: CattleCrossing
+  Description: Rural unpaved sector with sudden cattle herd migration requiring safe stop
+  XODR_SHA256: C729E68AA7D01627FBAC4694A858A2A26E64D1E3B9C524E678B7D88343ED31E8
+  Trace_SHA256: 7B109688FE3D13E6698883E5C414D776D83F07B81B2F22C997F427F1274811AF
+  Mode: PARAMETRIC_FALLBACK (Deterministic geometry & kinematics)

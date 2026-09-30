@@ -1,0 +1,1 @@
+{"total_trials":1000,"scenario_completion_rate":0.906,"mean_replanning_latency_ms":3.58,"p99_replanning_latency_ms":76.16,"mean_longitudinal_jerk_mps3":0.76,"p99_longitudinal_jerk_mps3":8,"minimum_obstacle_clearance_m":-0.46,"zero_toolbox_verified":true,"status":"PASS"}

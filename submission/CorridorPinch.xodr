@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenDRIVE>
+  <header revMajor="1" revMinor="6" name="CorridorPinch" version="1.00" date="2026-09-30T15:20:16"/>
+  <road name="CorridorPinch" length="100.0000" id="1" junction="-1">
+    <link/>
+    <planView>
+      <geometry s="0.0" x="0.0" y="0.0" hdg="0.0" length="100.0000">
+        <line/>
+      </geometry>
+    </planView>
+    <elevationProfile><elevation s="0.0" a="0.0" b="0.0" c="0.0" d="0.0"/></elevationProfile>
+    <lateralProfile><superelevation s="0.0" a="0.0" b="0.0" c="0.0" d="0.0"/></lateralProfile>
+    <lanes>
+      <laneOffset s="0.0" a="0.0" b="0.0" c="0.0" d="0.0"/>
+      <laneSection s="0.0000">
+        <left>
+          <lane id="1" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.3000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </left>
+        <center>
+          <lane id="0" type="none" level="false"/>
+        </center>
+        <right>
+          <lane id="-1" type="driving" level="false">
+            <width sOffset="0.0" a="3.7000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+          <lane id="-2" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.3000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </right>
+      </laneSection>
+      <laneSection s="43.0000">
+        <left>
+          <lane id="1" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.3000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </left>
+        <center>
+          <lane id="0" type="none" level="false"/>
+        </center>
+        <right>
+          <lane id="-1" type="driving" level="false">
+            <width sOffset="0.0" a="3.2000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+          <lane id="-2" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.3000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </right>
+      </laneSection>
+      <laneSection s="47.0000">
+        <left>
+          <lane id="1" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.3000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </left>
+        <center>
+          <lane id="0" type="none" level="false"/>
+        </center>
+        <right>
+          <lane id="-1" type="driving" level="false">
+            <width sOffset="0.0" a="3.7000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+          <lane id="-2" type="shoulder" level="false">
+            <width sOffset="0.0" a="0.3000" b="0.0" c="0.0" d="0.0"/>
+          </lane>
+        </right>
+      </laneSection>
+    </lanes>
+  </road>
+</OpenDRIVE>
