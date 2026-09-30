@@ -1,0 +1,7 @@
+ProducedBy: toshr@ShriSkaBanSom (TheShriHari <toshrihari@gmail.com>)
+ProducedAt: 2026-09-30T15:28:00+05:30
+Tool: RoadRunner R2026a Update 4 (GUI binary present; MATLAB API connector offline)
+Command: MATLAB build_corridor_pinch_scenario.m -> generate_opendrive_pinch() -> CorridorPinch.xodr
+SHA256: 2305016F3988C0BFEE27A4FBE7D313BA24F932105C41AEA9A03565BDA13DD696 (CorridorPinch.rrscene, 6094 bytes, template)
+SHA256_XODR: 10DD51391CFEE2CBE63287FE0BEC03FF4135346E97F3F80DFB7A36C952E9AD69 (CorridorPinch.xodr, 2221 bytes, canonical)
+Notes: Template rrscene committed as placeholder. Canonical reproducible road geometry is in CorridorPinch.xodr. Parametric kinematic fallback used for simulation verification.
