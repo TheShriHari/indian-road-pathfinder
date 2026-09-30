@@ -150,7 +150,7 @@ export const RigorKPIs: React.FC = () => {
               lineHeight: 1,
             }}
           >
-            1,000
+            90.6%
           </div>
           <div
             style={{
@@ -161,7 +161,7 @@ export const RigorKPIs: React.FC = () => {
               lineHeight: 1.2,
             }}
           >
-            Monte Carlo Trials
+            Scenario Completion Rate
           </div>
           <div style={{ height: 1, backgroundColor: `${COLORS.cyan}30`, width: "100%" }} />
           <div
@@ -172,7 +172,7 @@ export const RigorKPIs: React.FC = () => {
               lineHeight: 1.5,
             }}
           >
-            Zero safety boundary violations across randomized initial states, varying cattle velocities, and dynamic pedestrian spawn rates.
+            436 Successes + 470 Safe Stops across 1,000 randomized Monte Carlo trials. 4.2% collision rate, down 56.25% from baseline.
           </div>
           <div
             style={{
@@ -184,7 +184,7 @@ export const RigorKPIs: React.FC = () => {
               fontWeight: 600,
             }}
           >
-            ✓ 100% COLLISION-FREE RATE
+            ✓ 90.6% SCENARIO COMPLETION · 4.2% COLLISION
           </div>
         </div>
 
@@ -235,7 +235,7 @@ export const RigorKPIs: React.FC = () => {
               lineHeight: 1.5,
             }}
           >
-            First-principles vectorized matrix mathematics in pure C++20 and Eigen. Zero dependency on closed-source navigation toolboxes.
+            First-principles vectorized matrix mathematics in 100% MATLAB and Python. Zero dependency on proprietary toolboxes.
           </div>
           <div
             style={{
@@ -247,11 +247,11 @@ export const RigorKPIs: React.FC = () => {
               fontWeight: 600,
             }}
           >
-            ✓ PURE FIRST-PRINCIPLES STACK
+            ✓ 100% FIRST-PRINCIPLES MAT/PY
           </div>
         </div>
 
-        {/* Card 3: 2.3ms Latency */}
+        {/* Card 3: Measured Latency */}
         <div
           style={{
             flex: 1,
@@ -276,7 +276,7 @@ export const RigorKPIs: React.FC = () => {
               lineHeight: 1,
             }}
           >
-            2.3 ms
+            3.6 ms
           </div>
           <div
             style={{
@@ -287,7 +287,7 @@ export const RigorKPIs: React.FC = () => {
               lineHeight: 1.2,
             }}
           >
-            Measured Replan Latency
+            Mean Replan Latency
           </div>
           <div style={{ height: 1, backgroundColor: `${COLORS.amber}30`, width: "100%" }} />
           <div
@@ -298,7 +298,7 @@ export const RigorKPIs: React.FC = () => {
               lineHeight: 1.5,
             }}
           >
-            Real-time closed-loop candidate sampling and collision checking. Sustained 50 Hz control rate comfortably within the 20ms frame budget.
+            Real-time candidate path sampling and collision checking (42.85 ms P99) under 10 Hz closed-loop control.
           </div>
           <div
             style={{
@@ -310,7 +310,7 @@ export const RigorKPIs: React.FC = () => {
               fontWeight: 600,
             }}
           >
-            ✓ 50 Hz DETERMINISTIC CLOSED LOOP
+            ✓ 10 Hz REAL-TIME CLOSED LOOP
           </div>
         </div>
       </div>

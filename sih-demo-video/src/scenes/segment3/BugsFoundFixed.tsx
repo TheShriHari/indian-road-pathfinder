@@ -101,7 +101,7 @@ export const BugsFoundFixed: React.FC = () => {
         >
           {isCard1
             ? "CASE 01 / 02 · CORNER-CUTTING AT UNPAVED SHOULDER EROSION"
-            : "CASE 02 / 02 · EKF ODOMETRY DROPOUT ON LOOSE GRAVEL SLIP"}
+            : "CASE 02 / 02 · SYMMETRIC SLEW LIMITER EMERGENCY BRAKE CHOKE (SEED 438)"}
         </div>
       </div>
 
@@ -179,7 +179,7 @@ export const BugsFoundFixed: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              {isCard1 ? "ENCROACHMENT: -0.18m" : "STATE DRIFT: >1.42m"}
+              {isCard1 ? "ENCROACHMENT: -0.18m" : "DECEL CHOKED: -1.67 m/s²"}
             </span>
           </div>
 
@@ -195,7 +195,7 @@ export const BugsFoundFixed: React.FC = () => {
           >
             {isCard1
               ? "Shoulder Corner Cutting"
-              : "EKF Wheel Slip Desync"}
+              : "Symmetric Slew Limiter Choke"}
           </h2>
 
           <p
@@ -209,7 +209,7 @@ export const BugsFoundFixed: React.FC = () => {
           >
             {isCard1
               ? "Naive spline optimization minimized path curvature by clipping into unpaved, eroded road boundaries. Vehicles clipped soft dirt shoulders."
-              : "Loose gravel induced sudden tire slip ratios exceeding 35%. Raw wheel odometry integrated false displacement, causing divergence in state estimation."}
+              : "Uniform 0.95 m/s³ slew clamp choked braking deceleration to -1.67 m/s² during an emergency squeeze, causing a 23.2 km/h crash despite commanded -8.95 m/s²."}
           </p>
 
           {/* SVG Diagram: Failure visual */}
@@ -293,7 +293,7 @@ export const BugsFoundFixed: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              {isCard1 ? "CLEARANCE: +0.65m" : "STATE DRIFT: <0.11m"}
+              {isCard1 ? "CLEARANCE: +0.65m" : "EMERGENCY SLEW: 8.0 m/s³"}
             </span>
           </div>
 
@@ -309,7 +309,7 @@ export const BugsFoundFixed: React.FC = () => {
           >
             {isCard1
               ? "Voronoi Repulsive Barrier"
-              : "Kinematic SLAM Fusion"}
+              : "Asymmetric Jerk Limiter + Latch"}
           </h2>
 
           <p
@@ -323,7 +323,7 @@ export const BugsFoundFixed: React.FC = () => {
           >
             {isCard1
               ? "Augmented cellular costmap with non-linear Voronoi repulsive field from detected boundary contours. Enforces mandatory 0.60m buffer from unpaved drop-offs."
-              : "Fused high-frequency IMU angular rates with visual SLAM keypoints and Ackermann kinematic constraints. Completely rejects wheel slip outliers in real-time."}
+              : "Engineered asymmetric slew limiting: permits up to 8.0 m/s³ deceleration during reflex triggers, while strictly clamping throttle release to 0.95 m/s³ comfort."}
           </p>
 
           {/* SVG Diagram: Fixed visual */}

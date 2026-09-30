@@ -37,7 +37,7 @@ function [control, e_y, e_theta, target_pt] = pure_pursuit_controller(state, pat
 %   e_theta   : heading error (radians)
 %   target_pt : [x, y] lookahead target point coordinates
 
-persistent p_last_steer p_last_accel;
+persistent p_last_steer p_last_accel p_emergency_latch p_latch_timer;
 
 if nargin < 4 || isempty(params), params = struct(); end
 
@@ -45,6 +45,8 @@ if nargin < 4 || isempty(params), params = struct(); end
 if isfield(params, 'reset') && params.reset
     p_last_steer = [];
     p_last_accel = [];
+    p_emergency_latch = false;
+    p_latch_timer = 0.0;
     if isempty(state)
         control = [0.0; 0.0];
         e_y = 0.0;
@@ -174,15 +176,53 @@ clamped_steer = min(max(raw_steer, -max_steer), max_steer);
 max_delta_steer = slew_rate * dt;
 delta_cmd = min(max(clamped_steer, last_steer - max_delta_steer), last_steer + max_delta_steer);
 
-% ── 5. Longitudinal Acceleration & Jerk Limiting ───────────────────────────
+% ── 5. Longitudinal Acceleration & Asymmetric Jerk Limiting ───────────────
 raw_accel = Kp_v * (v_ref - v);
 
 % Clamp raw acceleration to vehicle physical envelope [-3.5, +2.5] m/s^2
 raw_accel = min(max(raw_accel, -3.5), 2.5);
 
-% Longitudinal jerk limit: comfort for acceleration and braking (|da/dt| <= jerk_max)
-max_delta_a = jerk_max * dt;
-a_cmd = min(max(raw_accel, last_accel - max_delta_a), last_accel + max_delta_a);
+% Check emergency condition: explicit parameter or severe negative decel demand
+is_emergency = false;
+if isfield(params, 'is_emergency') && params.is_emergency
+    is_emergency = true;
+elseif isfield(params, 'emergency') && params.emergency
+    is_emergency = true;
+elseif raw_accel < -2.0 || v_ref <= 0.05
+    is_emergency = true;
+end
+
+% Anti-chatter emergency brake latch
+if isempty(p_emergency_latch), p_emergency_latch = false; end
+if isempty(p_latch_timer),    p_latch_timer = 0.0; end
+
+if is_emergency
+    p_emergency_latch = true;
+    p_latch_timer = 0.0;
+elseif p_emergency_latch
+    p_latch_timer = p_latch_timer + dt;
+    if p_latch_timer >= 0.50 || v <= 0.2
+        p_emergency_latch = false;
+        p_latch_timer = 0.0;
+    end
+end
+
+delta_a_demanded = raw_accel - last_accel;
+if delta_a_demanded < 0
+    % Braking harder: allow emergency 8.0 m/s^3 jerk during reflex/latch, 0.95 m/s^3 nominal
+    if is_emergency || p_emergency_latch
+        jerk_limit_neg = 8.0; % Emergency braking allowance
+    else
+        jerk_limit_neg = 0.95; % Nominal comfort decel limit
+    end
+    max_delta_neg = jerk_limit_neg * dt;
+    a_cmd = max(raw_accel, last_accel - max_delta_neg);
+else
+    % Releasing brakes or accelerating: strictly enforce 0.95 m/s^3 comfort
+    jerk_limit_pos = 0.95;
+    max_delta_pos = jerk_limit_pos * dt;
+    a_cmd = min(raw_accel, last_accel + max_delta_pos);
+end
 
 % Update persistent state
 p_last_steer = delta_cmd;
