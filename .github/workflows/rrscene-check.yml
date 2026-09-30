@@ -1,0 +1,9 @@
+name: rrscene-check
+on: [push, pull_request]
+jobs:
+  verify-rrscene:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run scene check
+        run: powershell -ExecutionPolicy Bypass -File .\check-scene.ps1

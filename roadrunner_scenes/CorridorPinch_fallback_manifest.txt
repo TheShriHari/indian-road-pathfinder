@@ -1,0 +1,4 @@
+fallback_used=true
+reason=RoadRunner MATLAB connector not available in this MATLAB environment.
+trace_csv=C:\Users\toshr\OneDrive\Desktop\Hari@Work\Shri Hari - Official Documents\IIT KGP\SIH\indian-road-pathfinder\roadrunner_scenes\CorridorPinch_parametric_trace.csv
+timestamp=2026-09-30 15:33:12
