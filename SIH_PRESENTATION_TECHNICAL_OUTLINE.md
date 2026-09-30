@@ -481,7 +481,9 @@ Data extracted from systematic batch validation suites across randomized Indian 
 ```
 
 ### 5.3 Projected Hardware Deployment & Compute Topology
-To transition this codebase from Webots 3D / MATLAB co-simulation to an on-vehicle automotive prototype:
+To transition this codebase from MATLAB simulation to an on-vehicle automotive prototype:
+
+> **Perception Scope Clarification:** The evaluated 1,000-trial benchmark relies on `simulate_sensor_detection.m` (synthetic range/FoV/dropout/Gaussian noise modeling a 200ms camera+detector latency) and IDD Lite semantic segmentation validation (`idd_lite_smoke_test.py`). In a physical vehicle deployment, simulated sensor detections would be replaced by an onboard camera/LiDAR perception stack as outlined below:
 
 ```
 [ VEHICLE SENSOR SUITE ]
@@ -491,11 +493,11 @@ To transition this codebase from Webots 3D / MATLAB co-simulation to an on-vehic
                │
                ▼  GMSL2 / Automotive Ethernet
 [ EDGE COMPUTE PLATFORM: NVIDIA DRIVE Orin / Jetson AGX Orin (64GB) ]
- ├─ TensorRT Inference Engine: YOLOv8x / BEVDet running on Ampere GPU (~12 ms)
+ ├─ Projected Perception Layer: Off-the-shelf detector (e.g., TensorRT YOLOv8 / BEVDet, ~12 ms)
  ├─ ROS 2 Humble Middleware (DDS communication bus, zero-copy pointer transfers)
- ├─ C++ Compiled Core (Auto-coded via MATLAB Coder / C++20 port):
+ ├─ Evaluated Core Pipeline (Ported / auto-coded via MATLAB Coder):
  │    ├── Dynamic Obstacle Predictor EKF Node           (100 Hz, < 1 ms)
- │    ├── Rolling Costmap Builder (OpenVDB / GridMap)   (50 Hz, < 5 ms)
+ │    ├── Rolling Costmap Builder (GridMap)             (50 Hz, < 5 ms)
  │    ├── Universal Bottleneck Decider Node             (50 Hz, < 2 ms)
  │    ├── Kinematic Hybrid A* Planner Node              (20 Hz, < 25 ms)
  │    └── Pure Pursuit & Longitudinal Control Node      (100 Hz, < 1 ms)

@@ -120,6 +120,12 @@ IDD Lite (idd20k_lite) uses a **condensed 8-class label taxonomy** — not the f
 
 **Honest claim:** "Real IDD Lite imagery confirms our ODD's high pedestrian/rider density (45% of labeled pixels). Vehicle-specific classes (autorickshaw, cattle) require the Multimodal Primary dataset — targeted for post-submission integration."
 
+### 🔍 Perception Architecture Truthfulness:
+- **Evaluated System:** All verified quantitative benchmark results (90.6% completion, 3.58ms latency, 0.76 m/s³ jerk) are produced by the MATLAB algorithmic pipeline using `simulate_sensor_detection.m` (simulated sensor noise, 140° FoV gate, 35m range gate, 5-10% dropout, 2-tick 200ms transport delay, and 3% misclassification).
+- **No In-Loop Neural Network:** No custom CNN was trained, no loss function (Cross-Entropy, etc.) was minimized, and no IoU was evaluated in the 1,000-trial benchmark run.
+- **Legacy CARLA Branch:** Off-the-shelf YOLOv8n was explored strictly in an auxiliary script (`carla_bridge.py`) for 3D camera experiments, but it is **not** in the loop of the verified Monte Carlo submission results.
+- **IDD Lite Role:** Real IDD Lite imagery was processed via `idd_lite_smoke_test.py` to analyze pixel ground-truth class frequencies and validate Indian ODD clutter characteristics.
+
 - `idd_mm_primary.zip` status: **NOT TOUCHED** (downloading in background, out of scope)
 
 ---
